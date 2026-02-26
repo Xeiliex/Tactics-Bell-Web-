@@ -414,3 +414,33 @@ GameUI.prototype.showDefeatScreen = function (onRetry, onMenu) {
   document.getElementById('btn-retry').onclick       = onRetry || null;
   document.getElementById('btn-title-defeat').onclick = onMenu  || null;
 };
+
+// ─── Loading overlay ─────────────────────────────────────────────────────────
+
+GameUI.prototype.showLoadingScreen = function (text) {
+  var el = document.getElementById('screen-loading');
+  if (!el) return;
+  var msg = el.querySelector('.loading-message');
+  if (msg && text) msg.textContent = text;
+  el.classList.remove('hidden');
+  el.style.opacity = 1;
+};
+
+GameUI.prototype.hideLoadingScreen = function (callback) {
+  var el = document.getElementById('screen-loading');
+  if (!el || el.classList.contains('hidden')) {
+    if (callback) callback();
+    return;
+  }
+  anime({
+    targets: el,
+    opacity: [1, 0],
+    duration: 350,
+    easing: 'linear',
+    complete: function () {
+      el.classList.add('hidden');
+      el.style.opacity = '';
+      if (callback) callback();
+    }
+  });
+};

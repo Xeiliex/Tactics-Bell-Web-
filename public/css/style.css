@@ -470,3 +470,37 @@ html, body {
 }
 .lvl-stat { font-size: 14px; text-align: left; }
 .lvl-stat .stat-up { color: var(--green); font-weight: 700; }
+
+/* ────────────────────────────────────────
+   LOADING OVERLAY
+──────────────────────────────────────── */
+.loading-overlay {
+  position: fixed; inset: 0;
+  background: rgba(10, 14, 39, 0.93);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 500;
+}
+.loading-overlay.hidden { display: none; }
+
+.loading-container {
+  display: flex; flex-direction: column; align-items: center; gap: 24px;
+}
+
+.loading-spinner {
+  width: 56px; height: 56px;
+  border: 4px solid rgba(255, 215, 0, 0.2);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: loadSpin 0.8s linear infinite;
+}
+
+@keyframes loadSpin { to { transform: rotate(360deg); } }
+
+.loading-message {
+  font-family: var(--font-title);
+  font-size: 22px;
+  letter-spacing: 3px;
+  color: var(--gold);
+}
+
+#btn-continue-game.hidden { display: none; }
