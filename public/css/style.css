@@ -470,3 +470,21 @@ html, body {
 }
 .lvl-stat { font-size: 14px; text-align: left; }
 .lvl-stat .stat-up { color: var(--green); font-weight: 700; }
+
+/* ────────────────────────────────────────
+   DEBUG FRAME COUNTER
+──────────────────────────────────────── */
+#debug-fps {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #0f0;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 50;
+  user-select: none;
+}

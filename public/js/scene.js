@@ -31,6 +31,9 @@ function GameScene() {
   this._unitNodes     = {};   // unitId → { body, head, glow }
   this._hlMeshes      = [];   // highlight overlays
   this._gridSize      = GRID_SIZE;
+  this._frameCount    = 0;    // debug frame counter
+  this._fpsEl         = null; // #debug-fps-rate DOM element
+  this._frameEl       = null; // #debug-fps-frame DOM element
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────
@@ -75,7 +78,15 @@ GameScene.prototype.init = function (canvasId) {
 
   // Render loop
   var self = this;
-  this.engine.runRenderLoop(function () { self.scene.render(); });
+  this._frameCount = 0;
+  this._fpsEl      = document.getElementById('debug-fps-rate');
+  this._frameEl    = document.getElementById('debug-fps-frame');
+  this.engine.runRenderLoop(function () {
+    self.scene.render();
+    self._frameCount++;
+    if (self._fpsEl)   { self._fpsEl.textContent   = 'FPS: '   + self.engine.getFps().toFixed(1); }
+    if (self._frameEl) { self._frameEl.textContent = 'Frame: ' + self._frameCount; }
+  });
   window.addEventListener('resize', function () { self.engine.resize(); });
 };
 
@@ -482,4 +493,13 @@ GameScene.prototype.dispose = function () {
     this.engine = null;
     this.scene  = null;
   }
+  if (this._fpsEl) {
+    this._fpsEl.textContent = 'FPS: --';
+    this._fpsEl = null;
+  }
+  if (this._frameEl) {
+    this._frameEl.textContent = 'Frame: 0';
+    this._frameEl = null;
+  }
+  this._frameCount = 0;
 };
