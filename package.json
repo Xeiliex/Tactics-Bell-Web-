@@ -1,0 +1,16 @@
+{
+  "name": "tactics-bell-web",
+  "version": "1.0.0",
+  "description": "A light tactical battle game powered by Babylon.js, Oimo.js, and anime.js",
+  "main": "server.js",
+  "scripts": {
+    "start":      "bun server.js",
+    "dev":        "bun --watch server.js",
+    "start:node": "node server.js"
+  },
+  "engines": {
+    "bun":  ">=1.1.0",
+    "node": ">=18.0.0"
+  },
+  "license": "GPL-3.0"
+}

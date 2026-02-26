@@ -1,0 +1,11 @@
+# Bun project configuration — https://bun.sh/docs/runtime/bunfig
+
+[install]
+# Save exact versions in bun.lockb
+exact = false
+# Use the default registry
+registry = "https://registry.npmjs.org"
+
+[run]
+# Silence Bun's "bun run" prefix banner
+bun = true

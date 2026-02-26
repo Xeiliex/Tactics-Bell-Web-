@@ -1,0 +1,212 @@
+/* jshint esversion: 6 */
+'use strict';
+
+// ═══════════════════════════════════════
+//  CHARACTER — stat management, EXP & levelling
+// ═══════════════════════════════════════
+
+var _unitIdCounter = 0;
+
+/**
+ * Create a new character.
+ * @param {object} opts
+ *   - name, raceId, classId, level, isEnemy, isPlayer, isAlly
+ *   - overrideColor  (optional, {r,g,b} 0-1 for enemy models)
+ *   - emoji (optional)
+ */
+function Character(opts) {
+  this.id       = ++_unitIdCounter;
+  this.name     = opts.name      || 'Unit';
+  this.race     = opts.raceId    || 'human';
+  this.classId  = opts.classId   || 'warrior';
+  this.level    = opts.level     || 1;
+  this.isEnemy  = !!opts.isEnemy;
+  this.isPlayer = !!opts.isPlayer;
+  this.isAlly   = !!opts.isAlly;
+  this.emoji    = opts.emoji     || CLASSES[this.classId].emoji;
+  this.overrideMeshColor = opts.overrideMeshColor || null;
+
+  // Grid position
+  this.gridRow = 0;
+  this.gridCol = 0;
+
+  // EXP
+  this.exp          = opts.exp || 0;
+  this.expToNext    = expToNextLevel(this.level);
+
+  // Compute base stats
+  this._buildStats();
+
+  // Current HP = max HP
+  this.hp = this.maxHp;
+
+  // Turn state (reset each turn)
+  this.hasMoved    = false;
+  this.hasActed    = false;
+
+  // Babylon mesh reference
+  this.meshes = null;
+}
+
+Character.prototype._buildStats = function () {
+  var raceData  = RACES[this.race];
+  var classData = CLASSES[this.classId];
+  var lvl       = this.level - 1; // growth iterations (0 at level 1)
+
+  this.maxHp  = classData.baseStats.hp  + raceData.statBonuses.hp  + classData.statGrowth.hp  * lvl;
+  this.atk    = classData.baseStats.atk + raceData.statBonuses.atk + classData.statGrowth.atk * lvl;
+  this.def    = classData.baseStats.def + raceData.statBonuses.def + classData.statGrowth.def * lvl;
+  this.mag    = classData.baseStats.mag + raceData.statBonuses.mag + classData.statGrowth.mag * lvl;
+  this.spd    = classData.baseStats.spd + raceData.statBonuses.spd + classData.statGrowth.spd * lvl;
+  this.res    = classData.baseStats.res + raceData.statBonuses.res + classData.statGrowth.res * lvl;
+
+  this.moveRange   = classData.moveRange;
+  this.attackRange = classData.attackRange;
+  this.skills      = classData.skills;
+
+  // Clamp to 1 minimum
+  this.maxHp = Math.max(1, this.maxHp);
+  this.atk   = Math.max(1, this.atk);
+  this.def   = Math.max(0, this.def);
+  this.mag   = Math.max(0, this.mag);
+  this.spd   = Math.max(1, this.spd);
+  this.res   = Math.max(0, this.res);
+};
+
+/** Restore HP to max (used for new stage). */
+Character.prototype.restoreHp = function () {
+  this.hp = this.maxHp;
+};
+
+/** Returns true if the unit is alive. */
+Character.prototype.isAlive = function () {
+  return this.hp > 0;
+};
+
+/** Returns HP ratio 0-1. */
+Character.prototype.hpRatio = function () {
+  return Math.max(0, Math.min(1, this.hp / this.maxHp));
+};
+
+/** Take damage. Returns actual damage dealt. */
+Character.prototype.takeDamage = function (amount) {
+  var dmg = Math.max(1, Math.round(amount));
+  this.hp = Math.max(0, this.hp - dmg);
+  return dmg;
+};
+
+/** Heal. Returns amount healed. */
+Character.prototype.healHp = function (amount) {
+  var heal = Math.max(1, Math.round(amount));
+  var before = this.hp;
+  this.hp = Math.min(this.maxHp, this.hp + heal);
+  return this.hp - before;
+};
+
+/** Reset per-turn flags. */
+Character.prototype.startTurn = function () {
+  this.hasMoved  = false;
+  this.hasActed  = false;
+};
+
+/**
+ * Grant EXP. Returns the stat-gains object if the unit levelled up, or null.
+ */
+Character.prototype.gainExp = function (amount) {
+  var raceData = RACES[this.race];
+  this.exp += Math.round(amount * raceData.expMultiplier);
+
+  if (this.exp >= this.expToNext) {
+    return this.levelUp();   // returns { hp, atk, def, mag, spd, res } gains
+  }
+  return null;
+};
+
+/**
+ * Level up! Recalculate stats and return the stat gains.
+ */
+Character.prototype.levelUp = function () {
+  this.exp -= this.expToNext;
+  this.level++;
+  this.expToNext = expToNextLevel(this.level);
+
+  var oldMaxHp = this.maxHp;
+  var oldAtk   = this.atk;
+  var oldDef   = this.def;
+  var oldMag   = this.mag;
+  var oldSpd   = this.spd;
+  var oldRes   = this.res;
+
+  this._buildStats();
+
+  var gains = {
+    hp:  this.maxHp - oldMaxHp,
+    atk: this.atk   - oldAtk,
+    def: this.def   - oldDef,
+    mag: this.mag   - oldMag,
+    spd: this.spd   - oldSpd,
+    res: this.res   - oldRes
+  };
+
+  // HP healed by the gain amount
+  this.hp = Math.min(this.maxHp, this.hp + gains.hp);
+
+  return gains;
+};
+
+/** EXP rewarded for defeating this unit. */
+Character.prototype.expReward = function () {
+  return Math.round(20 * this.level);
+};
+
+/** Mesh body colour (r,g,b 0-1). */
+Character.prototype.meshColor = function () {
+  if (this.overrideMeshColor) return this.overrideMeshColor;
+  var raceData = RACES[this.race];
+  return { r: raceData.mr, g: raceData.mg, b: raceData.mb };
+};
+
+// ─── Factory helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Create a player character.
+ */
+function createPlayerCharacter(raceId, classId) {
+  return new Character({
+    name:     'Hero',
+    raceId:   raceId,
+    classId:  classId,
+    level:    1,
+    isPlayer: true
+  });
+}
+
+/**
+ * Create an AI ally.
+ */
+function createAlly(preset, level) {
+  return new Character({
+    name:    preset.name,
+    raceId:  preset.race,
+    classId: preset.classId,
+    emoji:   preset.emoji,
+    level:   level,
+    isAlly:  true
+  });
+}
+
+/**
+ * Create an enemy scaled to the given stage number.
+ */
+function createEnemy(preset, stage) {
+  var level = Math.max(1, stage + Math.floor(Math.random() * 2));
+  return new Character({
+    name:    preset.name,
+    raceId:  preset.race,
+    classId: preset.classId,
+    emoji:   preset.emoji,
+    level:   level,
+    isEnemy: true,
+    overrideMeshColor: { r: preset.mr, g: preset.mg, b: preset.mb }
+  });
+}
