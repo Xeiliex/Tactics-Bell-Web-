@@ -110,17 +110,16 @@ Character.prototype.startTurn = function () {
 };
 
 /**
- * Grant EXP. Returns true if levelled up.
+ * Grant EXP. Returns the stat-gains object if the unit levelled up, or null.
  */
 Character.prototype.gainExp = function (amount) {
   var raceData = RACES[this.race];
   this.exp += Math.round(amount * raceData.expMultiplier);
 
   if (this.exp >= this.expToNext) {
-    this.levelUp();
-    return true;
+    return this.levelUp();   // returns { hp, atk, def, mag, spd, res } gains
   }
-  return false;
+  return null;
 };
 
 /**

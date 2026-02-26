@@ -1,7 +1,7 @@
-FROM node:20-alpine
+FROM oven/bun:1-alpine
 WORKDIR /app
-COPY package*.json ./
-RUN npm install --omit=dev
+COPY package.json ./
+RUN bun install --frozen-lockfile --production
 COPY . .
 EXPOSE 8080
-CMD ["node", "server.js"]
+CMD ["bun", "server.js"]

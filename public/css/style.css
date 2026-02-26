@@ -248,7 +248,8 @@ html, body {
 /* ────────────────────────────────────────
    BATTLE SCREEN
 ──────────────────────────────────────── */
-#screen-battle { display: block; background: #000; }
+/* display is controlled by .screen.hidden / .screen.active — do not override it here */
+#screen-battle { background: #000; }
 
 #renderCanvas {
   position: absolute; inset: 0;
