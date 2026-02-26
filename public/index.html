@@ -54,6 +54,7 @@
         <div id="stage-display">Stage <span id="stage-number">1</span></div>
         <div id="phase-display">Your Turn</div>
         <div id="turn-counter">Turn <span id="turn-number">1</span></div>
+        <button id="btn-fullscreen" class="btn-icon" title="Enter Fullscreen">&#x26F6;</button>
       </div>
 
       <!-- Turn order strip -->
@@ -97,6 +98,9 @@
 
       <!-- Debug frame counter -->
       <div id="debug-fps"><span id="debug-fps-rate">FPS: --</span><br><span id="debug-fps-frame">Frame: 0</span></div>
+
+      <!-- Hardware tier badge -->
+      <div id="hw-tier-badge"></div>
 
       <!-- Party panel -->
       <div id="party-panel"></div>
@@ -150,6 +154,7 @@
   <!-- anime.js 3.2.1 -->
   <script src="vendor/anime.min.js"></script>
   <!-- Game modules (order matters) -->
+  <script src="js/hardware.js"></script>
   <script src="js/data.js"></script>
   <script src="js/terrain.js"></script>
   <script src="js/grid.js"></script>
