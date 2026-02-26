@@ -18,6 +18,8 @@ const MIME = {
   '.woff2':'font/woff2',
   '.woff': 'font/woff',
   '.ttf':  'font/ttf',
+  '.obj':  'model/obj',
+  '.mtl':  'model/mtl',
 };
 
 function mimeFor(filePath) {

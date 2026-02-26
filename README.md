@@ -73,6 +73,8 @@ docker run -p 8080:8080 tactics-bell
 ## Features
 
 - Procedurally generated battle stages (terrain clusters: grass, forest, water, mountain, lava, crystal)
+- **Optional 3D terrain models** — drop OBJ tiles from the Modular Terrain Collections pack into
+  `public/models/terrain/` and they replace the procedural boxes automatically (see below)
 - 4 playable **races** — Human, Elf, Dwarf, Beastkin — each with unique stat bonuses
 - 4 **classes** — Warrior, Mage, Archer, Healer — with 2 skills each
 - Turn-based tactical combat on a 10 × 10 grid
@@ -81,6 +83,32 @@ docker run -p 8080:8080 tactics-bell
 - Enemy AI that moves toward the nearest ally and attacks
 - Oimo.js ragdoll physics on unit defeat
 - anime.js animated UI: damage numbers, HP bars, level-up, screen transitions
+
+## Terrain Models (optional)
+
+The game ships with procedural coloured-box terrain.  You can upgrade to the
+**Modular Terrain Collections** 3D model pack (CC-BY 3.0, free):
+
+1. Download `modular_terrain_collections.zip` from
+   <https://opengameart.org/sites/default/files/modular_terrain_collections.zip>
+2. Extract the archive and copy one representative OBJ tile for each terrain
+   type into `public/models/terrain/` using the filenames below:
+
+   | Terrain  | Filename                 | Suggested source tile             |
+   |----------|--------------------------|-----------------------------------|
+   | Grass    | `terrain-grass.obj`      | `Hilly/` — any flat grassy tile   |
+   | Forest   | `terrain-forest.obj`     | `Hilly/` — a tile with trees      |
+   | Water    | `terrain-water.obj`      | `Beach/` — a water/shoreline tile |
+   | Mountain | `terrain-mountain.obj`   | `Cliff/` — a rocky cliff tile     |
+   | Road     | `terrain-road.obj`       | `Hilly/` — a dirt path tile       |
+
+3. Also copy the matching `.mtl` file for each OBJ into the same directory.
+
+The OBJ file loader (`public/vendor/babylon.objFileLoader.min.js`) is already
+vendored.  When the server starts, models load asynchronously — if a file is
+missing the tile keeps its procedural appearance and the game continues to work.
+
+See `public/models/terrain/README.md` for more details and scale tuning notes.
 
 ## Development (hot-reload)
 
