@@ -128,8 +128,8 @@ Grid.prototype.tilesInRange = function (row, col, range) {
 // ─── PROCEDURAL STAGE GENERATION ────────────────────────────────────────────
 
 /**
- * Generate a random battle stage.
- * @param {number} stage  – stage number (affects terrain variety)
+ * Generate a random battle stage from a randomly chosen known-good map config.
+ * @param {number} stage  – stage number (used to filter eligible configs)
  * @returns {Grid}
  */
 function generateStage(stage) {
@@ -145,81 +145,58 @@ function generateStage(stage) {
     }
   }
 
-  // 2. Terrain palette for this stage
-  var palette = selectPalette(stage);
+  // 2. Pick a map config appropriate for this stage
+  var config = selectMapConfig(stage);
 
-  // 3. Paint random terrain clusters
-  palette.forEach(function (entry) {
-    var seeds  = entry.seeds;
-    var spread = entry.spread;
-    var type   = entry.type;
-    for (var s = 0; s < seeds; s++) {
+  // 3. Paint terrain clusters from the config's palette
+  config.palette.forEach(function (entry) {
+    for (var s = 0; s < entry.seeds; s++) {
       var sr = randInt(1, size - 2);
       var sc = randInt(1, size - 2);
-      paintCluster(grid, sr, sc, type, spread);
+      paintCluster(grid, sr, sc, entry.type, entry.spread);
     }
   });
 
-  // 4. Guarantee spawn zones (top-left and bottom-right corners)
-  var spawnZone = [
-    [0,0],[0,1],[1,0],[1,1],[2,0],[0,2]
-  ];
-  var enemyZone = [
-    [size-1,size-1],[size-1,size-2],[size-2,size-1],
-    [size-2,size-2],[size-3,size-1],[size-1,size-3]
-  ];
+  // 4. Add road tiles connecting the spawn zones
+  var p0 = config.playerSpawns[0];
+  var e0 = config.enemySpawns[0];
+  addRoad(grid, p0.row, p0.col, e0.row, e0.col);
 
-  spawnZone.forEach(function (rc) {
-    grid.tiles[rc[0]][rc[1]].terrain = TERRAIN.GRASS;
-  });
-  enemyZone.forEach(function (rc) {
-    grid.tiles[rc[0]][rc[1]].terrain = TERRAIN.GRASS;
-  });
+  // 5. Clear spawn zones so they are always accessible (must run after addRoad)
+  clearSpawnArea(grid, config.playerSpawns);
+  clearSpawnArea(grid, config.enemySpawns);
 
-  // 5. Add some road tiles between spawn zones (aesthetic)
-  addRoad(grid, 1, 1, size - 2, size - 2);
-
-  // 6. Assign spawn positions
-  grid.playerSpawns = [
-    { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 1 }
-  ];
-  grid.enemySpawns = [
-    { row: size-1, col: size-1 },
-    { row: size-2, col: size-1 },
-    { row: size-1, col: size-2 },
-    { row: size-3, col: size-1 },
-    { row: size-1, col: size-3 }
-  ];
+  // 6. Assign spawn positions from the config
+  grid.playerSpawns = config.playerSpawns;
+  grid.enemySpawns  = config.enemySpawns;
 
   return grid;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function selectPalette(stage) {
-  // Stage 1 = gentle terrain; higher stages = more obstacles
-  var palettes = [
-    // stage 1
-    [
-      { type: TERRAIN.FOREST, seeds: 3, spread: 0.45 },
-      { type: TERRAIN.WATER,  seeds: 1, spread: 0.30 }
-    ],
-    // stage 2
-    [
-      { type: TERRAIN.FOREST,  seeds: 3, spread: 0.45 },
-      { type: TERRAIN.WATER,   seeds: 2, spread: 0.35 },
-      { type: TERRAIN.CRYSTAL, seeds: 2, spread: 0.30 }
-    ],
-    // stage 3+
-    [
-      { type: TERRAIN.FOREST,   seeds: 3, spread: 0.40 },
-      { type: TERRAIN.WATER,    seeds: 2, spread: 0.35 },
-      { type: TERRAIN.MOUNTAIN, seeds: 2, spread: 0.30 },
-      { type: TERRAIN.LAVA,     seeds: 1, spread: 0.25 },
-      { type: TERRAIN.CRYSTAL,  seeds: 2, spread: 0.30 }
-    ]
-  ];
-  return palettes[Math.min(stage - 1, palettes.length - 1)];
+/**
+ * Return a random map config eligible for the given stage.
+ * Falls back to all configs if none match (should not happen with minStage: 1 entries).
+ */
+function selectMapConfig(stage) {
+  var eligible = MAP_CONFIGS.filter(function (c) { return c.minStage <= stage; });
+  if (!eligible.length) eligible = MAP_CONFIGS;
+  return eligible[Math.floor(Math.random() * eligible.length)];
+}
+
+/**
+ * Clear the tile at each spawn point and its cardinal neighbours to grass,
+ * ensuring units can always be placed and can move on the first turn.
+ * getTile() returns null for out-of-bounds coords, so the null guard on `t`
+ * is intentional; grid.neighbours() already filters invalid tiles internally.
+ */
+function clearSpawnArea(grid, spawns) {
+  spawns.forEach(function (sp) {
+    var t = grid.getTile(sp.row, sp.col);
+    if (t) t.terrain = TERRAIN.GRASS;
+    grid.neighbours(sp.row, sp.col).forEach(function (n) { n.terrain = TERRAIN.GRASS; });
+  });
 }
 
 /** Cellular-automata-style blob painter */
