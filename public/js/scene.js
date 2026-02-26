@@ -7,6 +7,21 @@
 
 var TILE_STEP = 1.15;   // world-space units per grid cell
 
+// ─── Terrain model configuration ─────────────────────────────────────────────
+// Maps game terrain names to OBJ filenames in public/models/terrain/.
+// Any terrain not listed here (Lava, Crystal) keeps its procedural appearance.
+var TERRAIN_MODEL_FILES = {
+  Grass:    'terrain-grass.obj',
+  Forest:   'terrain-forest.obj',
+  Water:    'terrain-water.obj',
+  Mountain: 'terrain-mountain.obj',
+  Road:     'terrain-road.obj'
+};
+
+// Uniform scale applied to every loaded terrain model.
+// Adjust if the models appear too large or too small relative to the grid cells.
+var TERRAIN_MODEL_SCALE = 1.0;
+
 function GameScene() {
   this.engine    = null;
   this.scene     = null;
@@ -124,6 +139,77 @@ GameScene.prototype.renderGrid = function (grid) {
   // Reposition camera
   this.camera.target = BABYLON.Vector3.Zero();
   this.camera.radius = grid.size * 1.35;
+
+  // Asynchronously replace fallback boxes with terrain models when files exist
+  this._upgradeToModels(grid);
+};
+
+// ─── Terrain model loading ────────────────────────────────────────────────────
+// Tries to load an OBJ from public/models/terrain/ for each configured terrain
+// type.  On success the procedural box for every matching tile is replaced with
+// a scaled clone of the loaded mesh.  On failure (file missing, loader absent)
+// the box is silently kept, so the game always remains playable.
+
+GameScene.prototype._upgradeToModels = function (grid) {
+  if (!BABYLON.SceneLoader || typeof BABYLON.SceneLoader.ImportMesh !== 'function') return;
+
+  var self = this;
+
+  Object.keys(TERRAIN_MODEL_FILES).forEach(function (terrainName) {
+    var fileName = TERRAIN_MODEL_FILES[terrainName];
+
+    BABYLON.SceneLoader.ImportMesh(
+      '',                      // import all meshes
+      'models/terrain/',       // root URL (relative to index.html)
+      fileName,                // OBJ filename
+      self.scene,
+      function (meshes) {
+        if (!meshes || !meshes.length || !self.scene) return;
+
+        // Merge sub-meshes (e.g. multiple material groups) into one so that
+        // the single resulting mesh can be cloned and positioned simply.
+        var template = meshes.length === 1
+          ? meshes[0]
+          : BABYLON.Mesh.MergeMeshes(meshes, true, true, undefined, false, true);
+        if (!template) return;
+
+        template.setEnabled(false);
+        template.isPickable = false;
+        template.scaling = new BABYLON.Vector3(
+          TERRAIN_MODEL_SCALE, TERRAIN_MODEL_SCALE, TERRAIN_MODEL_SCALE
+        );
+
+        // Replace each matching tile's fallback box with a clone of the model
+        for (var r = 0; r < grid.size; r++) {
+          for (var c = 0; c < grid.size; c++) {
+            var tile = grid.tiles[r][c];
+            if (tile.terrain.name !== terrainName) continue;
+
+            var pos  = self.gridToWorld(r, c);
+            var clone = template.clone('tilemodel_' + r + '_' + c);
+            clone.setEnabled(true);
+            clone.position   = new BABYLON.Vector3(pos.x, 0, pos.z);
+            clone.isPickable = true;
+            clone.metadata   = { row: r, col: c };
+
+            // Dispose old fallback box and update tracking arrays
+            if (tile.mesh) {
+              var idx = self._tileMeshes.indexOf(tile.mesh);
+              if (idx !== -1) self._tileMeshes.splice(idx, 1);
+              tile.mesh.dispose();
+            }
+            tile.mesh = clone;
+            self._tileMeshes.push(clone);
+          }
+        }
+
+        template.dispose();
+      },
+      null,           // progress callback — not needed
+      function () {   // error callback — model file absent, keep fallback boxes
+      }
+    );
+  });
 };
 
 // ─── Unit meshes ─────────────────────────────────────────────────────────────
