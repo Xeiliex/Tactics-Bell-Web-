@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tactics Bell ⚔️</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Fonts are vendored locally — no CDN required -->
+  <link rel="stylesheet" href="vendor/fonts.css" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -134,13 +135,12 @@
   </div>
 
   <!-- ══════════════ SCRIPTS ══════════════ -->
-  <!-- Babylon.js + Oimo.js physics plugin -->
-  <script src="https://cdn.babylonjs.com/babylon.js"></script>
-  <script src="https://cdn.babylonjs.com/oimo.js"></script>
-  <!-- anime.js animation library -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"
-          integrity="sha512-z4OUqw38qNLpn1libAN9BsoDx6nbNFio5lA6CuTp9NlK83b89hgyCVq+N5FdBcpttzHbMzC+GBVkKmF+2VoCJw=="
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- Vendored libraries — served locally so the game works fully offline. -->
+  <!-- Babylon.js (babylonjs@7.38.0) + Oimo.js physics plugin (oimo@1.0.9) -->
+  <script src="vendor/babylon.js"></script>
+  <script src="vendor/oimo.min.js"></script>
+  <!-- anime.js 3.2.1 -->
+  <script src="vendor/anime.min.js"></script>
   <!-- Game modules (order matters) -->
   <script src="js/data.js"></script>
   <script src="js/grid.js"></script>

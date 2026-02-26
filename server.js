@@ -25,36 +25,83 @@ function mimeFor(filePath) {
   return MIME[ext] || 'application/octet-stream';
 }
 
-Bun.serve({
-  port: PORT,
+/** Resolve a URL pathname to a safe absolute file path, or null if outside publicDir. */
+function resolveSafe(pathname) {
+  const resolved = join(publicDir, pathname);
+  const rel      = relative(publicDir, resolved);
+  if (rel.startsWith('..') || isAbsolute(rel)) return null;
+  return resolved;
+}
 
-  async fetch(req) {
-    const url      = new URL(req.url);
-    const pathname = url.pathname === '/' ? '/index.html' : url.pathname;
+// ─── Bun ─────────────────────────────────────────────────────────────────────
+if (typeof Bun !== 'undefined') {
+  Bun.serve({
+    port: PORT,
 
-    // Prevent path-traversal attacks
-    const resolved = join(publicDir, pathname);
-    const rel      = relative(publicDir, resolved);
-    if (rel.startsWith('..') || isAbsolute(rel)) {
-      return new Response('Forbidden', { status: 403 });
-    }
+    async fetch(req) {
+      const url      = new URL(req.url);
+      const pathname = url.pathname === '/' ? '/index.html' : url.pathname;
+      const resolved = resolveSafe(pathname);
 
-    const file = Bun.file(resolved);
-    if (!(await file.exists())) {
-      // SPA fallback — serve index.html for unknown paths
-      return new Response(Bun.file(join(publicDir, 'index.html')), {
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      if (!resolved) return new Response('Forbidden', { status: 403 });
+
+      const file = Bun.file(resolved);
+      if (!(await file.exists())) {
+        // SPA fallback — serve index.html for unknown paths
+        return new Response(Bun.file(join(publicDir, 'index.html')), {
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        });
+      }
+
+      return new Response(file, {
+        headers: { 'Content-Type': mimeFor(resolved) },
       });
+    },
+
+    error(err) {
+      return new Response('Internal Server Error: ' + err.message, { status: 500 });
+    },
+  });
+
+  console.log(`Tactics Bell (Bun) running on http://localhost:${PORT}`);
+
+// ─── Node.js ──────────────────────────────────────────────────────────────────
+} else {
+  const http = require('http');
+  const fs   = require('fs');
+
+  const server = http.createServer((req, res) => {
+    try {
+      const url      = new URL(req.url, `http://localhost:${PORT}`);
+      const pathname = url.pathname === '/' ? '/index.html' : url.pathname;
+      const resolved = resolveSafe(pathname);
+
+      if (!resolved) {
+        res.writeHead(403);
+        return res.end('Forbidden');
+      }
+
+      // Try the requested file; fall back to index.html for unknown paths (SPA)
+      const filePath = fs.existsSync(resolved) ? resolved : join(publicDir, 'index.html');
+
+      // Async read — does not block the event loop
+      fs.readFile(filePath, (err, content) => {
+        if (err) {
+          res.writeHead(500);
+          res.end('Internal Server Error');
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': mimeFor(filePath) });
+        res.end(content);
+      });
+    } catch (err) {
+      res.writeHead(500);
+      res.end('Internal Server Error');
     }
+  });
 
-    return new Response(file, {
-      headers: { 'Content-Type': mimeFor(resolved) },
-    });
-  },
+  server.listen(PORT, () => {
+    console.log(`Tactics Bell (Node) running on http://localhost:${PORT}`);
+  });
+}
 
-  error(err) {
-    return new Response('Internal Server Error: ' + err.message, { status: 500 });
-  },
-});
-
-console.log(`Tactics Bell (Bun) running on http://localhost:${PORT}`);
