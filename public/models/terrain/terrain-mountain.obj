@@ -1,0 +1,25 @@
+# Mountain terrain tile — Tactics Bell
+# Square pyramid  1.0 x 1.0 base,  apex at Y = 0.60
+# Tall peaked shape clearly distinguishes impassable mountain terrain
+mtllib terrain-mountain.mtl
+o Mountain
+
+# Base corners  (Y = 0)
+v -0.500  0.000 -0.500
+v  0.500  0.000 -0.500
+v  0.500  0.000  0.500
+v -0.500  0.000  0.500
+# Apex
+v  0.000  0.600  0.000
+
+usemtl mountain_mat
+# Base     (-Y)
+f 1 2 3 4
+# Front    (-Z)
+f 2 1 5
+# Right    (+X)
+f 3 2 5
+# Back     (+Z)
+f 4 3 5
+# Left     (-X)
+f 1 4 5

@@ -73,8 +73,8 @@ docker run -p 8080:8080 tactics-bell
 ## Features
 
 - Procedurally generated battle stages (terrain clusters: grass, forest, water, mountain, lava, crystal)
-- **Optional 3D terrain models** — drop OBJ tiles from the Modular Terrain Collections pack into
-  `public/models/terrain/` and they replace the procedural boxes automatically (see below)
+- **3D terrain models** — handcrafted OBJ tiles bundled in `public/models/terrain/` replace
+  the procedural boxes at runtime (grass, forest, water, mountain, road have distinctive shapes)
 - 4 playable **races** — Human, Elf, Dwarf, Beastkin — each with unique stat bonuses
 - 4 **classes** — Warrior, Mage, Archer, Healer — with 2 skills each
 - Turn-based tactical combat on a 10 × 10 grid
@@ -84,31 +84,24 @@ docker run -p 8080:8080 tactics-bell
 - Oimo.js ragdoll physics on unit defeat
 - anime.js animated UI: damage numbers, HP bars, level-up, screen transitions
 
-## Terrain Models (optional)
+## Terrain Models
 
-The game ships with procedural coloured-box terrain.  You can upgrade to the
-**Modular Terrain Collections** 3D model pack (CC-BY 3.0, free):
+Handcrafted OBJ tile models are bundled in `public/models/terrain/` and loaded
+automatically at runtime via the vendored OBJ loader.  Each terrain type has a
+distinctive geometric shape:
 
-1. Download `modular_terrain_collections.zip` from
-   <https://opengameart.org/sites/default/files/modular_terrain_collections.zip>
-2. Extract the archive and copy one representative OBJ tile for each terrain
-   type into `public/models/terrain/` using the filenames below:
+| Terrain  | File                   | Shape                              |
+|----------|------------------------|------------------------------------|
+| Grass    | `terrain-grass.obj`    | Flat slab (1.0 × 0.14 × 1.0)      |
+| Forest   | `terrain-forest.obj`   | Slab + 4 corner tree pyramids      |
+| Water    | `terrain-water.obj`    | Thin flat slab (1.0 × 0.04 × 1.0) |
+| Mountain | `terrain-mountain.obj` | Tall square pyramid (0.6 units)    |
+| Road     | `terrain-road.obj`     | Slab + raised kerb strips          |
 
-   | Terrain  | Filename                 | Suggested source tile             |
-   |----------|--------------------------|-----------------------------------|
-   | Grass    | `terrain-grass.obj`      | `Hilly/` — any flat grassy tile   |
-   | Forest   | `terrain-forest.obj`     | `Hilly/` — a tile with trees      |
-   | Water    | `terrain-water.obj`      | `Beach/` — a water/shoreline tile |
-   | Mountain | `terrain-mountain.obj`   | `Cliff/` — a rocky cliff tile     |
-   | Road     | `terrain-road.obj`       | `Hilly/` — a dirt path tile       |
+Lava and Crystal tiles continue to use procedural coloured geometry.  If a
+model file is absent or fails to load the tile silently keeps its fallback box.
 
-3. Also copy the matching `.mtl` file for each OBJ into the same directory.
-
-The OBJ file loader (`public/vendor/babylon.objFileLoader.min.js`) is already
-vendored.  When the server starts, models load asynchronously — if a file is
-missing the tile keeps its procedural appearance and the game continues to work.
-
-See `public/models/terrain/README.md` for more details and scale tuning notes.
+See `public/models/terrain/README.md` for coordinate conventions and scale notes.
 
 ## Development (hot-reload)
 
