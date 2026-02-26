@@ -1,0 +1,7 @@
+# Mountain terrain tile material — Tactics Bell
+newmtl mountain_mat
+Ka 0.19 0.22 0.24
+Kd 0.47 0.56 0.61
+Ks 0.10 0.10 0.12
+Ns 20.0
+d  1.0

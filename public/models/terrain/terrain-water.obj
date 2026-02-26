@@ -1,0 +1,30 @@
+# Water terrain tile — Tactics Bell
+# Very thin box  1.0 x 0.04 x 1.0,  base at Y = 0
+# Shallow depth suggests a water surface
+mtllib terrain-water.mtl
+o Water
+
+# Vertices — bottom ring
+v -0.500  0.000 -0.500
+v  0.500  0.000 -0.500
+v  0.500  0.000  0.500
+v -0.500  0.000  0.500
+# Vertices — top ring
+v -0.500  0.040 -0.500
+v  0.500  0.040 -0.500
+v  0.500  0.040  0.500
+v -0.500  0.040  0.500
+
+usemtl water_mat
+# Bottom  (-Y)
+f 1 2 3 4
+# Top     (+Y)
+f 5 8 7 6
+# Front   (-Z)
+f 1 5 6 2
+# Right   (+X)
+f 2 6 7 3
+# Back    (+Z)
+f 3 7 8 4
+# Left    (-X)
+f 1 4 8 5

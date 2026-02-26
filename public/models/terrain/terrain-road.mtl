@@ -1,0 +1,7 @@
+# Road terrain tile material — Tactics Bell
+newmtl road_mat
+Ka 0.35 0.34 0.18
+Kd 0.88 0.84 0.46
+Ks 0.06 0.06 0.04
+Ns 8.0
+d  1.0

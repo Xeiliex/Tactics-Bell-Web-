@@ -1,35 +1,31 @@
 # Terrain 3D Models
 
-This directory holds the OBJ terrain tile models from the
-**Modular Terrain Collections** pack (CC-BY 3.0):
+This directory contains handcrafted OBJ terrain tile models for Tactics Bell.
+Each terrain type has a distinctive geometric shape that replaces the procedural
+coloured-box fallback at runtime.
 
-> https://opengameart.org/sites/default/files/modular_terrain_collections.zip
+| Game terrain | OBJ file               | MTL file               | Shape                          |
+|--------------|------------------------|------------------------|--------------------------------|
+| Grass        | `terrain-grass.obj`    | `terrain-grass.mtl`    | Flat slab 1.0×0.14×1.0         |
+| Forest       | `terrain-forest.obj`   | `terrain-forest.mtl`   | Flat slab + 4 corner tree pyramids |
+| Water        | `terrain-water.obj`    | `terrain-water.mtl`    | Thin flat slab 1.0×0.04×1.0    |
+| Mountain     | `terrain-mountain.obj` | `terrain-mountain.mtl` | Square pyramid 1.0×0.6 tall    |
+| Road         | `terrain-road.obj`     | `terrain-road.mtl`     | Flat slab + raised kerb strips |
 
-## Setup
+> **Lava** and **Crystal** tiles have no OBJ equivalent and continue to use
+> their procedural coloured geometry.
 
-1. Download and unzip `modular_terrain_collections.zip` from the link above.
-2. Pick one representative OBJ tile from the pack for each terrain type and copy
-   it into this directory with the filename listed below.  The `.mtl` material
-   file that accompanies the OBJ (usually the same base name) should also be
-   copied alongside it.
+## Coordinate convention
 
-| Game terrain | Expected filename          | Suggested source in the zip         |
-|-------------|---------------------------|-------------------------------------|
-| Grass       | `terrain-grass.obj`       | `Hilly/` — any flat grassy tile     |
-| Forest      | `terrain-forest.obj`      | `Hilly/` — a tile with trees        |
-| Water       | `terrain-water.obj`       | `Beach/` — a water or shoreline tile|
-| Mountain    | `terrain-mountain.obj`    | `Cliff/` — a rocky cliff tile       |
-| Road        | `terrain-road.obj`        | `Hilly/` — a dirt path / road tile  |
-
-> **Lava** and **Crystal** tiles have no equivalent in the pack and will continue
-> to use their procedural coloured geometry.
+All models use a Y-up right-hand coordinate system:
+- Tile footprint: **−0.5 to +0.5 in X and Z** (fits a ~1.07 unit game cell)
+- Base at **Y = 0**; geometry extends upward in +Y
 
 ## Scale
 
-The loader sets `TERRAIN_MODEL_SCALE = 1.0` in `public/js/scene.js`.  If the
-loaded tiles appear too large or too small, adjust that constant to match the
-actual units used in the OBJ files.  A value of `1.0` assumes each model tile
-is roughly 1 unit wide; the game grid cell is ~1.15 units wide.
+The loader sets `TERRAIN_MODEL_SCALE = 1.0` in `public/js/scene.js`.  Each
+model tile is 1 unit wide, matching the assumption.  Adjust that constant if
+you replace models with different-sized art.
 
 ## Fallback
 
