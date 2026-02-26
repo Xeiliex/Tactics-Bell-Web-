@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tactics Bell ⚔️</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ══════════════ TITLE SCREEN ══════════════ -->
+  <div id="screen-title" class="screen active">
+    <div class="title-bg"></div>
+    <div class="title-content">
+      <div class="title-bell">🔔</div>
+      <h1 class="game-title">TACTICS BELL</h1>
+      <p class="tagline">Battle · Level Up · Conquer</p>
+      <button class="btn-primary btn-large" id="btn-new-game">⚔ NEW GAME</button>
+    </div>
+  </div>
+
+  <!-- ══════════════ CREATE SCREEN ══════════════ -->
+  <div id="screen-create" class="screen hidden">
+    <div class="create-container">
+      <h2 class="section-title">Create Your Hero</h2>
+
+      <div class="selection-section">
+        <h3>Choose Your Race</h3>
+        <div class="cards-grid" id="race-cards"></div>
+      </div>
+
+      <div class="selection-section">
+        <h3>Choose Your Class</h3>
+        <div class="cards-grid" id="class-cards"></div>
+      </div>
+
+      <div class="stats-preview" id="stats-preview">
+        <div class="stats-placeholder">← Select a race and class to preview stats</div>
+      </div>
+
+      <button class="btn-primary btn-large" id="btn-start-battle" disabled>⚔ BEGIN ADVENTURE!</button>
+    </div>
+  </div>
+
+  <!-- ══════════════ BATTLE SCREEN ══════════════ -->
+  <div id="screen-battle" class="screen hidden">
+    <canvas id="renderCanvas"></canvas>
+
+    <div id="battle-ui">
+      <!-- Top bar -->
+      <div id="top-bar">
+        <div id="stage-display">Stage <span id="stage-number">1</span></div>
+        <div id="phase-display">Your Turn</div>
+        <div id="turn-counter">Turn <span id="turn-number">1</span></div>
+      </div>
+
+      <!-- Turn order strip -->
+      <div id="turn-order-bar">
+        <span class="turn-label">Next:</span>
+        <div id="turn-order-icons"></div>
+      </div>
+
+      <!-- Unit info panel -->
+      <div id="unit-panel" class="hidden">
+        <div id="unit-icon-box"><span id="unit-icon">⚔️</span></div>
+        <div id="unit-details">
+          <div class="unit-name" id="unit-name">Hero</div>
+          <div class="unit-subtitle" id="unit-subtitle">Human Warrior · Lv.1</div>
+          <div class="hp-bar-wrap">
+            <div class="hp-bar-fill" id="hp-bar-fill"></div>
+          </div>
+          <div class="hp-text" id="hp-text">50 / 50</div>
+          <div class="unit-stats-row" id="unit-stats-row"></div>
+        </div>
+      </div>
+
+      <!-- Action menu -->
+      <div id="action-menu" class="hidden">
+        <button class="action-btn" id="btn-attack">⚔ Attack</button>
+        <button class="action-btn skill-btn" id="btn-skill">✨ Skill</button>
+        <button class="action-btn wait-btn" id="btn-wait">⏱ Wait</button>
+        <button class="action-btn back-btn" id="btn-cancel-action">↩ Back</button>
+      </div>
+
+      <!-- Skill sub-menu -->
+      <div id="skill-menu" class="hidden">
+        <div id="skill-list"></div>
+        <button class="action-btn back-btn" id="btn-cancel-skill">↩ Back</button>
+      </div>
+
+      <!-- Message log -->
+      <div id="message-log">
+        <div id="message-text">Select a unit to begin your turn.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ LEVEL-UP SCREEN ══════════════ -->
+  <div id="screen-levelup" class="screen hidden">
+    <div class="overlay-box levelup-box">
+      <div class="levelup-burst">🌟</div>
+      <div class="levelup-title">LEVEL UP!</div>
+      <div id="levelup-level" class="levelup-level"></div>
+      <div id="levelup-stats" class="levelup-stats"></div>
+      <button class="btn-primary" id="btn-continue-levelup">Continue →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════ VICTORY SCREEN ══════════════ -->
+  <div id="screen-victory" class="screen hidden">
+    <div class="overlay-box victory-box">
+      <div class="result-icon">⭐</div>
+      <div class="result-title victory-title">VICTORY!</div>
+      <div id="victory-details" class="result-details"></div>
+      <div class="result-buttons">
+        <button class="btn-primary" id="btn-next-stage">Next Stage ▶</button>
+        <button class="btn-secondary" id="btn-title-victory">Main Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ DEFEAT SCREEN ══════════════ -->
+  <div id="screen-defeat" class="screen hidden">
+    <div class="overlay-box defeat-box">
+      <div class="result-icon">💀</div>
+      <div class="result-title defeat-title">DEFEATED</div>
+      <p class="result-sub">Your adventure ends here...</p>
+      <div class="result-buttons">
+        <button class="btn-primary" id="btn-retry">Retry Stage</button>
+        <button class="btn-secondary" id="btn-title-defeat">Main Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SCRIPTS ══════════════ -->
+  <!-- Babylon.js + Oimo.js physics plugin -->
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/oimo.js"></script>
+  <!-- anime.js animation library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"
+          integrity="sha512-z4OUqw38qNLpn1libAN9BsoDx6nbNFio5lA6CuTp9NlK83b89hgyCVq+N5FdBcpttzHbMzC+GBVkKmF+2VoCJw=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- Game modules (order matters) -->
+  <script src="js/data.js"></script>
+  <script src="js/grid.js"></script>
+  <script src="js/character.js"></script>
+  <script src="js/scene.js"></script>
+  <script src="js/combat.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
