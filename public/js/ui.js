@@ -418,7 +418,9 @@ GameUI.prototype.updatePartyMember = function (unit) {
   anime({ targets: fill, width: ratio + '%', duration: 350, easing: 'easeOutQuart' });
   fill.style.backgroundPosition = bgPos + '% 0';
   text.textContent = unit.hp + ' / ' + unit.maxHp;
-  if (!unit.isAlive()) {
+  if (unit.isAlive()) {
+    card.classList.remove('party-card-dead');
+  } else {
     card.classList.add('party-card-dead');
   }
 };
