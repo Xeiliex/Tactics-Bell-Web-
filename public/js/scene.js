@@ -37,7 +37,7 @@ function GameScene() {
 
 GameScene.prototype.init = function (canvasId) {
   var canvas = document.getElementById(canvasId);
-  this.engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true });
+  this.engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true }, true);
   this.scene  = new BABYLON.Scene(this.engine);
   this.scene.clearColor = new BABYLON.Color4(0.05, 0.07, 0.14, 1);
 
