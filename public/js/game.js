@@ -106,7 +106,7 @@ var game = (function () {
     g.grid = generateStage(g.stage);
 
     // 4. Create allies
-    var numAllies = Math.min(2, ALLY_PRESETS.length);
+    var numAllies = Math.min(3, ALLY_PRESETS.length);
     g.allies = [];
     for (var a = 0; a < numAllies; a++) {
       var ally = createAlly(ALLY_PRESETS[a], g.player.level);
@@ -166,6 +166,7 @@ var game = (function () {
     g.ui.setStageNumber(g.stage);
     g.ui.setTurnNumber(1);
     g.ui.showMessage('Battle start! Select a unit to act.');
+    g.ui.renderPartyPanel([g.player].concat(g.allies));
 
     // 11. Start
     g.combat.start();
