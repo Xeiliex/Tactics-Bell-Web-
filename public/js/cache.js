@@ -14,8 +14,12 @@ var AssetCache = (function () {
   var _blobUrls = Object.create(null);
 
   // Whether all terrain model preloads have been attempted (success or failure)
-  var _ready   = false;
-  var _pending = 0;
+  var _ready          = false;
+  var _pending        = 0;
+
+  // Whether all character model preloads have been attempted (success or failure)
+  var _charReady      = false;
+  var _charPending    = 0;
 
   // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -27,6 +31,15 @@ var AssetCache = (function () {
     'terrain-water.obj',    'terrain-water.mtl',
     'terrain-mountain.obj', 'terrain-mountain.mtl',
     'terrain-road.obj',     'terrain-road.mtl'
+  ];
+
+  // OBJ + MTL pairs for every configured character model
+  var CHARACTER_MODEL_BASE = 'models/character/';
+  var CHARACTER_FILENAMES  = [
+    'character-warrior.obj', 'character-warrior.mtl',
+    'character-mage.obj',    'character-mage.mtl',
+    'character-archer.obj',  'character-archer.mtl',
+    'character-healer.obj',  'character-healer.mtl'
   ];
 
   // Memory warning fires when used JS heap exceeds this fraction of the limit.
@@ -99,6 +112,42 @@ var AssetCache = (function () {
     });
   }
 
+  // ─── Public: preload character models ────────────────────────────────────────
+
+  /**
+   * Fetch all character OBJ and MTL files in the background and store them as
+   * blob: URLs so that subsequent stage loads avoid network round-trips.
+   * Safe to call multiple times — only runs once.
+   *
+   * @param {Function} [onComplete]  Called when all fetches have settled.
+   */
+  function preloadCharacterModels(onComplete) {
+    if (_charReady) {
+      if (typeof onComplete === 'function') onComplete();
+      return;
+    }
+
+    if (typeof fetch === 'undefined') {
+      _charReady = true;
+      if (typeof onComplete === 'function') onComplete();
+      return;
+    }
+
+    _charPending = CHARACTER_FILENAMES.length;
+
+    function _checkChar() {
+      _charPending--;
+      if (_charPending === 0) {
+        _charReady = true;
+        if (typeof onComplete === 'function') onComplete();
+      }
+    }
+
+    CHARACTER_FILENAMES.forEach(function (filename) {
+      _fetchOne(CHARACTER_MODEL_BASE + filename, _checkChar);
+    });
+  }
+
   // ─── Public: cache query ──────────────────────────────────────────────────────
 
   /** Returns true if the given URL has been successfully cached. */
@@ -160,13 +209,14 @@ var AssetCache = (function () {
   // ─── Public API ───────────────────────────────────────────────────────────────
 
   return {
-    preloadTerrainModels: preloadTerrainModels,
-    hasCached:            hasCached,
-    getCachedUrl:         getCachedUrl,
-    isReady:              isReady,
-    getMemoryInfo:        getMemoryInfo,
-    startMemoryMonitor:   startMemoryMonitor,
-    stopMemoryMonitor:    stopMemoryMonitor
+    preloadTerrainModels:    preloadTerrainModels,
+    preloadCharacterModels:  preloadCharacterModels,
+    hasCached:               hasCached,
+    getCachedUrl:            getCachedUrl,
+    isReady:                 isReady,
+    getMemoryInfo:           getMemoryInfo,
+    startMemoryMonitor:      startMemoryMonitor,
+    stopMemoryMonitor:       stopMemoryMonitor
   };
 
 }());

@@ -310,7 +310,7 @@ var game = (function () {
     g.scene = new GameScene();
     g.scene.init('renderCanvas');
     g.scene.renderGrid(g.grid);
-    allUnits.forEach(function (u) { g.scene.spawnUnit(u); });
+    g.scene.renderUnits(allUnits);
 
     // 8. Set up click handler
     g.scene.setClickHandler(function (row, col) {
