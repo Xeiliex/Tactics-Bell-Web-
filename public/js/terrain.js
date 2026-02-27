@@ -39,7 +39,7 @@ var MAP_CONFIGS = [
       { type: TERRAIN.WATER,  seeds: 1, spread: 0.28 }
     ],
     playerSpawns: [
-      { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 1 }
+      { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 1 }, { row: 2, col: 0 }
     ],
     enemySpawns: [
       { row: 9, col: 9 }, { row: 8, col: 9 }, { row: 9, col: 8 },
@@ -56,7 +56,7 @@ var MAP_CONFIGS = [
       { type: TERRAIN.WATER,  seeds: 1, spread: 0.18 }
     ],
     playerSpawns: [
-      { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 1 }
+      { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 1 }, { row: 2, col: 0 }
     ],
     enemySpawns: [
       { row: 9, col: 9 }, { row: 8, col: 9 }, { row: 9, col: 8 },
@@ -75,7 +75,7 @@ var MAP_CONFIGS = [
       { type: TERRAIN.FOREST, seeds: 3, spread: 0.35 }
     ],
     playerSpawns: [
-      { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 1 }
+      { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 1 }, { row: 2, col: 0 }
     ],
     enemySpawns: [
       { row: 9, col: 9 }, { row: 8, col: 9 }, { row: 9, col: 8 },
@@ -93,7 +93,7 @@ var MAP_CONFIGS = [
       { type: TERRAIN.FOREST,   seeds: 2, spread: 0.30 }
     ],
     playerSpawns: [
-      { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 1 }
+      { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 1 }, { row: 2, col: 0 }
     ],
     enemySpawns: [
       { row: 9, col: 9 }, { row: 8, col: 9 }, { row: 9, col: 8 },
@@ -113,7 +113,7 @@ var MAP_CONFIGS = [
       { type: TERRAIN.CRYSTAL,  seeds: 2, spread: 0.28 }
     ],
     playerSpawns: [
-      { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 1 }
+      { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 1 }, { row: 2, col: 0 }
     ],
     enemySpawns: [
       { row: 9, col: 9 }, { row: 8, col: 9 }, { row: 9, col: 8 },
@@ -131,7 +131,7 @@ var MAP_CONFIGS = [
       { type: TERRAIN.LAVA,     seeds: 1, spread: 0.22 }
     ],
     playerSpawns: [
-      { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 1 }
+      { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 1 }, { row: 2, col: 0 }
     ],
     enemySpawns: [
       { row: 9, col: 9 }, { row: 8, col: 9 }, { row: 9, col: 8 },

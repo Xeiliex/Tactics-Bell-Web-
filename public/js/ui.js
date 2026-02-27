@@ -40,6 +40,15 @@ if (typeof anime === 'undefined') {
 function GameUI(game) {
   this.game = game;
   this._currentScreen = null;
+  this._party = [];
+  this._memWarnTimer = null;
+
+  // Allow the user to manually dismiss the memory warning
+  var self = this;
+  var closeBtn = document.getElementById('memory-warning-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function () { self.hideMemoryWarning(); });
+  }
 }
 
 // ─── Screen switching ─────────────────────────────────────────────────────────
@@ -258,6 +267,7 @@ GameUI.prototype.showUnitPanel = function (unit) {
 GameUI.prototype.updateUnitPanel = function (unit) {
   // Silently update if the panel is already showing this unit
   this._fillUnitPanel(unit);
+  this.updatePartyMember(unit);
 };
 
 GameUI.prototype._fillUnitPanel = function (unit) {
@@ -364,6 +374,63 @@ GameUI.prototype._floatAt = function (x, y, text, color) {
     easing: 'easeOutQuart',
     complete: function () { el.remove(); }
   });
+};
+
+// ─── Party panel ─────────────────────────────────────────────────────────────
+
+GameUI.prototype.renderPartyPanel = function (members) {
+  this._party = members;
+  var panel = document.getElementById('party-panel');
+  if (!panel) return;
+  panel.innerHTML = '';
+  var self = this;
+  members.forEach(function (unit) {
+    panel.appendChild(self._buildPartyCard(unit));
+  });
+  anime({ targets: '.party-card', scale: [0.85, 1], opacity: [0, 1],
+    duration: 350, delay: anime.stagger(60), easing: 'easeOutBack' });
+};
+
+GameUI.prototype._buildPartyCard = function (unit) {
+  var card = document.createElement('div');
+  card.id = 'party-card-' + unit.id;
+  card.className = 'party-card' + (unit.isPlayer ? ' party-card-player' : '');
+  var ratio = unit.hpRatio() * 100;
+  var bgPos  = (1 - unit.hpRatio()) * 100;
+  card.innerHTML =
+    '<div class="party-card-header">' +
+      '<span class="party-card-emoji">' + unit.emoji + '</span>' +
+      '<span class="party-card-name">' + unit.name + '</span>' +
+    '</div>' +
+    '<div class="party-card-sub">' +
+      RACES[unit.race].name + ' ' + CLASSES[unit.classId].name + ' · Lv.' + unit.level +
+    '</div>' +
+    '<div class="hp-bar-wrap">' +
+      '<div class="hp-bar-fill" id="party-hp-fill-' + unit.id + '" ' +
+        'style="width:' + ratio + '%;background-position:' + bgPos + '% 0"></div>' +
+    '</div>' +
+    '<div class="party-card-hp" id="party-hp-text-' + unit.id + '">' +
+      unit.hp + ' / ' + unit.maxHp +
+    '</div>';
+  return card;
+};
+
+GameUI.prototype.updatePartyMember = function (unit) {
+  if (!unit.isPlayer && !unit.isAlly) return;
+  var fill = document.getElementById('party-hp-fill-' + unit.id);
+  var text = document.getElementById('party-hp-text-' + unit.id);
+  var card = document.getElementById('party-card-' + unit.id);
+  if (!fill || !text || !card) return;
+  var ratio = unit.hpRatio() * 100;
+  var bgPos  = (1 - unit.hpRatio()) * 100;
+  anime({ targets: fill, width: ratio + '%', duration: 350, easing: 'easeOutQuart' });
+  fill.style.backgroundPosition = bgPos + '% 0';
+  text.textContent = unit.hp + ' / ' + unit.maxHp;
+  if (unit.isAlive()) {
+    card.classList.remove('party-card-dead');
+  } else {
+    card.classList.add('party-card-dead');
+  }
 };
 
 // ─── Level-up screen ─────────────────────────────────────────────────────────
