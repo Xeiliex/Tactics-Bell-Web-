@@ -25,7 +25,16 @@
   <!-- ══════════════ CREATE SCREEN ══════════════ -->
   <div id="screen-create" class="screen hidden">
     <div class="create-container">
-      <h2 class="section-title">Create Your Hero</h2>
+      <h2 class="section-title">Create Your Party</h2>
+
+      <!-- Party member tabs -->
+      <div class="party-member-tabs" id="party-member-tabs"></div>
+
+      <!-- Character name input -->
+      <div class="selection-section">
+        <h3>Character Name</h3>
+        <input type="text" id="char-name-input" class="char-name-input" maxlength="16" placeholder="Enter name…" />
+      </div>
 
       <div class="selection-section">
         <h3>Choose Your Race</h3>
@@ -35,6 +44,12 @@
       <div class="selection-section">
         <h3>Choose Your Class</h3>
         <div class="cards-grid" id="class-cards"></div>
+      </div>
+
+      <!-- Body colour picker -->
+      <div class="selection-section">
+        <h3>Body Colour</h3>
+        <div class="color-swatches" id="color-swatches"></div>
       </div>
 
       <div class="stats-preview" id="stats-preview">

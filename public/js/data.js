@@ -133,3 +133,57 @@ var ALLY_PRESETS = [
   { race: 'elf',      classId: 'mage',    name: 'Sorcerer', emoji: '🔮' },
   { race: 'beastkin', classId: 'archer',  name: 'Ranger',   emoji: '🏹' }
 ];
+
+// ═══════════════════════════════════════
+//  BODY COLOUR PRESETS  (character customisation)
+// ═══════════════════════════════════════
+var BODY_COLORS = [
+  { id: 'default', name: 'Default', hex: null,      r: null, g: null, b: null },
+  { id: 'crimson', name: 'Crimson', hex: '#E53935',  r: 0.90, g: 0.22, b: 0.21 },
+  { id: 'sapphire', name: 'Sapphire', hex: '#1E88E5',  r: 0.12, g: 0.53, b: 0.90 },
+  { id: 'emerald', name: 'Emerald', hex: '#43A047',  r: 0.26, g: 0.63, b: 0.28 },
+  { id: 'violet',  name: 'Violet',  hex: '#8E24AA',  r: 0.56, g: 0.14, b: 0.67 },
+  { id: 'amber',   name: 'Amber',   hex: '#FFB300',  r: 1.00, g: 0.70, b: 0.00 },
+  { id: 'silver',  name: 'Silver',  hex: '#78909C',  r: 0.47, g: 0.56, b: 0.61 }
+];
+
+// ═══════════════════════════════════════
+//  STAGE ENEMY CONFIGURATIONS
+//  Mixed enemy teams that scale with story progression
+// ═══════════════════════════════════════
+var STAGE_ENEMY_CONFIGS = [
+  {
+    minStage: 1, maxStage: 2,
+    team: [
+      { race: 'human', classId: 'warrior', name: 'Dark Knight', emoji: '🗡️', mr: 0.7, mg: 0.1, mb: 0.1 },
+      { race: 'human', classId: 'warrior', name: 'Iron Guard',  emoji: '⚔️',  mr: 0.5, mg: 0.1, mb: 0.1 }
+    ]
+  },
+  {
+    minStage: 3, maxStage: 5,
+    team: [
+      { race: 'human',    classId: 'warrior', name: 'Dark Knight',   emoji: '🗡️', mr: 0.7, mg: 0.1, mb: 0.1 },
+      { race: 'elf',      classId: 'mage',    name: 'Shadow Mage',   emoji: '🌑', mr: 0.3, mg: 0.1, mb: 0.5 },
+      { race: 'beastkin', classId: 'archer',  name: 'Shadow Archer', emoji: '🎯', mr: 0.2, mg: 0.2, mb: 0.2 }
+    ]
+  },
+  {
+    minStage: 6, maxStage: 9,
+    team: [
+      { race: 'human',    classId: 'warrior', name: 'Dark Knight',   emoji: '🗡️', mr: 0.7, mg: 0.1, mb: 0.1 },
+      { race: 'elf',      classId: 'mage',    name: 'Shadow Mage',   emoji: '🌑', mr: 0.3, mg: 0.1, mb: 0.5 },
+      { race: 'beastkin', classId: 'archer',  name: 'Shadow Archer', emoji: '🎯', mr: 0.2, mg: 0.2, mb: 0.2 },
+      { race: 'human',    classId: 'healer',  name: 'Dark Witch',    emoji: '🧙', mr: 0.6, mg: 0.1, mb: 0.4 }
+    ]
+  },
+  {
+    minStage: 10, maxStage: null,
+    team: [
+      { race: 'dwarf',    classId: 'warrior', name: 'Orc Crusher',   emoji: '👹', mr: 0.2, mg: 0.5, mb: 0.1 },
+      { race: 'elf',      classId: 'mage',    name: 'Shadow Mage',   emoji: '🌑', mr: 0.3, mg: 0.1, mb: 0.5 },
+      { race: 'beastkin', classId: 'archer',  name: 'Shadow Archer', emoji: '🎯', mr: 0.2, mg: 0.2, mb: 0.2 },
+      { race: 'human',    classId: 'healer',  name: 'Dark Witch',    emoji: '🧙', mr: 0.6, mg: 0.1, mb: 0.4 },
+      { race: 'human',    classId: 'warrior', name: 'Dark Knight',   emoji: '🗡️', mr: 0.7, mg: 0.1, mb: 0.1 }
+    ]
+  }
+];

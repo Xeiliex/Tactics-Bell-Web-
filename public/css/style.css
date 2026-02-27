@@ -537,3 +537,93 @@ html, body {
   z-index: 50;
   user-select: none;
 }
+
+/* ────────────────────────────────────────
+   PARTY MEMBER TABS (create screen)
+──────────────────────────────────────── */
+.party-member-tabs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.party-tab {
+  flex: 1;
+  max-width: 200px;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  color: #aaa;
+  font-family: var(--font-title);
+  font-size: 15px;
+  letter-spacing: 1px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.party-tab:hover {
+  border-color: rgba(255,255,255,0.4);
+  color: #eee;
+}
+.party-tab.active {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(255,215,0,0.1);
+}
+.party-tab.configured {
+  border-color: var(--green);
+  color: var(--green);
+  background: rgba(105,255,71,0.07);
+}
+.party-tab.active.configured {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(255,215,0,0.1);
+}
+
+/* Character name input */
+.char-name-input {
+  width: 100%;
+  max-width: 320px;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  color: #eee;
+  font-family: var(--font-body);
+  font-size: 15px;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.char-name-input:focus {
+  border-color: var(--gold);
+}
+
+/* Body colour swatches */
+.color-swatches {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.color-swatch {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+  position: relative;
+}
+.color-swatch:hover { transform: scale(1.18); }
+.color-swatch.selected {
+  border-color: #fff;
+  box-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+.color-swatch[data-color="default"] {
+  background: conic-gradient(var(--gold) 0deg 120deg, var(--cyan) 120deg 240deg, var(--purple) 240deg 360deg);
+  border-color: var(--border);
+}

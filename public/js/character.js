@@ -196,6 +196,33 @@ function createAlly(preset, level) {
 }
 
 /**
+ * Create a player party member from a customisation slot.
+ * Handles name, race, class, level, exp, and optional body-colour override.
+ * @param {object} opts  { name, race, classId, colorId, level, exp, isPlayer, isAlly }
+ */
+function createPartyMember(opts) {
+  var meshColor = null;
+  if (opts.colorId && opts.colorId !== 'default') {
+    for (var ci = 0; ci < BODY_COLORS.length; ci++) {
+      if (BODY_COLORS[ci].id === opts.colorId) {
+        meshColor = { r: BODY_COLORS[ci].r, g: BODY_COLORS[ci].g, b: BODY_COLORS[ci].b };
+        break;
+      }
+    }
+  }
+  return new Character({
+    name:              opts.name     || 'Adventurer',
+    raceId:            opts.race,
+    classId:           opts.classId,
+    level:             opts.level    || 1,
+    exp:               opts.exp      || 0,
+    isPlayer:          !!opts.isPlayer,
+    isAlly:            !!opts.isAlly,
+    overrideMeshColor: opts.overrideMeshColor || meshColor
+  });
+}
+
+/**
  * Create an enemy scaled to the given stage number.
  */
 function createEnemy(preset, stage) {

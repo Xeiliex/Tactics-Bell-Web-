@@ -110,9 +110,29 @@ GameUI.prototype.showTitleScreen = function () {
 // ─── Character creation screen ────────────────────────────────────────────────
 
 GameUI.prototype.showCreateScreen = function () {
+  var game = this.game;
+
+  // Initialise party config if this is a fresh visit
+  if (!game.partyConfig) {
+    game.partyConfig = [{ name: 'Hero', race: null, classId: null, colorId: 'default' }];
+    for (var pi = 0; pi < 2 && pi < ALLY_PRESETS.length; pi++) {
+      var p = ALLY_PRESETS[pi];
+      game.partyConfig.push({ name: p.name, race: p.race, classId: p.classId, colorId: 'default' });
+    }
+    game.activePartyMember = 0;
+  }
+
+  // Load the active member's state into the shared selectors
+  var active = game.partyConfig[game.activePartyMember || 0];
+  game.selectedRace  = active.race;
+  game.selectedClass = active.classId;
+
   this.showScreen('screen-create');
+  this._buildPartyTabs();
   this._buildRaceCards();
   this._buildClassCards();
+  this._buildColorSwatches();
+  this._syncNameInput();
   this._updateStatsPreview();
 
   anime({
@@ -123,6 +143,106 @@ GameUI.prototype.showCreateScreen = function () {
   });
 };
 
+// ─── Party tabs ───────────────────────────────────────────────────────────────
+
+GameUI.prototype._buildPartyTabs = function () {
+  var container = document.getElementById('party-member-tabs');
+  if (!container) return;
+  container.innerHTML = '';
+  var game = this.game;
+  var self = this;
+  var activeIdx = game.activePartyMember || 0;
+
+  game.partyConfig.forEach(function (member, i) {
+    var btn = document.createElement('button');
+    var isActive = i === activeIdx;
+    var isConfigured = !!(member.race && member.classId);
+    var classes = 'party-tab';
+    if (isActive)     classes += ' active';
+    if (isConfigured) classes += ' configured';
+    btn.className = classes;
+    btn.dataset.member = i;
+
+    // Label shows emoji + name once configured
+    btn.textContent = isConfigured
+      ? CLASSES[member.classId].emoji + ' ' + member.name
+      : (i === 0 ? '⚔ Hero' : '👤 Ally ' + i);
+
+    btn.addEventListener('click', function () {
+      self._switchPartyMember(i);
+    });
+    container.appendChild(btn);
+  });
+};
+
+GameUI.prototype._switchPartyMember = function (index) {
+  var game = this.game;
+  var fromIdx = game.activePartyMember || 0;
+
+  // Persist current tab state before switching
+  var current = game.partyConfig[fromIdx];
+  current.race    = game.selectedRace;
+  current.classId = game.selectedClass;
+  var nameInput = document.getElementById('char-name-input');
+  if (nameInput) current.name = nameInput.value.trim() || current.name;
+
+  // Switch
+  game.activePartyMember = index;
+  var next = game.partyConfig[index];
+  game.selectedRace  = next.race;
+  game.selectedClass = next.classId;
+
+  // Rebuild UI for the new member
+  this._buildPartyTabs();
+  this._buildRaceCards();
+  this._buildClassCards();
+  this._buildColorSwatches();
+  this._syncNameInput();
+  this._updateStatsPreview();
+};
+
+GameUI.prototype._syncNameInput = function () {
+  var game  = this.game;
+  var input = document.getElementById('char-name-input');
+  if (!input) return;
+  var m = game.partyConfig && game.partyConfig[game.activePartyMember || 0];
+  input.value = m ? (m.name || '') : '';
+};
+
+// ─── Colour swatches ─────────────────────────────────────────────────────────
+
+GameUI.prototype._buildColorSwatches = function () {
+  var container = document.getElementById('color-swatches');
+  if (!container) return;
+  container.innerHTML = '';
+  var game = this.game;
+  var self = this;
+  var activeIdx = game.activePartyMember || 0;
+  var currentColorId = (game.partyConfig && game.partyConfig[activeIdx].colorId) || 'default';
+
+  BODY_COLORS.forEach(function (color) {
+    var swatch = document.createElement('div');
+    swatch.className = 'color-swatch' + (color.id === currentColorId ? ' selected' : '');
+    swatch.dataset.color = color.id;
+    swatch.title = color.name;
+
+    if (color.hex) {
+      swatch.style.backgroundColor = color.hex;
+    }
+
+    swatch.addEventListener('click', function () {
+      document.querySelectorAll('.color-swatch').forEach(function (s) { s.classList.remove('selected'); });
+      swatch.classList.add('selected');
+      if (game.partyConfig) {
+        game.partyConfig[game.activePartyMember || 0].colorId = color.id;
+      }
+      anime({ targets: swatch, scale: [0.85, 1.0], duration: 200, easing: 'easeOutBack' });
+    });
+
+    container.appendChild(swatch);
+  });
+};
+
 GameUI.prototype._buildRaceCards = function () {
   var container = document.getElementById('race-cards');
   container.innerHTML = '';
@@ -130,7 +250,7 @@ GameUI.prototype._buildRaceCards = function () {
 
   Object.values(RACES).forEach(function (race) {
     var card = document.createElement('div');
-    card.className = 'card';
+    card.className = 'card' + (game.selectedRace === race.id ? ' selected' : '');
     card.dataset.race = race.id;
 
     var bonuses = Object.entries(race.statBonuses)
@@ -163,7 +283,7 @@ GameUI.prototype._buildClassCards = function () {
 
   Object.values(CLASSES).forEach(function (cls) {
     var card = document.createElement('div');
-    card.className = 'card';
+    card.className = 'card' + (game.selectedClass === cls.id ? ' selected' : '');
     card.dataset.cls = cls.id;
 
     card.innerHTML =
@@ -191,7 +311,9 @@ GameUI.prototype._updateStatsPreview = function () {
 
   if (!game.selectedRace || !game.selectedClass) {
     preview.innerHTML = '<div class="stats-placeholder">← Select a race and class to preview stats</div>';
-    startBtn.disabled = true;
+    // Enable the button only if the hero slot (index 0) is already configured
+    var heroConfigured = game.partyConfig && game.partyConfig[0].race && game.partyConfig[0].classId;
+    startBtn.disabled = !heroConfigured;
     return;
   }
 
@@ -209,7 +331,13 @@ GameUI.prototype._updateStatsPreview = function () {
     return '<div class="stat-chip">' + s.label + ' <span>' + s.val + '</span></div>';
   }).join('');
 
-  startBtn.disabled = false;
+  // Enable start when the hero (member 0) has both race and class selected
+  var activeIdx = game.activePartyMember || 0;
+  var heroReady = activeIdx === 0
+    ? !!(game.selectedRace && game.selectedClass)
+    : !!(game.partyConfig && game.partyConfig[0] && game.partyConfig[0].race && game.partyConfig[0].classId);
+  startBtn.disabled = !heroReady;
+
   anime({ targets: '.stat-chip', scale: [0.85, 1], opacity: [0, 1], duration: 250,
     delay: anime.stagger(40), easing: 'easeOutBack' });
 };
