@@ -143,9 +143,12 @@ GameUI.prototype.showCreateScreen = function () {
     }];
     for (var pi = 0; pi < 2 && pi < ALLY_PRESETS.length; pi++) {
       var p = ALLY_PRESETS[pi];
+      // Pre-assign a default background ('soldier') so the background wizard
+      // step is pre-selected for ally members and the Next button is never
+      // permanently disabled — the user can still change it.
       game.partyConfig.push({
         name: p.name, race: p.race, classId: p.classId,
-        backgroundId: null, colorId: 'default'
+        backgroundId: 'soldier', colorId: 'default'
       });
     }
   }
@@ -214,10 +217,13 @@ GameUI.prototype._renderWizardStep = function () {
   }
 
   // Show the 3-D preview canvas on class (1) and identity (3) steps;
-  // hide it on race (0) and background (2) steps.
+  // hide it on race (0) and background (2) steps, and always hide it when
+  // GRAPHICS_QUALITY is 'low' (CharacterPreviewScene is not initialised in
+  // that mode, which would leave a blank dark box visible to the user).
   var previewWrap = document.getElementById('wizard-preview-wrap');
   if (previewWrap) {
-    if (w.stepIdx === 1 || w.stepIdx === 3) {
+    var previewEnabled = (typeof GRAPHICS_QUALITY === 'undefined' || GRAPHICS_QUALITY !== 'low');
+    if (previewEnabled && (w.stepIdx === 1 || w.stepIdx === 3)) {
       previewWrap.classList.remove('hidden');
     } else {
       previewWrap.classList.add('hidden');
@@ -365,11 +371,17 @@ GameUI.prototype._buildWizardClassStep = function (container, member) {
     var card = document.createElement('div');
     card.className = 'card' + (member.classId === cls.id ? ' selected' : '');
 
+    // Show the two class skills so the player knows what abilities they get
+    var skillsHtml = cls.skills.map(function (s) {
+      return '<span class="card-skill-tag">' + s.emoji + ' ' + s.name + '</span>';
+    }).join('');
+
     card.innerHTML =
       '<div class="card-emoji">' + cls.emoji + '</div>' +
       '<div class="card-name" style="color:' + cls.color + '">' + cls.name + '</div>' +
       '<div class="card-desc">' + cls.description + '</div>' +
-      '<div class="card-bonuses">Move ' + cls.moveRange + '  Range ' + cls.attackRange + '</div>';
+      '<div class="card-bonuses">Move ' + cls.moveRange + '  ·  Range ' + cls.attackRange + '</div>' +
+      (skillsHtml ? '<div class="card-skills">' + skillsHtml + '</div>' : '');
 
     card.addEventListener('click', function () {
       container.querySelectorAll('.card').forEach(function (c) { c.classList.remove('selected'); });
@@ -409,12 +421,24 @@ GameUI.prototype._buildWizardBackgroundStep = function (container, member) {
       .map(function (e) { return (e[1] > 0 ? '+' : '') + e[1] + ' ' + e[0].toUpperCase(); })
       .join('  ');
 
+    // Show what the final HP will be with this background applied (preview stat)
+    var hpPreview = '';
+    if (member.race && member.classId) {
+      var dummy = new Character({
+        name: 'Preview', raceId: member.race,
+        classId: member.classId, backgroundId: bg.id, level: 1
+      });
+      hpPreview = '<div class="card-stat-preview">→ HP ' + dummy.maxHp +
+        '  ATK ' + dummy.atk + '  SPD ' + dummy.spd + '</div>';
+    }
+
     card.innerHTML =
       '<div class="card-emoji">' + bg.emoji + '</div>' +
       '<div class="card-name" style="color:' + bg.color + '">' + bg.name + '</div>' +
       '<div class="card-desc">' + bg.description + '</div>' +
       '<div class="card-flavor">' + bg.flavor + '</div>' +
-      (bonuses ? '<div class="card-bonuses">' + bonuses + '</div>' : '');
+      (bonuses ? '<div class="card-bonuses">' + bonuses + '</div>' : '') +
+      hpPreview;
 
     card.addEventListener('click', function () {
       container.querySelectorAll('.card').forEach(function (c) { c.classList.remove('selected'); });
@@ -633,8 +657,11 @@ GameUI.prototype.updateUnitPanel = function (unit) {
 GameUI.prototype._fillUnitPanel = function (unit) {
   document.getElementById('unit-icon').textContent    = unit.emoji;
   document.getElementById('unit-name').textContent    = unit.name;
+  // Show bloodied indicator next to name when unit is below 50 % HP
+  var bloodied = (typeof unit.isBloodied === 'function') && unit.isBloodied();
   document.getElementById('unit-subtitle').textContent =
-    RACES[unit.race].name + ' ' + CLASSES[unit.classId].name + ' · Lv.' + unit.level;
+    RACES[unit.race].name + ' ' + CLASSES[unit.classId].name + ' · Lv.' + unit.level +
+    (bloodied ? ' 🩸' : '');
   document.getElementById('hp-text').textContent = unit.hp + ' / ' + unit.maxHp;
 
   var ratio = unit.hpRatio() * 100;
@@ -644,12 +671,20 @@ GameUI.prototype._fillUnitPanel = function (unit) {
   var bgPos = (1 - unit.hpRatio()) * 100;
   fill.style.backgroundPosition = bgPos + '% 0';
 
+  // Status effect badges
+  var statusIcons = '';
+  if (unit.statusEffects) {
+    if (unit.statusEffects.burn  > 0) { statusIcons += ' 🔥×' + unit.statusEffects.burn; }
+    if (unit.statusEffects.stun > 0)  { statusIcons += ' 💫'; }
+  }
+
   var statsRow = document.getElementById('unit-stats-row');
   statsRow.innerHTML =
     '<span class="mini-stat">ATK <b>' + unit.atk + '</b></span>' +
     '<span class="mini-stat">DEF <b>' + unit.def + '</b></span>' +
     '<span class="mini-stat">MAG <b>' + unit.mag + '</b></span>' +
-    '<span class="mini-stat">SPD <b>' + unit.spd + '</b></span>';
+    '<span class="mini-stat">SPD <b>' + unit.spd + '</b></span>' +
+    (statusIcons ? '<span class="mini-stat status-icons">' + statusIcons + '</span>' : '');
 };
 
 // ─── Action / skill menus ─────────────────────────────────────────────────────

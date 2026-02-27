@@ -20,7 +20,15 @@ const MIME = {
   '.ttf':  'font/ttf',
   '.obj':  'model/obj',
   '.mtl':  'model/mtl',
+  '.gltf': 'model/gltf+json',
+  '.bin':  'application/octet-stream',
 };
+
+/**
+ * Extensions that benefit from gzip on-the-fly compression.
+ * Binary image/font formats are already compressed, so we skip them.
+ */
+const GZIP_EXTS = new Set(['.html', '.css', '.js', '.json', '.svg', '.obj', '.mtl', '.gltf']);
 
 function mimeFor(filePath) {
   const ext = filePath.slice(filePath.lastIndexOf('.'));
@@ -69,8 +77,9 @@ if (typeof Bun !== 'undefined') {
 
 // ─── Node.js ──────────────────────────────────────────────────────────────────
 } else {
-  const http = require('http');
-  const fs   = require('fs');
+  const http  = require('http');
+  const fs    = require('fs');
+  const zlib  = require('zlib');
 
   const server = http.createServer((req, res) => {
     try {
@@ -85,6 +94,8 @@ if (typeof Bun !== 'undefined') {
 
       // Try the requested file; fall back to index.html for unknown paths (SPA)
       const filePath = fs.existsSync(resolved) ? resolved : join(publicDir, 'index.html');
+      const ext      = filePath.slice(filePath.lastIndexOf('.'));
+      const mime     = mimeFor(filePath);
 
       // Async read — does not block the event loop
       fs.readFile(filePath, (err, content) => {
@@ -93,8 +104,29 @@ if (typeof Bun !== 'undefined') {
           res.end('Internal Server Error');
           return;
         }
-        res.writeHead(200, { 'Content-Type': mimeFor(filePath) });
-        res.end(content);
+
+        // On-the-fly gzip compression for text and model assets.
+        // Only compress if the client signals Accept-Encoding: gzip.
+        const acceptsGzip = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
+        if (acceptsGzip && GZIP_EXTS.has(ext)) {
+          zlib.gzip(content, (gzErr, compressed) => {
+            if (gzErr) {
+              // Compression failed — fall back to uncompressed
+              res.writeHead(200, { 'Content-Type': mime });
+              res.end(content);
+              return;
+            }
+            res.writeHead(200, {
+              'Content-Type':     mime,
+              'Content-Encoding': 'gzip',
+              'Content-Length':   compressed.length,
+            });
+            res.end(compressed);
+          });
+        } else {
+          res.writeHead(200, { 'Content-Type': mime });
+          res.end(content);
+        }
       });
     } catch (err) {
       res.writeHead(500);
