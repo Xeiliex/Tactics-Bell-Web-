@@ -141,6 +141,26 @@ var game = (function () {
     g.ui.showTitleScreen();
     _updateContinueButton();
 
+    // Graphics quality toggle (title screen)
+    (function () {
+      var btn = document.getElementById('btn-gfx-toggle');
+      if (!btn) return;
+      function updateBtn() {
+        var isHigh = (typeof GRAPHICS_QUALITY === 'undefined' || GRAPHICS_QUALITY !== 'low');
+        btn.textContent  = isHigh ? '🖥 High Graphics' : '⚙ Low Graphics';
+        btn.className    = 'btn-gfx-toggle ' + (isHigh ? 'gfx-high' : 'gfx-low');
+        btn.title        = isHigh
+          ? 'Using high-quality 3-D models — click to switch to low graphics'
+          : 'Using low-quality procedural shapes — click to switch to high graphics';
+      }
+      btn.addEventListener('click', function () {
+        GRAPHICS_QUALITY = (GRAPHICS_QUALITY === 'low') ? 'high' : 'low';
+        try { localStorage.setItem('tactics-bell-gfx', GRAPHICS_QUALITY); } catch (e) {}
+        updateBtn();
+      });
+      updateBtn();
+    }());
+
     // Fullscreen toggle
     (function () {
       var btn = document.getElementById('btn-fullscreen');
@@ -317,6 +337,7 @@ var game = (function () {
           classId:      heroSlot.classId,
           backgroundId: heroSlot.backgroundId || null,
           colorId:      heroSlot.colorId,
+          portrait:     heroSlot.portrait     || null,
           level:        1,
           exp:          0,
           isPlayer:     true
@@ -336,6 +357,7 @@ var game = (function () {
           classId:      hero.classId,
           backgroundId: hero.backgroundId || null,
           colorId:      hero.colorId,
+          portrait:     hero.portrait     || null,
           level:        hero.level || 1,
           exp:          hero.exp   || 0,
           isPlayer:     true
@@ -384,6 +406,7 @@ var game = (function () {
             classId:      m.classId,
             backgroundId: m.backgroundId || null,
             colorId:      m.colorId,
+            portrait:     m.portrait     || null,
             level:        allyLevel,
             exp:          isNewGame ? 0 : (m.exp || 0),
             isAlly:       true

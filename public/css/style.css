@@ -744,3 +744,84 @@ html, body {
   background: conic-gradient(var(--gold) 0deg 120deg, var(--cyan) 120deg 240deg, var(--purple) 240deg 360deg);
   border-color: var(--border);
 }
+
+/* ────────────────────────────────────────
+   GRAPHICS QUALITY TOGGLE  (title screen)
+──────────────────────────────────────── */
+.btn-gfx-toggle {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: #aaa;
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 1px;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  margin-top: -4px;
+}
+.btn-gfx-toggle:hover {
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+  border-color: rgba(255,255,255,0.35);
+}
+.btn-gfx-toggle.gfx-low {
+  color: var(--orange);
+  border-color: rgba(255,138,101,0.5);
+}
+.btn-gfx-toggle.gfx-high {
+  color: var(--cyan);
+  border-color: rgba(0,229,255,0.4);
+}
+
+/* ────────────────────────────────────────
+   CHARACTER CREATOR 3-D PREVIEW CANVAS
+──────────────────────────────────────── */
+.wizard-preview-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.wizard-preview-wrap.hidden { display: none; }
+
+#char-preview-canvas {
+  width: 220px;
+  height: 220px;
+  border-radius: 16px;
+  border: 2px solid var(--border);
+  background: #0d1130;
+  cursor: grab;
+  touch-action: none;
+}
+#char-preview-canvas:active { cursor: grabbing; }
+
+.preview-hint {
+  font-size: 11px;
+  color: #555;
+  font-style: italic;
+}
+
+/* ────────────────────────────────────────
+   CHARACTER PORTRAITS
+──────────────────────────────────────── */
+/* Small portrait in the battle-screen party panel */
+.party-portrait {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Larger portrait on the party-review screen */
+.review-portrait {
+  width: 88px;
+  height: 88px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 2px solid var(--border);
+}

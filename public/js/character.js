@@ -29,6 +29,7 @@ function Character(opts) {
   this.emoji    = opts.emoji     || CLASSES[this.classId].emoji;
   this.overrideMeshColor = opts.overrideMeshColor || null;
   this.backgroundId = opts.backgroundId || null;
+  this.portrait     = opts.portrait     || null;  // data-URL captured from wizard preview
 
   // Grid position
   this.gridRow = 0;
@@ -227,7 +228,8 @@ function createPartyMember(opts) {
     exp:               opts.exp      || 0,
     isPlayer:          !!opts.isPlayer,
     isAlly:            !!opts.isAlly,
-    overrideMeshColor: opts.overrideMeshColor || meshColor
+    overrideMeshColor: opts.overrideMeshColor || meshColor,
+    portrait:          opts.portrait  || null
   });
 }
 

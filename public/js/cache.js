@@ -33,13 +33,18 @@ var AssetCache = (function () {
     'terrain-road.obj',     'terrain-road.mtl'
   ];
 
-  // OBJ + MTL pairs for every configured character model
+  // glTF + bin files for every configured character model (high-quality assets).
+  // Textures are NOT blob-cached because the glTF loader fetches them via relative
+  // URL at the same root as the .gltf file.  Blob-caching the .gltf alone is also
+  // insufficient because external .bin buffers use relative paths.  We list them
+  // here only so the preload status tracking works correctly; actual loading is
+  // always done directly from the server path.
   var CHARACTER_MODEL_BASE = 'models/character/';
   var CHARACTER_FILENAMES  = [
-    'character-warrior.obj', 'character-warrior.mtl',
-    'character-mage.obj',    'character-mage.mtl',
-    'character-archer.obj',  'character-archer.mtl',
-    'character-healer.obj',  'character-healer.mtl'
+    'Male_Peasant.gltf',
+    'Male_Ranger.gltf',
+    'Female_Ranger.gltf',
+    'Female_Peasant.gltf'
   ];
 
   // Memory warning fires when used JS heap exceeds this fraction of the limit.
