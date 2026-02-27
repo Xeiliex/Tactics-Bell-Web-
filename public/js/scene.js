@@ -97,6 +97,11 @@ function GameScene() {
   this._frameEl       = null; // #debug-fps-frame DOM element
   this._shadowGenerator = null; // ShadowGenerator for directional light
   this._fxaaPostProcess = null; // FXAA anti-aliasing post-process
+  // Weather
+  this._weatherPs     = null;  // active weather BABYLON.ParticleSystem
+  this._weatherTickFn = null;  // gameLoop callback for animated weather effects
+  this._fogActive     = false; // whether Babylon scene fog is currently applied
+  this._weatherTime   = 0;    // accumulated time (seconds) for weather animation
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────
@@ -804,6 +809,7 @@ GameScene.prototype.setClickHandler = function (callback) {
 // ─── Cleanup (dispose scene on screen change) ────────────────────────────────
 
 GameScene.prototype.dispose = function () {
+  this._stopWeather();
   this.clearHighlights();
   if (this._fxaaPostProcess) {
     this._fxaaPostProcess.dispose();
@@ -825,6 +831,131 @@ GameScene.prototype.dispose = function () {
     this._frameEl = null;
   }
   this._frameCount = 0;
+};
+
+// ─── Weather effects ─────────────────────────────────────────────────────────
+//
+// setWeather(weatherId) starts the matching visual effect:
+//   • rain  — falling blue-tinted streaks (ParticleSystem)
+//   • snow  — drifting white flakes with a gentle sway (ParticleSystem + gameLoop tick)
+//   • wind  — horizontal streaks that gust over time (ParticleSystem + gameLoop tick)
+//   • fog   — exponential scene fog that slowly pulses in density (gameLoop tick)
+//   • clear — removes any active effect
+//
+// _stopWeather() tears everything down cleanly and is called automatically by
+// dispose() so no manual cleanup is needed on screen transitions.
+
+GameScene.prototype.setWeather = function (weatherId) {
+  this._stopWeather();
+  if (!weatherId || weatherId === 'clear') return;
+
+  var scene = this.scene;
+  if (!scene) return;
+  var self  = this;
+  var isLow = (typeof HARDWARE_TIER !== 'undefined' && HARDWARE_TIER === 'low');
+
+  if (weatherId === 'rain') {
+    var count = isLow ? 200 : 500;
+    var ps = new BABYLON.ParticleSystem('weather_rain', count, scene);
+    ps.emitter    = new BABYLON.Vector3(0, 8, 0);
+    ps.minEmitBox = new BABYLON.Vector3(-8, 0, -8);
+    ps.maxEmitBox = new BABYLON.Vector3( 8, 0,  8);
+    ps.color1     = new BABYLON.Color4(0.5, 0.7, 1.0, 0.7);
+    ps.color2     = new BABYLON.Color4(0.4, 0.6, 0.9, 0.4);
+    ps.minSize    = 0.03;  ps.maxSize    = 0.06;
+    ps.minLifeTime = 0.5;  ps.maxLifeTime = 0.9;
+    ps.emitRate   = count * 2;
+    ps.direction1 = new BABYLON.Vector3(-0.5, -8, -0.5);
+    ps.direction2 = new BABYLON.Vector3( 0.5, -8,  0.5);
+    ps.minEmitPower = 4;   ps.maxEmitPower = 7;
+    ps.updateSpeed  = 0.02;
+    ps.start();
+    this._weatherPs = ps;
+
+  } else if (weatherId === 'snow') {
+    var count = isLow ? 150 : 350;
+    var ps = new BABYLON.ParticleSystem('weather_snow', count, scene);
+    ps.emitter    = new BABYLON.Vector3(0, 8, 0);
+    ps.minEmitBox = new BABYLON.Vector3(-8, 0, -8);
+    ps.maxEmitBox = new BABYLON.Vector3( 8, 0,  8);
+    ps.color1     = new BABYLON.Color4(1.0, 1.0, 1.0, 0.9);
+    ps.color2     = new BABYLON.Color4(0.85, 0.9, 1.0, 0.5);
+    ps.minSize    = 0.05;  ps.maxSize    = 0.14;
+    ps.minLifeTime = 1.5;  ps.maxLifeTime = 3.0;
+    ps.emitRate   = 80;
+    ps.direction1 = new BABYLON.Vector3(-0.3, -1, -0.3);
+    ps.direction2 = new BABYLON.Vector3( 0.3, -1,  0.3);
+    ps.minEmitPower = 0.5; ps.maxEmitPower = 1.2;
+    ps.updateSpeed  = 0.02;
+    ps.start();
+    this._weatherPs = ps;
+    // Slowly sway snow sideways so it feels like real drifting flakes.
+    this._weatherTickFn = function (dt) {
+      if (!self._weatherPs) return;
+      self._weatherTime += dt;
+      var sway = Math.sin(self._weatherTime * 0.4) * 0.4;
+      self._weatherPs.direction1 = new BABYLON.Vector3(-0.3 + sway, -1, -0.3);
+      self._weatherPs.direction2 = new BABYLON.Vector3( 0.3 + sway, -1,  0.3);
+    };
+    if (typeof gameLoop !== 'undefined') gameLoop.register(this._weatherTickFn);
+
+  } else if (weatherId === 'wind') {
+    var count = isLow ? 100 : 250;
+    var ps = new BABYLON.ParticleSystem('weather_wind', count, scene);
+    ps.emitter    = new BABYLON.Vector3(-8, 1.5, 0);
+    ps.minEmitBox = new BABYLON.Vector3(0, -1, -8);
+    ps.maxEmitBox = new BABYLON.Vector3(0,  2,  8);
+    ps.color1     = new BABYLON.Color4(0.85, 0.9, 1.0, 0.5);
+    ps.color2     = new BABYLON.Color4(1.0,  1.0, 1.0, 0.1);
+    ps.minSize    = 0.02;  ps.maxSize    = 0.05;
+    ps.minLifeTime = 0.4;  ps.maxLifeTime = 0.9;
+    ps.emitRate   = 200;
+    ps.direction1 = new BABYLON.Vector3(6, 0.1, -0.2);
+    ps.direction2 = new BABYLON.Vector3(9, 0.3,  0.2);
+    ps.minEmitPower = 5;   ps.maxEmitPower = 9;
+    ps.updateSpeed  = 0.02;
+    ps.start();
+    this._weatherPs = ps;
+    // Simulate gusts: periodically ramp power up and down.
+    this._weatherTickFn = function (dt) {
+      if (!self._weatherPs) return;
+      self._weatherTime += dt;
+      var gust = 1.0 + 0.5 * Math.sin(self._weatherTime * 1.2);
+      self._weatherPs.minEmitPower = 5 * gust;
+      self._weatherPs.maxEmitPower = 9 * gust;
+    };
+    if (typeof gameLoop !== 'undefined') gameLoop.register(this._weatherTickFn);
+
+  } else if (weatherId === 'fog') {
+    scene.fogMode    = BABYLON.Scene.FOGMODE_EXP2;
+    scene.fogDensity = 0.07;
+    scene.fogColor   = new BABYLON.Color3(0.6, 0.65, 0.75);
+    this._fogActive  = true;
+    // Slowly pulse fog density to give a living, rolling-mist appearance.
+    this._weatherTickFn = function (dt) {
+      if (!self._fogActive || !self.scene) return;
+      self._weatherTime += dt;
+      self.scene.fogDensity = 0.06 + 0.02 * Math.sin(self._weatherTime * 0.5);
+    };
+    if (typeof gameLoop !== 'undefined') gameLoop.register(this._weatherTickFn);
+  }
+};
+
+GameScene.prototype._stopWeather = function () {
+  if (this._weatherTickFn) {
+    if (typeof gameLoop !== 'undefined') gameLoop.unregister(this._weatherTickFn);
+    this._weatherTickFn = null;
+  }
+  if (this._weatherPs) {
+    this._weatherPs.stop();
+    this._weatherPs.dispose();
+    this._weatherPs = null;
+  }
+  if (this._fogActive && this.scene) {
+    this.scene.fogMode = BABYLON.Scene.FOGMODE_NONE;
+    this._fogActive = false;
+  }
+  this._weatherTime = 0;
 };
 
 // ─── Character creator preview scene ─────────────────────────────────────────

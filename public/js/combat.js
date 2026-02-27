@@ -26,14 +26,16 @@ var COMBAT_STATE = {
  * @param {GameUI}     ui
  * @param {Function}   onVictory(expGained)
  * @param {Function}   onDefeat()
+ * @param {object}     [weather] – WEATHER_TYPES entry; defaults to WEATHER_TYPES.clear
  */
-function Combat(grid, units, scene, ui, onVictory, onDefeat) {
+function Combat(grid, units, scene, ui, onVictory, onDefeat, weather) {
   this.grid      = grid;
   this.units     = units;
   this.scene     = scene;
   this.ui        = ui;
   this.onVictory = onVictory;
   this.onDefeat  = onDefeat;
+  this.weather   = weather || (typeof WEATHER_TYPES !== 'undefined' ? WEATHER_TYPES.clear : { spdMod: 0, hitMod: 0 });
 
   this.state           = COMBAT_STATE.IDLE;
   this.turnOrder       = [];
@@ -44,6 +46,14 @@ function Combat(grid, units, scene, ui, onVictory, onDefeat) {
   this.targetableTiles = [];
   this.pendingSkill    = null;   // skill being used (null = basic attack)
 }
+
+// ─── Weather helper ───────────────────────────────────────────────────────────
+
+// Returns effective move range for a unit after applying the weather spdMod.
+// Always at least 1 so a unit can still escape its starting tile.
+Combat.prototype._effectiveMoveRange = function (unit) {
+  return Math.max(1, unit.moveRange + this.weather.spdMod);
+};
 
 // ─── Turn order ──────────────────────────────────────────────────────────────
 
@@ -243,7 +253,7 @@ Combat.prototype.selectUnit = function (unit) {
 
   if (!unit.hasMoved) {
     this.state = COMBAT_STATE.PLAYER_MOVE;
-    this.movableTiles = this.grid.reachableTiles(unit.gridRow, unit.gridCol, unit.moveRange);
+    this.movableTiles = this.grid.reachableTiles(unit.gridRow, unit.gridCol, this._effectiveMoveRange(unit));
     // Filter out tiles occupied by other units
     var self = this;
     this.movableTiles = this.movableTiles.filter(function (t) {
@@ -420,13 +430,18 @@ Combat.prototype.calcDamage = function (attacker, target, skill) {
     defensive += (skillType === 'magic') ? tile.terrain.resBonus : tile.terrain.defBonus;
   }
 
-  // d20 roll (1–20)
+  // d20 roll (1–20) modified by weather visibility penalty
   var roll      = Math.floor(Math.random() * 20) + 1;
   var atkBonus  = Math.floor(offensive / 2);   // reused in both dc check and miss check
   var dc        = 10 + Math.floor(defensive / 2);   // Defense Class
 
   var crit = (roll === 20);
-  var miss = (roll === 1) || (roll + atkBonus < dc);
+  // d20 roll (1–20) modified by weather visibility penalty.
+  // Natural 1  → always a critical miss regardless of weather or bonuses.
+  // Natural 20 → always a critical hit  regardless of weather or penalties
+  //              (crit=true short-circuits the entire miss expression).
+  // All other rolls: miss if roll + atkBonus + weather.hitMod < dc.
+  var miss = (roll === 1) || (!crit && (roll + atkBonus + this.weather.hitMod < dc));
 
   if (miss && !crit) {
     return { damage: 0, roll: roll, crit: false, miss: true };
@@ -469,7 +484,7 @@ Combat.prototype.runAllyTurn = function (ally) {
   }
 
   // Move toward nearest enemy
-  var moveTiles = this.grid.reachableTiles(ally.gridRow, ally.gridCol, ally.moveRange);
+  var moveTiles = this.grid.reachableTiles(ally.gridRow, ally.gridCol, this._effectiveMoveRange(ally));
   var selfRef   = this;
   moveTiles = moveTiles.filter(function (t) { return !selfRef.unitAt(t.row, t.col); });
 
@@ -534,7 +549,7 @@ Combat.prototype.runEnemyTurn = function (enemy) {
   }
 
   // Move toward nearest player unit
-  var moveTiles = this.grid.reachableTiles(enemy.gridRow, enemy.gridCol, enemy.moveRange);
+  var moveTiles = this.grid.reachableTiles(enemy.gridRow, enemy.gridCol, this._effectiveMoveRange(enemy));
   var selfRef   = this;
   moveTiles = moveTiles.filter(function (t) { return !selfRef.unitAt(t.row, t.col); });
 
