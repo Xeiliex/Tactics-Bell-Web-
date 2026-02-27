@@ -343,6 +343,9 @@ var game = (function () {
 
     // 12. Start
     g.combat.start();
+
+    // 13. Dismiss loading overlay now that the battle is ready
+    g.ui.hideLoadingScreen();
   }
 
   // ─── Victory ─────────────────────────────────────────────────────────────────

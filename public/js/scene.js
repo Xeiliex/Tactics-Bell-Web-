@@ -518,7 +518,8 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
   var pos    = this.gridToWorld(unit.gridRow, unit.gridCol);
   var frames = 20;
   var scene  = this.scene;
-  var ease   = new BABYLON.CubicEaseInOut();
+  var ease   = new BABYLON.CubicEase();
+  ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
 
   var animGlow = new BABYLON.Animation(
     'moveGlow_' + unit.id, 'position', 60,

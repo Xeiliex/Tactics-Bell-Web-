@@ -12,6 +12,7 @@ var COMBAT_STATE = {
   PLAYER_ACTION: 'PLAYER_ACTION',
   PLAYER_TARGET: 'PLAYER_TARGET',
   EXECUTING:     'EXECUTING',
+  ALLY_TURN:     'ALLY_TURN',
   ENEMY_TURN:    'ENEMY_TURN',
   DONE:          'DONE'
 };
@@ -76,6 +77,13 @@ Combat.prototype.advanceToCurrentUnit = function () {
     this.ui.setPhaseDisplay('Enemy Turn');
     var self = this;
     setTimeout(function () { self.runEnemyTurn(unit); }, 700);
+  } else if (unit.isAlly) {
+    this.state = COMBAT_STATE.ALLY_TURN;
+    this.ui.setPhaseDisplay('Ally Turn');
+    this.ui.showMessage(unit.name + '\'s turn.');
+    this.ui.showUnitPanel(unit);
+    var self = this;
+    setTimeout(function () { self.runAllyTurn(unit); }, 700);
   } else {
     this.state = COMBAT_STATE.PLAYER_SELECT;
     this.ui.setPhaseDisplay('Your Turn');
@@ -100,6 +108,7 @@ Combat.prototype.nextUnit = function () {
   if (this.currentIdx >= this.turnOrder.length) {
     this.endRound();
   } else {
+    this.ui.updateTurnOrder(this.turnOrder, this.currentUnit());
     this.advanceToCurrentUnit();
   }
 };
@@ -109,6 +118,7 @@ Combat.prototype.endRound = function () {
   this.ui.setTurnNumber(this.turnNumber);
   // Rebuild turn order (units may have died)
   this.buildTurnOrder();
+  this.ui.updateTurnOrder(this.turnOrder, this.currentUnit());
   this.advanceToCurrentUnit();
 };
 
@@ -146,6 +156,7 @@ Combat.prototype.checkEndConditions = function () {
 Combat.prototype.handleTileClick = function (row, col) {
   if (this.state === COMBAT_STATE.EXECUTING || this.state === COMBAT_STATE.DONE) return;
   if (this.state === COMBAT_STATE.ENEMY_TURN)  return;
+  if (this.state === COMBAT_STATE.ALLY_TURN)   return;
 
   var clickedUnit = this.unitAt(row, col);
 
@@ -361,6 +372,70 @@ Combat.prototype.calcDamage = function (attacker, target, skill) {
 
   var raw = offensive * skillPower - defensive * 0.5;
   return Math.max(1, Math.round(raw + (Math.random() * 3 - 1))); // ±1 RNG variance
+};
+
+// ─── AI (ally turns) ─────────────────────────────────────────────────────────
+
+Combat.prototype.runAllyTurn = function (ally) {
+  var self = this;
+  if (!ally.isAlive()) { this.nextUnit(); return; }
+
+  // Find nearest enemy
+  var enemies = this.units.filter(function (u) { return u.isEnemy && u.isAlive(); });
+  if (enemies.length === 0) { this.nextUnit(); return; }
+
+  var nearest = enemies.reduce(function (best, u) {
+    var d  = Math.abs(u.gridRow - ally.gridRow)    + Math.abs(u.gridCol - ally.gridCol);
+    var bd = Math.abs(best.gridRow - ally.gridRow) + Math.abs(best.gridCol - ally.gridCol);
+    return d < bd ? u : best;
+  });
+
+  var distToNearest = Math.abs(nearest.gridRow - ally.gridRow) + Math.abs(nearest.gridCol - ally.gridCol);
+
+  // Already in attack range → attack
+  if (distToNearest <= ally.attackRange) {
+    var skill = ally.skills[Math.floor(Math.random() * ally.skills.length)];
+    if (skill && skill.targetsAllies) skill = ally.skills.find(function (s) { return !s.targetsAllies; }) || null;
+    setTimeout(function () {
+      self.doEnemyAttack(ally, nearest, skill);
+    }, 600);
+    return;
+  }
+
+  // Move toward nearest enemy
+  var moveTiles = this.grid.reachableTiles(ally.gridRow, ally.gridCol, ally.moveRange);
+  var selfRef   = this;
+  moveTiles = moveTiles.filter(function (t) { return !selfRef.unitAt(t.row, t.col); });
+
+  if (moveTiles.length > 0) {
+    var best = moveTiles.reduce(function (b, t) {
+      var td = Math.abs(t.row - nearest.gridRow) + Math.abs(t.col - nearest.gridCol);
+      var bd = Math.abs(b.row - nearest.gridRow) + Math.abs(b.col - nearest.gridCol);
+      return td < bd ? t : b;
+    });
+
+    var oldTile = this.grid.getTile(ally.gridRow, ally.gridCol);
+    oldTile.unit  = null;
+    ally.gridRow  = best.row;
+    ally.gridCol  = best.col;
+    best.unit     = ally;
+    ally.hasMoved = true;
+
+    this.scene.moveUnit(ally, function () {
+      var newDist = Math.abs(nearest.gridRow - ally.gridRow) + Math.abs(nearest.gridCol - ally.gridCol);
+      if (newDist <= ally.attackRange) {
+        var skill = ally.skills[Math.floor(Math.random() * ally.skills.length)];
+        if (skill && skill.targetsAllies) skill = ally.skills.find(function (s) { return !s.targetsAllies; }) || null;
+        setTimeout(function () {
+          self.doEnemyAttack(ally, nearest, skill);
+        }, 400);
+      } else {
+        self.nextUnit();
+      }
+    });
+  } else {
+    this.nextUnit();
+  }
 };
 
 // ─── AI (enemy turns) ────────────────────────────────────────────────────────
