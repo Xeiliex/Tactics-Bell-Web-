@@ -25,6 +25,54 @@ var game = (function () {
 
   var SAVE_KEY = 'tactics-bell-save';
 
+  /**
+   * Compute a simple djb2-style checksum for lightweight tamper detection.
+   * Note: this deters casual editing via DevTools but is not a cryptographic
+   * guarantee — a determined user could recalculate the checksum from the
+   * visible source code.
+   * @param {string} str
+   * @returns {number}
+   */
+  function _computeChecksum(str) {
+    var hash = 5381;
+    for (var i = 0; i < str.length; i++) {
+      hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+    }
+    return hash;
+  }
+
+  /**
+   * Encode save data as a Base64 blob with an embedded checksum so the stored
+   * value is not plain, human-readable JSON and casual tampering is detectable.
+   * @param {object} data
+   * @returns {string}
+   */
+  function _encodeSave(data) {
+    var json     = JSON.stringify(data);
+    var checksum = _computeChecksum(json);
+    var payload  = JSON.stringify({ d: json, c: checksum });
+    var bytes    = new TextEncoder().encode(payload);
+    return btoa(String.fromCharCode.apply(null, bytes));
+  }
+
+  /**
+   * Decode a save blob produced by _encodeSave.  Returns null if the value
+   * cannot be decoded or the checksum does not match (i.e. tampered).
+   * @param {string} raw
+   * @returns {object|null}
+   */
+  function _decodeSave(raw) {
+    try {
+      var bytes   = Uint8Array.from(atob(raw), function (c) { return c.charCodeAt(0); });
+      var payload = JSON.parse(new TextDecoder().decode(bytes));
+      if (!payload || typeof payload.d !== 'string' || typeof payload.c !== 'number') return null;
+      if (_computeChecksum(payload.d) !== payload.c) return null;
+      return JSON.parse(payload.d);
+    } catch (e) {
+      return null;
+    }
+  }
+
   function saveProgress() {
     if (!g.player) return;
     try {
@@ -36,7 +84,7 @@ var game = (function () {
         exp:     g.player.exp,
         hp:      g.player.hp
       };
-      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+      localStorage.setItem(SAVE_KEY, _encodeSave(data));
     } catch (e) {
       // localStorage not available in this environment
     }
@@ -45,7 +93,7 @@ var game = (function () {
   function loadSave() {
     try {
       var raw = localStorage.getItem(SAVE_KEY);
-      return raw ? JSON.parse(raw) : null;
+      return raw ? _decodeSave(raw) : null;
     } catch (e) {
       return null;
     }
