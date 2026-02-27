@@ -100,9 +100,10 @@ GameScene.prototype.init = function (canvasId) {
   hemi.groundColor  = new BABYLON.Color3(0.15, 0.08, 0.2);
   hemi.specular     = BABYLON.Color3.Black();
 
-  // Shadow generator — blurred exponential for soft shadows
-  var shadowGen = new BABYLON.ShadowGenerator(1024, dirLight);
-  shadowGen.useBlurExponentialShadowMap = true;
+  // Shadow generator — quality scaled by hardware tier
+  var shadowMapSize = (typeof HARDWARE_TIER !== 'undefined' && HARDWARE_TIER === 'low') ? 512 : 1024;
+  var shadowGen = new BABYLON.ShadowGenerator(shadowMapSize, dirLight);
+  shadowGen.useBlurExponentialShadowMap = (typeof HARDWARE_TIER === 'undefined' || HARDWARE_TIER !== 'low');
   shadowGen.blurKernel = 8;
   this._shadowGenerator = shadowGen;
 
@@ -171,12 +172,15 @@ GameScene.prototype.renderGrid = function (grid) {
         }
 
         // Subtle surface micro-detail via procedural noise (ambient/AO variation)
-        var noiseTex = new BABYLON.NoiseProceduralTexture('noise_' + matKey, TERRAIN_NOISE_SIZE, this.scene);
-        noiseTex.octaves              = TERRAIN_NOISE_OCTAVES;
-        noiseTex.persistence          = TERRAIN_NOISE_PERSISTENCE;
-        noiseTex.animationSpeedFactor = 0;
-        mat.ambientTexture         = noiseTex;
-        mat.ambientTextureStrength = TERRAIN_NOISE_AMBIENT;
+        // Skipped on low-end hardware to avoid GPU overhead.
+        if (typeof HARDWARE_TIER === 'undefined' || HARDWARE_TIER !== 'low') {
+          var noiseTex = new BABYLON.NoiseProceduralTexture('noise_' + matKey, TERRAIN_NOISE_SIZE, this.scene);
+          noiseTex.octaves              = TERRAIN_NOISE_OCTAVES;
+          noiseTex.persistence          = TERRAIN_NOISE_PERSISTENCE;
+          noiseTex.animationSpeedFactor = 0;
+          mat.ambientTexture         = noiseTex;
+          mat.ambientTextureStrength = TERRAIN_NOISE_AMBIENT;
+        }
 
         this._tileMat[matKey] = mat;
       }
@@ -250,12 +254,14 @@ GameScene.prototype._upgradeToModels = function (grid) {
             pbrMat.emissiveColor     = new BABYLON.Color3(pbr.emissiveR, pbr.emissiveG, pbr.emissiveB);
             pbrMat.emissiveIntensity = pbr.emissiveIntensity;
           }
-          var noiseTex = new BABYLON.NoiseProceduralTexture('modelNoise_' + terrainName, TERRAIN_NOISE_SIZE, self.scene);
-          noiseTex.octaves              = TERRAIN_NOISE_OCTAVES;
-          noiseTex.persistence          = TERRAIN_NOISE_PERSISTENCE;
-          noiseTex.animationSpeedFactor = 0;
-          pbrMat.ambientTexture         = noiseTex;
-          pbrMat.ambientTextureStrength = TERRAIN_NOISE_AMBIENT;
+          if (typeof HARDWARE_TIER === 'undefined' || HARDWARE_TIER !== 'low') {
+            var noiseTex = new BABYLON.NoiseProceduralTexture('modelNoise_' + terrainName, TERRAIN_NOISE_SIZE, self.scene);
+            noiseTex.octaves              = TERRAIN_NOISE_OCTAVES;
+            noiseTex.persistence          = TERRAIN_NOISE_PERSISTENCE;
+            noiseTex.animationSpeedFactor = 0;
+            pbrMat.ambientTexture         = noiseTex;
+            pbrMat.ambientTextureStrength = TERRAIN_NOISE_AMBIENT;
+          }
           template.material = pbrMat;
           stdMat.dispose();
         }
@@ -451,7 +457,8 @@ GameScene.prototype._spawnHitParticles = function (unit, skillType) {
   var pos   = this.gridToWorld(unit.gridRow, unit.gridCol);
   var scene = this.scene;
 
-  var ps = new BABYLON.ParticleSystem('hit_' + unit.id + '_' + Date.now(), 40, scene);
+  var particleCount = (typeof HARDWARE_TIER !== 'undefined' && HARDWARE_TIER === 'low') ? 16 : 40;
+  var ps = new BABYLON.ParticleSystem('hit_' + unit.id + '_' + Date.now(), particleCount, scene);
   ps.emitter    = new BABYLON.Vector3(pos.x, 0.5, pos.z);
   ps.minEmitBox = new BABYLON.Vector3(-0.15, 0, -0.15);
   ps.maxEmitBox = new BABYLON.Vector3(0.15, 0.2, 0.15);

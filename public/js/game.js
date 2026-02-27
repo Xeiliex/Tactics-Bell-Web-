@@ -78,7 +78,33 @@ var game = (function () {
     g.ui.showTitleScreen();
     _updateContinueButton();
 
-    // Title → New Game
+    // Fullscreen toggle
+    (function () {
+      var btn = document.getElementById('btn-fullscreen');
+      if (!btn) return;
+
+      function updateIcon() {
+        var inFs = !!document.fullscreenElement;
+        // ⛶ = enter fullscreen, ✕-like symbol for exit
+        btn.innerHTML  = inFs ? '&#x2716;&#xFE0E;' : '&#x26F6;';
+        btn.title      = inFs ? 'Exit Fullscreen' : 'Enter Fullscreen';
+      }
+
+      btn.addEventListener('click', function () {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(function (err) {
+            console.warn('Fullscreen request failed:', err.message);
+          });
+        } else {
+          document.exitFullscreen();
+        }
+      });
+
+      document.addEventListener('fullscreenchange', updateIcon);
+      updateIcon();
+    }());
+
+    // Title → Create
     document.getElementById('btn-new-game').addEventListener('click', function () {
       clearSave();
       g.stage = 1;
@@ -259,10 +285,16 @@ var game = (function () {
     g.ui.showMessage('Battle start! Select a unit to act.');
     g.ui.renderPartyPanel([g.player].concat(g.allies));
 
-    // 11. Fade out loading screen, then start combat
-    g.ui.hideLoadingScreen(function () {
-      g.combat.start();
-    });
+    // 11. Show hardware tier badge briefly
+    var hwBadge = document.getElementById('hw-tier-badge');
+    if (hwBadge && typeof HARDWARE_TIER !== 'undefined') {
+      hwBadge.textContent = HARDWARE_TIER === 'high' ? '🖥 GPU: High Quality' : '⚙ CPU: Low Quality';
+      hwBadge.style.opacity = '1';
+      setTimeout(function () { hwBadge.style.opacity = '0'; }, 3000);
+    }
+
+    // 12. Start
+    g.combat.start();
   }
 
   // ─── Victory ─────────────────────────────────────────────────────────────────
