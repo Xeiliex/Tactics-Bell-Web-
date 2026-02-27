@@ -56,6 +56,7 @@ function GameScene() {
   this._fpsEl         = null; // #debug-fps-rate DOM element
   this._frameEl       = null; // #debug-fps-frame DOM element
   this._shadowGenerator = null; // ShadowGenerator for directional light
+  this._fxaaPostProcess = null; // FXAA anti-aliasing post-process
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────
@@ -106,6 +107,12 @@ GameScene.prototype.init = function (canvasId) {
   shadowGen.useBlurExponentialShadowMap = (typeof HARDWARE_TIER === 'undefined' || HARDWARE_TIER !== 'low');
   shadowGen.blurKernel = 8;
   this._shadowGenerator = shadowGen;
+
+  // FXAA anti-aliasing post-process — smooths jagged edges on high-end hardware.
+  // Skipped on low-end / software renderers where the GPU overhead is unwanted.
+  if (typeof HARDWARE_TIER === 'undefined' || HARDWARE_TIER !== 'low') {
+    this._fxaaPostProcess = new BABYLON.FxaaPostProcess('fxaa', 1.0, this.camera);
+  }
 
   // PBR environment intensity for image-based lighting
   this.scene.environmentIntensity = 0.4;
@@ -317,7 +324,7 @@ GameScene.prototype.spawnUnit = function (unit) {
 
   // Body (cylinder)
   var body = BABYLON.MeshBuilder.CreateCylinder('body_' + unit.id, {
-    height: 0.6, diameter: 0.45, tessellation: 8
+    height: 0.6, diameter: 0.45, tessellation: 16
   }, this.scene);
   body.position = new BABYLON.Vector3(pos.x, 0.3, pos.z);
   var bMat = new BABYLON.PBRMaterial('bmat_' + unit.id, this.scene);
@@ -332,7 +339,7 @@ GameScene.prototype.spawnUnit = function (unit) {
 
   // Head (sphere)
   var head = BABYLON.MeshBuilder.CreateSphere('head_' + unit.id, {
-    diameter: 0.28, segments: 6
+    diameter: 0.28, segments: 12
   }, this.scene);
   head.position = new BABYLON.Vector3(pos.x, 0.73, pos.z);
   var hMat = new BABYLON.PBRMaterial('hmat_' + unit.id, this.scene);
@@ -579,6 +586,10 @@ GameScene.prototype.setClickHandler = function (callback) {
 
 GameScene.prototype.dispose = function () {
   this.clearHighlights();
+  if (this._fxaaPostProcess) {
+    this._fxaaPostProcess.dispose();
+    this._fxaaPostProcess = null;
+  }
   if (this.engine) {
     this.engine.stopRenderLoop();
     this.scene.dispose();
