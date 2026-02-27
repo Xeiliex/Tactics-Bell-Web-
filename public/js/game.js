@@ -17,28 +17,86 @@ var game = (function () {
     grid:          null,   // Grid
     scene:         null,   // GameScene
     combat:        null,   // Combat
-    ui:            null    // GameUI
+    ui:            null,   // GameUI
+    _pendingSave:  null    // Temporary holder for continue-game restore data
   };
+
+  // ─── Local save helpers ──────────────────────────────────────────────────────
+
+  var SAVE_KEY = 'tactics-bell-save';
+
+  function saveProgress() {
+    if (!g.player) return;
+    try {
+      var data = {
+        stage:   g.stage,
+        race:    g.player.race,
+        classId: g.player.classId,
+        level:   g.player.level,
+        exp:     g.player.exp,
+        hp:      g.player.hp
+      };
+      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    } catch (e) {
+      // localStorage not available in this environment
+    }
+  }
+
+  function loadSave() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function clearSave() {
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch (e) {}
+  }
+
+  function _updateContinueButton() {
+    var btn = document.getElementById('btn-continue-game');
+    if (!btn) return;
+    if (loadSave() !== null) {
+      var wasHidden = btn.classList.contains('hidden');
+      btn.classList.remove('hidden');
+      if (wasHidden) {
+        anime({ targets: btn, scale: [0.8, 1], opacity: [0, 1], duration: 500, easing: 'easeOutBack', delay: 200 });
+      }
+    } else {
+      btn.classList.add('hidden');
+    }
+  }
 
   // ─── Boot ───────────────────────────────────────────────────────────────────
 
   function init() {
     g.ui = new GameUI(g);
     g.ui.showTitleScreen();
+    _updateContinueButton();
 
-    // Begin pre-fetching terrain model files in the background so that stage
-    // transitions can serve them from memory instead of making network requests.
-    if (typeof AssetCache !== 'undefined') {
-      AssetCache.preloadTerrainModels();
-    }
-
-    // Title → Create
+    // Title → New Game
     document.getElementById('btn-new-game').addEventListener('click', function () {
+      clearSave();
       g.stage = 1;
       g.player = null;
       g.selectedRace  = null;
       g.selectedClass = null;
       g.ui.showCreateScreen();
+    });
+
+    // Title → Continue
+    document.getElementById('btn-continue-game').addEventListener('click', function () {
+      var save = loadSave();
+      if (!save) return;
+      g.stage         = save.stage;
+      g.selectedRace  = save.race;
+      g.selectedClass = save.classId;
+      g._pendingSave  = save;
+      startBattle(false);
     });
 
     // Create → Battle
@@ -97,6 +155,9 @@ var game = (function () {
     // Show battle screen first so canvas exists in DOM
     g.ui.showBattleScreen();
 
+    // Show loading overlay while the scene initialises
+    g.ui.showLoadingScreen('Preparing battle…');
+
     // Small delay to let the DOM update before initialising Babylon
     setTimeout(function () {
       _setupBattle(isNewGame);
@@ -108,12 +169,28 @@ var game = (function () {
     if (g.scene) { g.scene.dispose(); g.scene = null; }
 
     // 2. Create/preserve player character
-    if (isNewGame || !g.player) {
+    if (isNewGame) {
       g.player = createPlayerCharacter(g.selectedRace, g.selectedClass);
-    } else {
+    } else if (g._pendingSave) {
+      // Restore from localStorage save
+      var save = g._pendingSave;
+      g._pendingSave = null;
+      g.player = new Character({
+        name:     'Hero',
+        raceId:   save.race,
+        classId:  save.classId,
+        level:    save.level,
+        exp:      save.exp,
+        isPlayer: true
+      });
+      // Apply the same 50 % partial heal used on stage transitions
+      g.player.hp = Math.min(g.player.maxHp, save.hp + Math.floor(g.player.maxHp * 0.5));
+    } else if (g.player) {
       // Restore HP for the new stage (partial heal — 50 % of max)
       g.player.hp = Math.min(g.player.maxHp, g.player.hp + Math.floor(g.player.maxHp * 0.5));
       g.player.startTurn();
+    } else {
+      g.player = createPlayerCharacter(g.selectedRace, g.selectedClass);
     }
 
     // 3. Generate stage
@@ -182,8 +259,10 @@ var game = (function () {
     g.ui.showMessage('Battle start! Select a unit to act.');
     g.ui.renderPartyPanel([g.player].concat(g.allies));
 
-    // 11. Start
-    g.combat.start();
+    // 11. Fade out loading screen, then start combat
+    g.ui.hideLoadingScreen(function () {
+      g.combat.start();
+    });
   }
 
   // ─── Victory ─────────────────────────────────────────────────────────────────
@@ -203,6 +282,7 @@ var game = (function () {
 
   function onNextStage() {
     g.stage++;
+    saveProgress();
     startBattle(false);
   }
 
@@ -228,6 +308,7 @@ var game = (function () {
     if (typeof AssetCache !== 'undefined') AssetCache.stopMemoryMonitor();
     if (g.ui) g.ui.hideMemoryWarning();
     g.ui.showTitleScreen();
+    _updateContinueButton();
   }
 
   // ─── Utility ─────────────────────────────────────────────────────────────────
