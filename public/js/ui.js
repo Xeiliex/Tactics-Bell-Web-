@@ -107,151 +107,157 @@ GameUI.prototype.showTitleScreen = function () {
   });
 };
 
-// ─── Character creation screen ────────────────────────────────────────────────
+// ─── Character creation wizard ────────────────────────────────────────────────
+
+var WIZARD_STEP_META = [
+  { title: 'Choose Your Race',      sub: 'Your heritage shapes your innate abilities.' },
+  { title: 'Choose Your Class',     sub: 'Your training defines your role in battle.' },
+  { title: 'Choose a Background',   sub: 'Your past grants unique advantages.' },
+  { title: 'Name & Appearance',     sub: 'Give your adventurer an identity.' }
+];
+
+var WIZARD_MEMBER_META = [
+  { label: '⚔ HERO  ·  MEMBER 1 OF 3',  defaultName: 'Hero',   cardTitle: 'Hero'    },
+  { label: '🛡 ALLY  ·  MEMBER 2 OF 3',  defaultName: 'Ally I', cardTitle: 'Ally I'  },
+  { label: '🗡 ALLY  ·  MEMBER 3 OF 3',  defaultName: 'Ally II', cardTitle: 'Ally II' }
+];
 
 GameUI.prototype.showCreateScreen = function () {
   var game = this.game;
 
-  // Initialise party config if this is a fresh visit
+  // Initialise partyConfig if this is a fresh visit
   if (!game.partyConfig) {
-    game.partyConfig = [{ name: 'Hero', race: null, classId: null, colorId: 'default' }];
+    game.partyConfig = [{
+      name: 'Hero', race: null, classId: null, backgroundId: null, colorId: 'default'
+    }];
     for (var pi = 0; pi < 2 && pi < ALLY_PRESETS.length; pi++) {
       var p = ALLY_PRESETS[pi];
-      game.partyConfig.push({ name: p.name, race: p.race, classId: p.classId, colorId: 'default' });
+      game.partyConfig.push({
+        name: p.name, race: p.race, classId: p.classId,
+        backgroundId: null, colorId: 'default'
+      });
     }
-    game.activePartyMember = 0;
   }
 
-  // Load the active member's state into the shared selectors
-  var active = game.partyConfig[game.activePartyMember || 0];
-  game.selectedRace  = active.race;
-  game.selectedClass = active.classId;
+  // Start (or restart) wizard from member 0, step 0
+  this._wizard = { memberIdx: 0, stepIdx: 0 };
 
   this.showScreen('screen-create');
-  this._buildPartyTabs();
-  this._buildRaceCards();
-  this._buildClassCards();
-  this._buildColorSwatches();
-  this._syncNameInput();
-  this._updateStatsPreview();
-
-  anime({
-    targets: '.card',
-    translateY: [20, 0], opacity: [0, 1],
-    duration: 400, easing: 'easeOutQuart',
-    delay: anime.stagger(60, { start: 200 })
-  });
+  this._renderWizardStep();
 };
 
-// ─── Party tabs ───────────────────────────────────────────────────────────────
+// ─── Wizard rendering ─────────────────────────────────────────────────────────
 
-GameUI.prototype._buildPartyTabs = function () {
-  var container = document.getElementById('party-member-tabs');
-  if (!container) return;
-  container.innerHTML = '';
-  var game = this.game;
-  var self = this;
-  var activeIdx = game.activePartyMember || 0;
+GameUI.prototype._renderWizardStep = function () {
+  var w      = this._wizard;
+  var game   = this.game;
+  var member = game.partyConfig[w.memberIdx];
+  var meta   = WIZARD_STEP_META[w.stepIdx];
+  var mmeta  = WIZARD_MEMBER_META[w.memberIdx] || WIZARD_MEMBER_META[0];
+  var isLastMember = w.memberIdx === game.partyConfig.length - 1;
+  var isLastStep   = w.stepIdx   === WIZARD_STEP_META.length - 1;
 
-  game.partyConfig.forEach(function (member, i) {
-    var btn = document.createElement('button');
-    var isActive = i === activeIdx;
-    var isConfigured = !!(member.race && member.classId);
-    var classes = 'party-tab';
-    if (isActive)     classes += ' active';
-    if (isConfigured) classes += ' configured';
-    btn.className = classes;
-    btn.dataset.member = i;
+  // Member label
+  var memberLabel = document.getElementById('wizard-member-label');
+  if (memberLabel) memberLabel.textContent = mmeta.label;
 
-    // Label shows emoji + name once configured
-    btn.textContent = isConfigured
-      ? CLASSES[member.classId].emoji + ' ' + member.name
-      : (i === 0 ? '⚔ Hero' : '👤 Ally ' + i);
+  // Step title & subtitle
+  var stepTitle = document.getElementById('wizard-step-title');
+  if (stepTitle) stepTitle.textContent = meta.title;
+  var stepSub = document.getElementById('wizard-step-sub');
+  if (stepSub) stepSub.textContent = meta.sub;
 
-    btn.addEventListener('click', function () {
-      self._switchPartyMember(i);
-    });
-    container.appendChild(btn);
-  });
-};
-
-GameUI.prototype._switchPartyMember = function (index) {
-  var game = this.game;
-  var fromIdx = game.activePartyMember || 0;
-
-  // Persist current tab state before switching
-  var current = game.partyConfig[fromIdx];
-  current.race    = game.selectedRace;
-  current.classId = game.selectedClass;
-  var nameInput = document.getElementById('char-name-input');
-  if (nameInput) current.name = nameInput.value.trim() || current.name;
-
-  // Switch
-  game.activePartyMember = index;
-  var next = game.partyConfig[index];
-  game.selectedRace  = next.race;
-  game.selectedClass = next.classId;
-
-  // Rebuild UI for the new member
-  this._buildPartyTabs();
-  this._buildRaceCards();
-  this._buildClassCards();
-  this._buildColorSwatches();
-  this._syncNameInput();
-  this._updateStatsPreview();
-};
-
-GameUI.prototype._syncNameInput = function () {
-  var game  = this.game;
-  var input = document.getElementById('char-name-input');
-  if (!input) return;
-  var m = game.partyConfig && game.partyConfig[game.activePartyMember || 0];
-  input.value = m ? (m.name || '') : '';
-};
-
-// ─── Colour swatches ─────────────────────────────────────────────────────────
-
-GameUI.prototype._buildColorSwatches = function () {
-  var container = document.getElementById('color-swatches');
-  if (!container) return;
-  container.innerHTML = '';
-  var game = this.game;
-  var self = this;
-  var activeIdx = game.activePartyMember || 0;
-  var currentColorId = (game.partyConfig && game.partyConfig[activeIdx].colorId) || 'default';
-
-  BODY_COLORS.forEach(function (color) {
-    var swatch = document.createElement('div');
-    swatch.className = 'color-swatch' + (color.id === currentColorId ? ' selected' : '');
-    swatch.dataset.color = color.id;
-    swatch.title = color.name;
-
-    if (color.hex) {
-      swatch.style.backgroundColor = color.hex;
+  // Progress dots
+  var dotsEl = document.getElementById('wizard-step-dots');
+  if (dotsEl) {
+    dotsEl.innerHTML = '';
+    for (var s = 0; s < WIZARD_STEP_META.length; s++) {
+      var dot = document.createElement('div');
+      dot.className = 'wizard-dot' +
+        (s < w.stepIdx ? ' done' : (s === w.stepIdx ? ' active' : ''));
+      dotsEl.appendChild(dot);
     }
+  }
 
-    swatch.addEventListener('click', function () {
-      document.querySelectorAll('.color-swatch').forEach(function (s) { s.classList.remove('selected'); });
-      swatch.classList.add('selected');
-      if (game.partyConfig) {
-        game.partyConfig[game.activePartyMember || 0].colorId = color.id;
-      }
-      anime({ targets: swatch, scale: [0.85, 1.0], duration: 200, easing: 'easeOutBack' });
-    });
+  // Back button label
+  var backBtn = document.getElementById('btn-wizard-back');
+  if (backBtn) {
+    backBtn.textContent = (w.memberIdx === 0 && w.stepIdx === 0) ? '← Cancel' : '← Back';
+  }
 
-    container.appendChild(swatch);
-  });
+  // Next button label & state
+  var nextBtn = document.getElementById('btn-wizard-next');
+  if (nextBtn) {
+    nextBtn.textContent = (isLastMember && isLastStep) ? 'Review Party →' : 'Next →';
+    nextBtn.disabled = !this._wizardStepComplete(w.memberIdx, w.stepIdx);
+  }
+
+  // Build content
+  var content = document.getElementById('wizard-content');
+  if (content) {
+    content.innerHTML = '';
+    if (w.stepIdx === 0)      this._buildWizardRaceStep(content, member);
+    else if (w.stepIdx === 1) this._buildWizardClassStep(content, member);
+    else if (w.stepIdx === 2) this._buildWizardBackgroundStep(content, member);
+    else                      this._buildWizardIdentityStep(content, member, w.memberIdx, mmeta);
+  }
+
+  anime({ targets: '#wizard-content', opacity: [0, 1], translateY: [12, 0],
+    duration: 280, easing: 'easeOutQuart' });
 };
 
-GameUI.prototype._buildRaceCards = function () {
-  var container = document.getElementById('race-cards');
-  container.innerHTML = '';
+GameUI.prototype._wizardStepComplete = function (memberIdx, stepIdx) {
+  var m = this.game.partyConfig[memberIdx];
+  if (stepIdx === 0) return !!m.race;
+  if (stepIdx === 1) return !!m.classId;
+  if (stepIdx === 2) return !!m.backgroundId;
+  return true; // identity always completable
+};
+
+// ─── Wizard navigation ────────────────────────────────────────────────────────
+
+GameUI.prototype.wizardNext = function () {
+  var w    = this._wizard;
   var game = this.game;
+  if (!this._wizardStepComplete(w.memberIdx, w.stepIdx)) return;
+
+  var isLastMember = w.memberIdx === game.partyConfig.length - 1;
+  var isLastStep   = w.stepIdx   === WIZARD_STEP_META.length - 1;
+
+  if (isLastMember && isLastStep) {
+    this.showPartyReviewScreen();
+    return;
+  }
+
+  if (isLastStep) {
+    w.memberIdx++;
+    w.stepIdx = 0;
+  } else {
+    w.stepIdx++;
+  }
+  this._renderWizardStep();
+};
+
+GameUI.prototype.wizardBack = function () {
+  var w = this._wizard;
+  if (w.stepIdx === 0 && w.memberIdx > 0) {
+    w.memberIdx--;
+    w.stepIdx = WIZARD_STEP_META.length - 1;
+  } else if (w.stepIdx > 0) {
+    w.stepIdx--;
+  }
+  this._renderWizardStep();
+};
+
+// ─── Wizard step renderers ────────────────────────────────────────────────────
+
+GameUI.prototype._buildWizardRaceStep = function (container, member) {
+  var grid = document.createElement('div');
+  grid.className = 'cards-grid';
 
   Object.values(RACES).forEach(function (race) {
     var card = document.createElement('div');
-    card.className = 'card' + (game.selectedRace === race.id ? ' selected' : '');
-    card.dataset.race = race.id;
+    card.className = 'card' + (member.race === race.id ? ' selected' : '');
 
     var bonuses = Object.entries(race.statBonuses)
       .filter(function (e) { return e[1] !== 0; })
@@ -261,85 +267,217 @@ GameUI.prototype._buildRaceCards = function () {
     card.innerHTML =
       '<div class="card-emoji">' + race.emoji + '</div>' +
       '<div class="card-name" style="color:' + race.color + '">' + race.name + '</div>' +
-      '<div class="card-desc">'  + race.description + '</div>' +
+      '<div class="card-desc">' + race.description + '</div>' +
       (bonuses ? '<div class="card-bonuses">' + bonuses + '</div>' : '');
 
     card.addEventListener('click', function () {
-      document.querySelectorAll('#race-cards .card').forEach(function (c) { c.classList.remove('selected'); });
+      container.querySelectorAll('.card').forEach(function (c) { c.classList.remove('selected'); });
       card.classList.add('selected');
-      game.selectedRace = race.id;
-      game.ui._updateStatsPreview();
+      member.race = race.id;
+      var nb = document.getElementById('btn-wizard-next');
+      if (nb) nb.disabled = false;
       anime({ targets: card, scale: [0.95, 1.0], duration: 200, easing: 'easeOutBack' });
     });
 
-    container.appendChild(card);
+    grid.appendChild(card);
   });
+
+  container.appendChild(grid);
+  anime({ targets: grid.querySelectorAll('.card'), translateY: [16, 0], opacity: [0, 1],
+    duration: 340, easing: 'easeOutQuart', delay: anime.stagger(50) });
 };
 
-GameUI.prototype._buildClassCards = function () {
-  var container = document.getElementById('class-cards');
-  container.innerHTML = '';
-  var game = this.game;
+GameUI.prototype._buildWizardClassStep = function (container, member) {
+  var grid = document.createElement('div');
+  grid.className = 'cards-grid';
 
   Object.values(CLASSES).forEach(function (cls) {
     var card = document.createElement('div');
-    card.className = 'card' + (game.selectedClass === cls.id ? ' selected' : '');
-    card.dataset.cls = cls.id;
+    card.className = 'card' + (member.classId === cls.id ? ' selected' : '');
 
     card.innerHTML =
       '<div class="card-emoji">' + cls.emoji + '</div>' +
       '<div class="card-name" style="color:' + cls.color + '">' + cls.name + '</div>' +
-      '<div class="card-desc">'  + cls.description + '</div>' +
+      '<div class="card-desc">' + cls.description + '</div>' +
       '<div class="card-bonuses">Move ' + cls.moveRange + '  Range ' + cls.attackRange + '</div>';
 
     card.addEventListener('click', function () {
-      document.querySelectorAll('#class-cards .card').forEach(function (c) { c.classList.remove('selected'); });
+      container.querySelectorAll('.card').forEach(function (c) { c.classList.remove('selected'); });
       card.classList.add('selected');
-      game.selectedClass = cls.id;
-      game.ui._updateStatsPreview();
+      member.classId = cls.id;
+      var nb = document.getElementById('btn-wizard-next');
+      if (nb) nb.disabled = false;
       anime({ targets: card, scale: [0.95, 1.0], duration: 200, easing: 'easeOutBack' });
     });
 
-    container.appendChild(card);
+    grid.appendChild(card);
   });
+
+  container.appendChild(grid);
+  anime({ targets: grid.querySelectorAll('.card'), translateY: [16, 0], opacity: [0, 1],
+    duration: 340, easing: 'easeOutQuart', delay: anime.stagger(50) });
 };
 
-GameUI.prototype._updateStatsPreview = function () {
-  var preview = document.getElementById('stats-preview');
-  var startBtn = document.getElementById('btn-start-battle');
-  var game    = this.game;
+GameUI.prototype._buildWizardBackgroundStep = function (container, member) {
+  var grid = document.createElement('div');
+  grid.className = 'cards-grid';
 
-  if (!game.selectedRace || !game.selectedClass) {
-    preview.innerHTML = '<div class="stats-placeholder">← Select a race and class to preview stats</div>';
-    // Enable the button only if the hero slot (index 0) is already configured
-    var heroConfigured = game.partyConfig && game.partyConfig[0].race && game.partyConfig[0].classId;
-    startBtn.disabled = !heroConfigured;
-    return;
+  Object.values(BACKGROUNDS).forEach(function (bg) {
+    var card = document.createElement('div');
+    card.className = 'card' + (member.backgroundId === bg.id ? ' selected' : '');
+
+    var bonuses = Object.entries(bg.statBonuses)
+      .filter(function (e) { return e[1] !== 0; })
+      .map(function (e) { return (e[1] > 0 ? '+' : '') + e[1] + ' ' + e[0].toUpperCase(); })
+      .join('  ');
+
+    card.innerHTML =
+      '<div class="card-emoji">' + bg.emoji + '</div>' +
+      '<div class="card-name" style="color:' + bg.color + '">' + bg.name + '</div>' +
+      '<div class="card-desc">' + bg.description + '</div>' +
+      '<div class="card-flavor">' + bg.flavor + '</div>' +
+      (bonuses ? '<div class="card-bonuses">' + bonuses + '</div>' : '');
+
+    card.addEventListener('click', function () {
+      container.querySelectorAll('.card').forEach(function (c) { c.classList.remove('selected'); });
+      card.classList.add('selected');
+      member.backgroundId = bg.id;
+      var nb = document.getElementById('btn-wizard-next');
+      if (nb) nb.disabled = false;
+      anime({ targets: card, scale: [0.95, 1.0], duration: 200, easing: 'easeOutBack' });
+    });
+
+    grid.appendChild(card);
+  });
+
+  container.appendChild(grid);
+  anime({ targets: grid.querySelectorAll('.card'), translateY: [16, 0], opacity: [0, 1],
+    duration: 340, easing: 'easeOutQuart', delay: anime.stagger(50) });
+};
+
+GameUI.prototype._buildWizardIdentityStep = function (container, member, memberIdx, mmeta) {
+  var wrap = document.createElement('div');
+  wrap.className = 'wizard-identity';
+
+  // Name input
+  var nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.className = 'char-name-input';
+  nameInput.maxLength = 16;
+  nameInput.placeholder = mmeta.defaultName + ' name…';
+  nameInput.value = member.name || mmeta.defaultName;
+  nameInput.addEventListener('input', function () {
+    member.name = nameInput.value || mmeta.defaultName;
+  });
+  wrap.appendChild(nameInput);
+
+  // Colour label
+  var colorLabel = document.createElement('div');
+  colorLabel.className = 'wizard-color-label';
+  colorLabel.textContent = 'Body Colour';
+  wrap.appendChild(colorLabel);
+
+  // Colour swatches
+  var swatchRow = document.createElement('div');
+  swatchRow.className = 'color-swatches';
+  var currentColor = member.colorId || 'default';
+
+  BODY_COLORS.forEach(function (color) {
+    var swatch = document.createElement('div');
+    swatch.className = 'color-swatch' + (color.id === currentColor ? ' selected' : '');
+    swatch.dataset.color = color.id;
+    swatch.title = color.name;
+    if (color.hex) swatch.style.backgroundColor = color.hex;
+
+    swatch.addEventListener('click', function () {
+      swatchRow.querySelectorAll('.color-swatch').forEach(function (s) { s.classList.remove('selected'); });
+      swatch.classList.add('selected');
+      member.colorId = color.id;
+      anime({ targets: swatch, scale: [0.85, 1.0], duration: 200, easing: 'easeOutBack' });
+    });
+
+    swatchRow.appendChild(swatch);
+  });
+  wrap.appendChild(swatchRow);
+
+  // Stats preview (race + class + background all applied)
+  if (member.race && member.classId) {
+    var preview = document.createElement('div');
+    preview.className = 'stats-preview';
+    var dummy = new Character({
+      name: 'Preview', raceId: member.race, classId: member.classId,
+      backgroundId: member.backgroundId, level: 1
+    });
+    var statDefs = [
+      { label: 'HP',  val: dummy.maxHp },
+      { label: 'ATK', val: dummy.atk   },
+      { label: 'DEF', val: dummy.def   },
+      { label: 'MAG', val: dummy.mag   },
+      { label: 'SPD', val: dummy.spd   },
+      { label: 'RES', val: dummy.res   }
+    ];
+    preview.innerHTML = statDefs.map(function (s) {
+      return '<div class="stat-chip">' + s.label + ' <span>' + s.val + '</span></div>';
+    }).join('');
+    wrap.appendChild(preview);
+    anime({ targets: preview.querySelectorAll('.stat-chip'), scale: [0.85, 1], opacity: [0, 1],
+      duration: 220, delay: anime.stagger(35), easing: 'easeOutBack' });
   }
 
-  var dummy = new Character({ name: 'Preview', raceId: game.selectedRace, classId: game.selectedClass, level: 1 });
-  var stats = [
-    { label: 'HP',  val: dummy.maxHp },
-    { label: 'ATK', val: dummy.atk   },
-    { label: 'DEF', val: dummy.def   },
-    { label: 'MAG', val: dummy.mag   },
-    { label: 'SPD', val: dummy.spd   },
-    { label: 'RES', val: dummy.res   }
-  ];
+  container.appendChild(wrap);
 
-  preview.innerHTML = stats.map(function (s) {
-    return '<div class="stat-chip">' + s.label + ' <span>' + s.val + '</span></div>';
-  }).join('');
+  // Auto-focus the name input after render
+  setTimeout(function () { nameInput.focus(); }, 50);
+};
 
-  // Enable start when the hero (member 0) has both race and class selected
-  var activeIdx = game.activePartyMember || 0;
-  var heroReady = activeIdx === 0
-    ? !!(game.selectedRace && game.selectedClass)
-    : !!(game.partyConfig && game.partyConfig[0] && game.partyConfig[0].race && game.partyConfig[0].classId);
-  startBtn.disabled = !heroReady;
+// ─── Party review screen ──────────────────────────────────────────────────────
 
-  anime({ targets: '.stat-chip', scale: [0.85, 1], opacity: [0, 1], duration: 250,
-    delay: anime.stagger(40), easing: 'easeOutBack' });
+GameUI.prototype.showPartyReviewScreen = function () {
+  var game  = this.game;
+  var grid  = document.getElementById('review-party-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  var memberTitles = WIZARD_MEMBER_META.map(function (m) { return m.cardTitle; });
+
+  game.partyConfig.forEach(function (member, i) {
+    if (!member.race || !member.classId) return;
+
+    var dummy = new Character({
+      name: member.name || 'Adventurer',
+      raceId: member.race, classId: member.classId,
+      backgroundId: member.backgroundId, level: 1
+    });
+
+    var bg = member.backgroundId && BACKGROUNDS && BACKGROUNDS[member.backgroundId];
+    var bgLine = bg
+      ? '<div class="review-member-bg">' + bg.emoji + ' ' + bg.name + '</div>'
+      : '';
+
+    var card = document.createElement('div');
+    card.className = 'review-member-card' + (i === 0 ? ' hero-card' : '');
+    card.innerHTML =
+      '<div class="review-member-role">' + memberTitles[i] + '</div>' +
+      '<div class="review-member-emoji">' + CLASSES[member.classId].emoji + '</div>' +
+      '<div class="review-member-name">' + (member.name || 'Adventurer') + '</div>' +
+      '<div class="review-member-subtitle">' +
+        RACES[member.race].name + ' · ' + CLASSES[member.classId].name +
+      '</div>' +
+      bgLine +
+      '<div class="review-member-stats">' +
+        '<div class="stat-chip">HP <span>'  + dummy.maxHp + '</span></div>' +
+        '<div class="stat-chip">ATK <span>' + dummy.atk   + '</span></div>' +
+        '<div class="stat-chip">DEF <span>' + dummy.def   + '</span></div>' +
+        '<div class="stat-chip">MAG <span>' + dummy.mag   + '</span></div>' +
+        '<div class="stat-chip">SPD <span>' + dummy.spd   + '</span></div>' +
+      '</div>';
+
+    grid.appendChild(card);
+  });
+
+  this.showScreen('screen-party-review');
+  anime({ targets: '.review-member-card', translateY: [24, 0], opacity: [0, 1],
+    duration: 420, easing: 'easeOutQuart', delay: anime.stagger(100) });
 };
 
 // ─── Battle screen ────────────────────────────────────────────────────────────

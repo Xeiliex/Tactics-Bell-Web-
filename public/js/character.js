@@ -7,6 +7,9 @@
 
 var _unitIdCounter = 0;
 
+/** Neutral stat-bonus object used as fallback when no background is set. */
+var _ZERO_STAT_BONUSES = { hp: 0, atk: 0, def: 0, mag: 0, spd: 0, res: 0 };
+
 /**
  * Create a new character.
  * @param {object} opts
@@ -25,6 +28,7 @@ function Character(opts) {
   this.isAlly   = !!opts.isAlly;
   this.emoji    = opts.emoji     || CLASSES[this.classId].emoji;
   this.overrideMeshColor = opts.overrideMeshColor || null;
+  this.backgroundId = opts.backgroundId || null;
 
   // Grid position
   this.gridRow = 0;
@@ -53,12 +57,16 @@ Character.prototype._buildStats = function () {
   var classData = CLASSES[this.classId];
   var lvl       = this.level - 1; // growth iterations (0 at level 1)
 
-  this.maxHp  = classData.baseStats.hp  + raceData.statBonuses.hp  + classData.statGrowth.hp  * lvl;
-  this.atk    = classData.baseStats.atk + raceData.statBonuses.atk + classData.statGrowth.atk * lvl;
-  this.def    = classData.baseStats.def + raceData.statBonuses.def + classData.statGrowth.def * lvl;
-  this.mag    = classData.baseStats.mag + raceData.statBonuses.mag + classData.statGrowth.mag * lvl;
-  this.spd    = classData.baseStats.spd + raceData.statBonuses.spd + classData.statGrowth.spd * lvl;
-  this.res    = classData.baseStats.res + raceData.statBonuses.res + classData.statGrowth.res * lvl;
+  var bgBonus = (this.backgroundId && typeof BACKGROUNDS !== 'undefined' && BACKGROUNDS[this.backgroundId])
+    ? BACKGROUNDS[this.backgroundId].statBonuses
+    : _ZERO_STAT_BONUSES;
+
+  this.maxHp  = classData.baseStats.hp  + raceData.statBonuses.hp  + classData.statGrowth.hp  * lvl + (bgBonus.hp  || 0);
+  this.atk    = classData.baseStats.atk + raceData.statBonuses.atk + classData.statGrowth.atk * lvl + (bgBonus.atk || 0);
+  this.def    = classData.baseStats.def + raceData.statBonuses.def + classData.statGrowth.def * lvl + (bgBonus.def || 0);
+  this.mag    = classData.baseStats.mag + raceData.statBonuses.mag + classData.statGrowth.mag * lvl + (bgBonus.mag || 0);
+  this.spd    = classData.baseStats.spd + raceData.statBonuses.spd + classData.statGrowth.spd * lvl + (bgBonus.spd || 0);
+  this.res    = classData.baseStats.res + raceData.statBonuses.res + classData.statGrowth.res * lvl + (bgBonus.res || 0);
 
   this.moveRange   = classData.moveRange;
   this.attackRange = classData.attackRange;
@@ -214,6 +222,7 @@ function createPartyMember(opts) {
     name:              opts.name     || 'Adventurer',
     raceId:            opts.race,
     classId:           opts.classId,
+    backgroundId:      opts.backgroundId || null,
     level:             opts.level    || 1,
     exp:               opts.exp      || 0,
     isPlayer:          !!opts.isPlayer,

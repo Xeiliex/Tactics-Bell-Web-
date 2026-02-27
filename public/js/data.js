@@ -135,6 +135,54 @@ var ALLY_PRESETS = [
 ];
 
 // ═══════════════════════════════════════
+//  BACKGROUNDS  (D&D-style origin bonus)
+// ═══════════════════════════════════════
+var BACKGROUNDS = {
+  soldier: {
+    id: 'soldier', name: 'Soldier', emoji: '🪖',
+    color: '#EF5350',
+    description: 'Trained in military discipline. Combat experience gives you an edge on the battlefield.',
+    flavor: '"I have seen a thousand battles. Each one had a lesson."',
+    statBonuses: { hp: 5, atk: 2, def: 2, mag: 0, spd: 0, res: 0 }
+  },
+  scholar: {
+    id: 'scholar', name: 'Scholar', emoji: '📚',
+    color: '#AB47BC',
+    description: 'Years of study sharpened your mind and deepened your mastery of arcane forces.',
+    flavor: '"Knowledge is the sharpest weapon of all."',
+    statBonuses: { hp: 0, atk: 0, def: 0, mag: 3, spd: 0, res: 2 }
+  },
+  wanderer: {
+    id: 'wanderer', name: 'Wanderer', emoji: '🌿',
+    color: '#66BB6A',
+    description: 'Roaming wild lands forged your endurance. You are swift and hard to pin down.',
+    flavor: '"Every road leads somewhere new."',
+    statBonuses: { hp: 5, atk: 0, def: 0, mag: 0, spd: 3, res: 0 }
+  },
+  noble: {
+    id: 'noble', name: 'Noble', emoji: '👑',
+    color: '#FFD700', // matches --gold CSS variable
+    description: 'Born to privilege, you received the finest training across all disciplines.',
+    flavor: '"Duty above all. Honour above all."',
+    statBonuses: { hp: 0, atk: 1, def: 1, mag: 1, spd: 0, res: 1 }
+  },
+  outcast: {
+    id: 'outcast', name: 'Outcast', emoji: '🌑',
+    color: '#78909C',
+    description: 'Surviving on the margins made you resilient and resourceful. You trust your instincts.',
+    flavor: '"They cast me out. I became stronger for it."',
+    statBonuses: { hp: 10, atk: 0, def: 0, mag: 0, spd: 2, res: 0 }
+  },
+  mystic: {
+    id: 'mystic', name: 'Mystic', emoji: '✨',
+    color: '#00E5FF',
+    description: 'Touched by arcane energies since birth. Magic flows through your very being.',
+    flavor: '"The veil between worlds is thinner than you think."',
+    statBonuses: { hp: -5, atk: 0, def: 0, mag: 4, spd: 0, res: 3 }
+  }
+};
+
+// ═══════════════════════════════════════
 //  BODY COLOUR PRESETS  (character customisation)
 // ═══════════════════════════════════════
 var BODY_COLORS = [
