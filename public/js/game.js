@@ -619,7 +619,7 @@ var game = (function () {
    * immediately start a stage-1 battle — bypassing the character-creation wizard.
    */
   function _startQuickMatch() {
-    var pool  = typeof QUICK_MATCH_HERO_PARTIES !== 'undefined' ? QUICK_MATCH_HERO_PARTIES : [];
+    var pool  = QUICK_MATCH_HERO_PARTIES;
     var party = pool.length
       ? pool[Math.floor(Math.random() * pool.length)]
       : null;
@@ -632,7 +632,8 @@ var game = (function () {
           classId:      m.classId      || 'warrior',
           backgroundId: m.backgroundId || null,
           colorId:      m.colorId      || 'default',
-          level: 1, exp: 0, hp: 0
+          level: 1, exp: 0,
+          hp: 0   // placeholder — Character constructor sets hp = maxHp on creation
         };
       });
       // First member is the player hero

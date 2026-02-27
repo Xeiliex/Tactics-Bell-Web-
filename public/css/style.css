@@ -537,7 +537,8 @@ html, body {
   position: absolute;
   bottom: 12px; left: 12px;
   display: flex; flex-direction: column; gap: 5px;
-  pointer-events: none;   /* clicks always pass through to canvas / action menu */
+  /* display-only — clicks must always pass through to canvas / action menu */
+  pointer-events: none;
   z-index: 5;
 }
 
