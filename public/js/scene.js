@@ -414,10 +414,22 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
       function (meshes) {
         if (!meshes || !meshes.length || !self.scene) return;
 
+        // For glTF files the loader returns a hierarchy that may include
+        // abstract TransformNodes (0 vertices).  MergeMeshes fails on these,
+        // returning null and causing the whole model to silently disappear.
+        // Filter down to only BABYLON.Mesh instances with actual geometry.
+        var geoMeshes = isGltf
+          ? meshes.filter(function (m) {
+              return m.getTotalVertices && m.getTotalVertices() > 0;
+            })
+          : meshes;
+        if (!geoMeshes.length) return;
+
         // Merge sub-meshes into a single template mesh.
-        var template = meshes.length === 1
-          ? meshes[0]
-          : BABYLON.Mesh.MergeMeshes(meshes, true, true, undefined, false, true);
+        // multiMultiMaterials:true (6th arg) preserves glTF PBR texture maps.
+        var template = geoMeshes.length === 1
+          ? geoMeshes[0]
+          : BABYLON.Mesh.MergeMeshes(geoMeshes, true, true, undefined, false, true);
         if (!template) return;
 
         template.setEnabled(false);
@@ -427,7 +439,8 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
         );
 
         // Clone template once per unit of this class.
-        // For glTF models the texture-based materials are preserved.
+        // For glTF models the texture-based PBR materials are preserved on the
+        // clone automatically (Babylon shares the material reference).
         // For OBJ models a solid PBR colour is applied per unit.
         classBuckets[classId].forEach(function (unit) {
           var node = self._unitNodes[unit.id];

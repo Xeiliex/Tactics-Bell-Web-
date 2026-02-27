@@ -305,6 +305,33 @@ html, body {
   line-height: 1.6;
 }
 
+/* Skills shown on the class selection cards */
+.card-skills {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+.card-skill-tag {
+  background: rgba(187, 134, 252, 0.15);
+  border: 1px solid rgba(187, 134, 252, 0.4);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 10px;
+  color: var(--purple);
+  white-space: nowrap;
+}
+
+/* Projected stat preview shown on the background selection cards */
+.card-stat-preview {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--green);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
 /* Stats preview (identity step) */
 .stats-preview {
   background: var(--panel);
@@ -513,6 +540,8 @@ html, body {
 .unit-stats-row { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .mini-stat { font-size: 11px; color: #aaa; }
 .mini-stat b { color: #fff; }
+/* Status effect badges in the unit panel */
+.mini-stat.status-icons { color: var(--orange); font-size: 12px; letter-spacing: 1px; }
 
 /* Action menu */
 #action-menu, #skill-menu {

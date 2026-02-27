@@ -49,6 +49,9 @@ function Character(opts) {
   this.hasMoved    = false;
   this.hasActed    = false;
 
+  // Status effects — always initialised so startTurn never hits undefined
+  this.statusEffects = { burn: 0, stun: 0 };
+
   // Babylon mesh reference
   this.meshes = null;
 }
@@ -112,10 +115,45 @@ Character.prototype.healHp = function (amount) {
   return this.hp - before;
 };
 
-/** Reset per-turn flags. */
+/** Reset per-turn flags and tick active status effects. Returns an array of
+ *  status-tick messages (may be empty) so the caller can show them in the log. */
 Character.prototype.startTurn = function () {
   this.hasMoved  = false;
   this.hasActed  = false;
+
+  var messages = [];
+  var self = this;
+
+  // Stun: unit skips its action this turn
+  if (this.statusEffects.stun > 0) {
+    this.statusEffects.stun--;
+    this.hasActed = true;   // mark already acted so the action menu is skipped
+    messages.push(this.name + ' is Stunned and cannot act! 💫');
+  }
+
+  // Burn: deal 2 damage per remaining turn
+  if (this.statusEffects.burn > 0) {
+    var burnDmg = 2;
+    this.hp = Math.max(0, this.hp - burnDmg);
+    this.statusEffects.burn--;
+    messages.push(this.name + ' takes ' + burnDmg + ' burn damage! 🔥 (' + this.hp + ' HP left)');
+  }
+
+  return messages;
+};
+
+/**
+ * Apply a status effect with the given duration (turns).
+ * @param {'burn'|'stun'} status
+ * @param {number} turns
+ */
+Character.prototype.applyStatus = function (status, turns) {
+  this.statusEffects[status] = Math.max(this.statusEffects[status] || 0, turns);
+};
+
+/** Returns true if the unit is "bloodied" (HP below 50 % of max). */
+Character.prototype.isBloodied = function () {
+  return this.hp > 0 && this.hp < this.maxHp * 0.5;
 };
 
 /**

@@ -70,26 +70,47 @@ Combat.prototype.start = function () {
 Combat.prototype.advanceToCurrentUnit = function () {
   var unit = this.currentUnit();
   if (!unit) { this.endRound(); return; }
-  unit.startTurn();
+
+  // Tick status effects (burn damage, stun expiry).  Show each message briefly.
+  var self = this;
+  var statusMsgs = unit.startTurn();
+  statusMsgs.forEach(function (msg) { self.ui.showMessage(msg); });
+
+  // Burn might have killed the unit — check before proceeding.
+  if (!unit.isAlive()) {
+    self.ui.updateUnitPanel(unit);
+    if (self.checkEndConditions()) return;
+    setTimeout(function () { self.nextUnit(); }, 600);
+    return;
+  }
 
   if (unit.isEnemy) {
     this.state = COMBAT_STATE.ENEMY_TURN;
     this.ui.setPhaseDisplay('Enemy Turn');
-    var self = this;
     setTimeout(function () { self.runEnemyTurn(unit); }, 700);
   } else if (unit.isAlly) {
     this.state = COMBAT_STATE.ALLY_TURN;
     this.ui.setPhaseDisplay('Ally Turn');
     this.ui.showMessage(unit.name + '\'s turn.');
     this.ui.showUnitPanel(unit);
-    var self = this;
-    setTimeout(function () { self.runAllyTurn(unit); }, 700);
+    // Stun skips AI action entirely
+    if (unit.hasActed) {
+      setTimeout(function () { self.nextUnit(); }, 600);
+    } else {
+      setTimeout(function () { self.runAllyTurn(unit); }, 700);
+    }
   } else {
     this.state = COMBAT_STATE.PLAYER_SELECT;
     this.ui.setPhaseDisplay('Your Turn');
-    this.ui.showMessage(unit.name + '\'s turn. Select a unit to act.');
-    this.scene.setUnitGlow(unit, true);
     this.ui.showUnitPanel(unit);
+    if (unit.hasActed) {
+      // Stunned player: skip turn automatically
+      this.ui.showMessage(unit.name + ' is Stunned — turn skipped! 💫');
+      setTimeout(function () { self.nextUnit(); }, 800);
+    } else {
+      this.ui.showMessage(unit.name + '\'s turn. Select a unit to act.');
+      this.scene.setUnitGlow(unit, true);
+    }
   }
 };
 
@@ -320,19 +341,38 @@ Combat.prototype.doAttack = function (attacker, target, skill) {
   this.ui.hideActionMenu();
   this.ui.hideSkillMenu();
 
-  var dmg = this.calcDamage(attacker, target, skill);
+  var result    = this.calcDamage(attacker, target, skill);
   var skillType = skill ? skill.type : 'physical';
 
   this.scene.playHitEffect(target, skillType, function () {
     if (skillType === 'heal') {
-      var healed = target.healHp(dmg);
+      var healed = target.healHp(result.damage);
       self.ui.showFloatingNumber(target, '+' + healed, '#69FF47');
       self.ui.showMessage(attacker.name + ' healed ' + target.name + ' for ' + healed + ' HP!');
-    } else {
-      var dealt = target.takeDamage(dmg);
-      self.ui.showFloatingNumber(target, '-' + dealt, skillType === 'magic' ? '#BB86FC' : '#FF6B9D');
+    } else if (result.miss) {
+      self.ui.showFloatingNumber(target, 'MISS', '#aaaaaa');
       self.ui.showMessage(attacker.name + ' used ' + (skill ? skill.name : 'Attack') +
-        ' → ' + target.name + ' took ' + dealt + ' damage!');
+        ' — MISSED! (rolled ' + result.roll + ')');
+    } else {
+      var dealt = target.takeDamage(result.damage);
+      var critLabel = result.crit ? ' ✦CRITICAL✦' : '';
+      var color = result.crit ? '#FFD700' : (skillType === 'magic' ? '#BB86FC' : '#FF6B9D');
+      self.ui.showFloatingNumber(target, (result.crit ? '★' : '-') + dealt, color);
+      self.ui.showMessage(attacker.name + ' used ' + (skill ? skill.name : 'Attack') +
+        critLabel + ' → ' + target.name + ' took ' + dealt + ' damage!' +
+        ' (d20: ' + result.roll + ')');
+
+      // ── Status effects ──────────────────────────────────────────────────
+      // Fireball applies Burn (2 HP/turn for 3 turns)
+      if (skill && skill.id === 'fireball' && !result.miss && target.isAlive()) {
+        target.applyStatus('burn', 3);
+        self.ui.showMessage(target.name + ' is Burning! 🔥');
+      }
+      // Shield Bash applies Stun (skip next action)
+      if (skill && skill.id === 'bash' && !result.miss && target.isAlive()) {
+        target.applyStatus('stun', 1);
+        self.ui.showMessage(target.name + ' is Stunned! 💫');
+      }
     }
 
     self.ui.updateUnitPanel(target);
@@ -351,14 +391,24 @@ Combat.prototype.doAttack = function (attacker, target, skill) {
   });
 };
 
-// ─── Damage formula ──────────────────────────────────────────────────────────
+// ─── Damage formula ── D&D-inspired d20 hit/miss system ─────────────────────
+//
+// Each physical or magic attack rolls a virtual d20:
+//   • Natural 20  → critical hit  (1.5× damage, minimum 1)
+//   • Natural  1  → critical miss (0 damage)
+//   • Otherwise   → hit if  d20 + ATK/MAG modifier ≥ Defense Class (DC)
+//                   DC = 10 + floor(DEF/RES / 2)
+//
+// Heal skills bypass the hit roll and always restore HP.
+//
+// Returns { damage, roll, crit, miss } so callers can show flavour text.
 
 Combat.prototype.calcDamage = function (attacker, target, skill) {
   var skillPower = skill ? skill.power : 1.0;
   var skillType  = skill ? skill.type  : 'physical';
 
   if (skillType === 'heal') {
-    return Math.round(attacker.mag * skillPower);
+    return { damage: Math.round(attacker.mag * skillPower), roll: 0, crit: false, miss: false };
   }
 
   var offensive = (skillType === 'magic') ? attacker.mag : attacker.atk;
@@ -370,8 +420,24 @@ Combat.prototype.calcDamage = function (attacker, target, skill) {
     defensive += (skillType === 'magic') ? tile.terrain.resBonus : tile.terrain.defBonus;
   }
 
+  // d20 roll (1–20)
+  var roll      = Math.floor(Math.random() * 20) + 1;
+  var atkBonus  = Math.floor(offensive / 2);   // reused in both dc check and miss check
+  var dc        = 10 + Math.floor(defensive / 2);   // Defense Class
+
+  var crit = (roll === 20);
+  var miss = (roll === 1) || (roll + atkBonus < dc);
+
+  if (miss && !crit) {
+    return { damage: 0, roll: roll, crit: false, miss: true };
+  }
+
   var raw = offensive * skillPower - defensive * 0.5;
-  return Math.max(1, Math.round(raw + (Math.random() * 3 - 1))); // ±1 RNG variance
+  raw = Math.max(1, Math.round(raw + (Math.random() * 3 - 1)));
+
+  if (crit) { raw = Math.ceil(raw * 1.5); }
+
+  return { damage: raw, roll: roll, crit: crit, miss: false };
 };
 
 // ─── AI (ally turns) ─────────────────────────────────────────────────────────
@@ -506,14 +572,28 @@ Combat.prototype.runEnemyTurn = function (enemy) {
 };
 
 Combat.prototype.doEnemyAttack = function (attacker, target, skill) {
-  var self = this;
-  var dmg  = this.calcDamage(attacker, target, skill);
+  var self      = this;
+  var result    = this.calcDamage(attacker, target, skill);
   var skillType = skill ? skill.type : 'physical';
 
   this.scene.playHitEffect(target, skillType, function () {
-    var dealt = target.takeDamage(dmg);
-    self.ui.showFloatingNumber(target, '-' + dealt, '#ff4444');
-    self.ui.showMessage(attacker.name + ' attacked ' + target.name + ' for ' + dealt + ' damage!');
+    if (result.miss) {
+      self.ui.showFloatingNumber(target, 'MISS', '#aaaaaa');
+      self.ui.showMessage(attacker.name + ' attacked ' + target.name + ' — MISSED! (rolled ' + result.roll + ')');
+    } else {
+      var dealt = target.takeDamage(result.damage);
+      var critLabel = result.crit ? ' ✦CRIT✦ ' : '';
+      self.ui.showFloatingNumber(target, (result.crit ? '★' : '-') + dealt,
+        result.crit ? '#FFD700' : '#ff4444');
+      self.ui.showMessage(attacker.name + critLabel + ' attacked ' + target.name +
+        ' for ' + dealt + ' damage! (d20: ' + result.roll + ')');
+
+      // Enemies can also apply Burn via fireball
+      if (skill && skill.id === 'fireball' && !result.miss && target.isAlive()) {
+        target.applyStatus('burn', 3);
+      }
+    }
+
     self.ui.updateUnitPanel(target);
 
     if (!target.isAlive()) {
