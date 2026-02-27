@@ -1,0 +1,8 @@
+# Archer character material — Tactics Bell
+# Albedo is overridden at runtime with the unit's race colour
+newmtl archer_mat
+Ka 0.08 0.18 0.08
+Kd 0.20 0.50 0.22
+Ks 0.06 0.12 0.06
+Ns 12.0
+d  1.0

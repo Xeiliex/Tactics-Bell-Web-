@@ -1,0 +1,8 @@
+# Warrior character material — Tactics Bell
+# Albedo is overridden at runtime with the unit's race colour
+newmtl warrior_mat
+Ka 0.22 0.08 0.08
+Kd 0.60 0.22 0.20
+Ks 0.18 0.10 0.10
+Ns 30.0
+d  1.0

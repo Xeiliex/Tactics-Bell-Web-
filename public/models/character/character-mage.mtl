@@ -1,0 +1,8 @@
+# Mage character material — Tactics Bell
+# Albedo is overridden at runtime with the unit's race colour
+newmtl mage_mat
+Ka 0.16 0.06 0.22
+Kd 0.42 0.18 0.60
+Ks 0.20 0.10 0.25
+Ns 18.0
+d  1.0

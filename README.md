@@ -75,6 +75,9 @@ docker run -p 8080:8080 tactics-bell
 - Procedurally generated battle stages (terrain clusters: grass, forest, water, mountain, lava, crystal)
 - **3D terrain models** — handcrafted OBJ tiles bundled in `public/models/terrain/` replace
   the procedural boxes at runtime (grass, forest, water, mountain, road have distinctive shapes)
+- **3D character models** — handcrafted OBJ models bundled in `public/models/character/` replace
+  the procedural cylinder + sphere at runtime; each class has a distinctive silhouette and each
+  unit is coloured by its race at load time
 - 4 playable **races** — Human, Elf, Dwarf, Beastkin — each with unique stat bonuses
 - 4 **classes** — Warrior, Mage, Archer, Healer — with 2 skills each
 - Turn-based tactical combat on a 10 × 10 grid
@@ -102,6 +105,24 @@ Lava and Crystal tiles continue to use procedural coloured geometry.  If a
 model file is absent or fails to load the tile silently keeps its fallback box.
 
 See `public/models/terrain/README.md` for coordinate conventions and scale notes.
+
+## Character Models
+
+Handcrafted OBJ character models are bundled in `public/models/character/` and
+loaded automatically at runtime.  Each class has a distinctive silhouette; the
+unit's race colour is applied as the albedo at load time.
+
+| Class   | File                     | Distinctive feature              |
+|---------|--------------------------|----------------------------------|
+| Warrior | `character-warrior.obj`  | Wide armoured body + boxy helmet |
+| Mage    | `character-mage.obj`     | Narrow robe + pointed hat        |
+| Archer  | `character-archer.obj`   | Slim body + bow stave            |
+| Healer  | `character-healer.obj`   | Medium body + tall staff         |
+
+If a model file is absent or fails to load the unit silently keeps its
+procedural cylinder + sphere appearance.
+
+See `public/models/character/README.md` for coordinate conventions and scale notes.
 
 ## Development (hot-reload)
 

@@ -1,0 +1,8 @@
+# Healer character material — Tactics Bell
+# Albedo is overridden at runtime with the unit's race colour
+newmtl healer_mat
+Ka 0.05 0.18 0.18
+Kd 0.16 0.48 0.50
+Ks 0.06 0.14 0.14
+Ns 14.0
+d  1.0

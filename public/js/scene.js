@@ -7,6 +7,24 @@
 
 var TILE_STEP = 1.15;   // world-space units per grid cell
 
+// ─── Character model configuration ───────────────────────────────────────────
+// Maps class IDs to OBJ filenames in public/models/character/.
+// Any class not listed here keeps its procedural cylinder + sphere appearance.
+var CHARACTER_MODEL_FILES = {
+  warrior: 'character-warrior.obj',
+  mage:    'character-mage.obj',
+  archer:  'character-archer.obj',
+  healer:  'character-healer.obj'
+};
+
+// Uniform scale applied to every loaded character model.
+var CHARACTER_MODEL_SCALE = 1.0;
+
+// PBR material properties for character models.
+// Albedo colour is applied per-unit from unit.meshColor() at load time.
+var CHARACTER_PBR_METALLIC  = 0.35;
+var CHARACTER_PBR_ROUGHNESS = 0.60;
+
 // ─── Terrain model configuration ─────────────────────────────────────────────
 // Maps game terrain names to OBJ filenames in public/models/terrain/.
 // Any terrain not listed here (Lava, Crystal) keeps its procedural appearance.
@@ -310,6 +328,108 @@ GameScene.prototype._upgradeToModels = function (grid) {
 
 // ─── Unit meshes ─────────────────────────────────────────────────────────────
 
+/**
+ * Spawn procedural fallback meshes for all units, then asynchronously replace
+ * them with class-specific OBJ models when the files are available.
+ * @param {Character[]} units
+ */
+GameScene.prototype.renderUnits = function (units) {
+  var self = this;
+  units.forEach(function (u) { self.spawnUnit(u); });
+  self._upgradeUnitsToModels(units);
+};
+
+// ─── Character model loading ──────────────────────────────────────────────────
+// Tries to load a class-specific OBJ from public/models/character/ for each
+// unit.  On success the procedural cylinder + sphere are hidden and replaced
+// with a cloned copy of the OBJ mesh coloured by the unit's race.  On failure
+// (file missing, loader absent) the procedural shapes are silently kept.
+
+GameScene.prototype._upgradeUnitsToModels = function (units) {
+  if (!BABYLON.SceneLoader || typeof BABYLON.SceneLoader.ImportMesh !== 'function') return;
+
+  var self = this;
+
+  // Group units by classId so each OBJ is loaded only once per class.
+  var classBuckets = {};
+  units.forEach(function (unit) {
+    var cid = unit.classId;
+    if (!classBuckets[cid]) { classBuckets[cid] = []; }
+    classBuckets[cid].push(unit);
+  });
+
+  Object.keys(classBuckets).forEach(function (classId) {
+    var fileName = CHARACTER_MODEL_FILES[classId];
+    if (!fileName) return;
+
+    var cacheKey  = 'models/character/' + fileName;
+    var useBlob   = typeof AssetCache !== 'undefined' && AssetCache.hasCached(cacheKey);
+    var rootUrl   = useBlob ? ''                    : 'models/character/';
+    var srcFile   = useBlob ? AssetCache.getCachedUrl(cacheKey) : fileName;
+    var pluginExt = useBlob ? '.obj'                : null;
+
+    BABYLON.SceneLoader.ImportMesh(
+      '',          // import all meshes
+      rootUrl,
+      srcFile,
+      self.scene,
+      function (meshes) {
+        if (!meshes || !meshes.length || !self.scene) return;
+
+        // Merge sub-meshes into a single template mesh.
+        var template = meshes.length === 1
+          ? meshes[0]
+          : BABYLON.Mesh.MergeMeshes(meshes, true, true, undefined, false, true);
+        if (!template) return;
+
+        template.setEnabled(false);
+        template.isPickable = false;
+        template.scaling = new BABYLON.Vector3(
+          CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
+        );
+
+        // Clone template once per unit of this class, applying the unit's race colour.
+        classBuckets[classId].forEach(function (unit) {
+          var node = self._unitNodes[unit.id];
+          if (!node) return;
+
+          var c   = unit.meshColor();
+          var pos = self.gridToWorld(unit.gridRow, unit.gridCol);
+
+          var clone = template.clone('charmodel_' + unit.id);
+          clone.setEnabled(true);
+          clone.position   = new BABYLON.Vector3(pos.x, 0, pos.z);
+          clone.isPickable = false;
+          clone.receiveShadows = true;
+
+          // Apply unit race colour as PBR material.
+          var pbrMat = new BABYLON.PBRMaterial('charpbr_' + unit.id, self.scene);
+          pbrMat.albedoColor  = new BABYLON.Color3(c.r, c.g, c.b);
+          pbrMat.metallic     = CHARACTER_PBR_METALLIC;
+          pbrMat.roughness    = CHARACTER_PBR_ROUGHNESS;
+          pbrMat.emissiveColor = BABYLON.Color3.Black();
+          clone.material = pbrMat;
+
+          if (self._shadowGenerator) { self._shadowGenerator.addShadowCaster(clone, true); }
+
+          // Hide the procedural fallback meshes — the OBJ model takes their place.
+          node.body.setEnabled(false);
+          node.head.setEnabled(false);
+
+          // Store model reference so animation and effect code can use it.
+          node.model = clone;
+        });
+
+        template.dispose();
+      },
+      null,           // progress callback — not needed
+      function () {   // error callback — model file absent, keep procedural fallback
+      },
+      pluginExt
+    );
+  });
+};
+
 GameScene.prototype.spawnUnit = function (unit) {
   var pos  = this.gridToWorld(unit.gridRow, unit.gridCol);
   var c    = unit.meshColor();
@@ -370,10 +490,15 @@ GameScene.prototype.snapUnit = function (unit) {
   var node = this._unitNodes[unit.id];
   if (!node) return;
   var pos = this.gridToWorld(unit.gridRow, unit.gridCol);
-  node.body.position.x = pos.x;
-  node.body.position.z = pos.z;
-  node.head.position.x = pos.x;
-  node.head.position.z = pos.z;
+  if (node.model) {
+    node.model.position.x = pos.x;
+    node.model.position.z = pos.z;
+  } else {
+    node.body.position.x = pos.x;
+    node.body.position.z = pos.z;
+    node.head.position.x = pos.x;
+    node.head.position.z = pos.z;
+  }
   node.glow.position.x = pos.x;
   node.glow.position.z = pos.z;
 };
@@ -386,6 +511,39 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
   var pos    = this.gridToWorld(unit.gridRow, unit.gridCol);
   var frames = 20;
   var scene  = this.scene;
+  var ease   = new BABYLON.CubicEaseInOut();
+
+  var animGlow = new BABYLON.Animation(
+    'moveGlow_' + unit.id, 'position', 60,
+    BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+    BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+  );
+  animGlow.setKeys([
+    { frame: 0,      value: node.glow.position.clone() },
+    { frame: frames, value: new BABYLON.Vector3(pos.x, 0.03, pos.z) }
+  ]);
+  animGlow.setEasingFunction(ease);
+  node.glow.animations = [animGlow];
+  scene.beginAnimation(node.glow, 0, frames, false, 1);
+
+  if (node.model) {
+    // Animate the OBJ model mesh instead of the procedural body + head.
+    var animModel = new BABYLON.Animation(
+      'moveModel_' + unit.id, 'position', 60,
+      BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+      BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
+    animModel.setKeys([
+      { frame: 0,      value: node.model.position.clone() },
+      { frame: frames, value: new BABYLON.Vector3(pos.x, 0, pos.z) }
+    ]);
+    animModel.setEasingFunction(ease);
+    node.model.animations = [animModel];
+    scene.beginAnimation(node.model, 0, frames, false, 1, function () {
+      if (onDone) onDone();
+    });
+    return;
+  }
 
   var animBody = new BABYLON.Animation(
     'moveBody_' + unit.id, 'position', 60,
@@ -407,28 +565,15 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
     { frame: frames, value: new BABYLON.Vector3(pos.x, 0.73, pos.z) }
   ]);
 
-  var animGlow = new BABYLON.Animation(
-    'moveGlow_' + unit.id, 'position', 60,
-    BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
-    BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
-  );
-  animGlow.setKeys([
-    { frame: 0,      value: node.glow.position.clone() },
-    { frame: frames, value: new BABYLON.Vector3(pos.x, 0.03, pos.z) }
-  ]);
-
-  var ease = new BABYLON.CubicEaseInOut();
-  [animBody, animHead, animGlow].forEach(function (a) { a.setEasingFunction(ease); });
+  [animBody, animHead].forEach(function (a) { a.setEasingFunction(ease); });
 
   node.body.animations = [animBody];
   node.head.animations = [animHead];
-  node.glow.animations = [animGlow];
 
-  var anim = scene.beginAnimation(node.body, 0, frames, false, 1, function () {
+  scene.beginAnimation(node.body, 0, frames, false, 1, function () {
     if (onDone) onDone();
   });
   scene.beginAnimation(node.head, 0, frames, false, 1);
-  scene.beginAnimation(node.glow, 0, frames, false, 1);
 };
 
 // Hit flash + particle burst
@@ -436,16 +581,18 @@ GameScene.prototype.playHitEffect = function (unit, skillType, onDone) {
   var node = this._unitNodes[unit.id];
   if (!node) { if (onDone) onDone(); return; }
 
-  var origDiff = node.body.material.albedoColor.clone();
-  var origEmit = node.body.material.emissiveColor.clone();
+  // Use the OBJ model material when available, otherwise the procedural body.
+  var targetMesh = node.model || node.body;
+  var origDiff = targetMesh.material.albedoColor.clone();
+  var origEmit = targetMesh.material.emissiveColor.clone();
 
-  node.body.material.albedoColor  = new BABYLON.Color3(1, 1, 1);
-  node.body.material.emissiveColor = new BABYLON.Color3(0.9, 0.2, 0.2);
+  targetMesh.material.albedoColor  = new BABYLON.Color3(1, 1, 1);
+  targetMesh.material.emissiveColor = new BABYLON.Color3(0.9, 0.2, 0.2);
 
   // Particle burst
   this._spawnHitParticles(unit, skillType);
 
-  var mat = node.body.material;
+  var mat = targetMesh.material;
   setTimeout(function () {
     mat.albedoColor   = origDiff;
     mat.emissiveColor = origEmit;
@@ -494,31 +641,38 @@ GameScene.prototype.removeUnit = function (unit) {
   var node = this._unitNodes[unit.id];
   if (!node) return;
 
-  // Try to add physics impulse if available
+  // Apply physics impulse to the primary visual mesh (OBJ model or cylinder body).
+  var physMesh   = node.model || node.body;
+  var impostorType = node.model
+    ? BABYLON.PhysicsImpostor.BoxImpostor
+    : BABYLON.PhysicsImpostor.CylinderImpostor;
+
   try {
-    node.body.physicsImpostor = new BABYLON.PhysicsImpostor(
-      node.body, BABYLON.PhysicsImpostor.CylinderImpostor,
+    physMesh.physicsImpostor = new BABYLON.PhysicsImpostor(
+      physMesh, impostorType,
       { mass: 1, restitution: 0.3, friction: 0.6 }, this.scene
     );
-    node.body.physicsImpostor.applyImpulse(
+    physMesh.physicsImpostor.applyImpulse(
       new BABYLON.Vector3(
         (Math.random() - 0.5) * 3,
         2.5 + Math.random(),
         (Math.random() - 0.5) * 3
       ),
-      node.body.getAbsolutePosition()
+      physMesh.getAbsolutePosition()
     );
   } catch (e) {
     // Physics not enabled; just fade out
   }
 
-  var body = node.body;
-  var head = node.head;
-  var glow = node.glow;
+  var model = node.model;
+  var body  = node.body;
+  var head  = node.head;
+  var glow  = node.glow;
   setTimeout(function () {
-    if (body) body.dispose();
-    if (head) head.dispose();
-    if (glow) glow.dispose();
+    if (model) model.dispose();
+    if (body)  body.dispose();
+    if (head)  head.dispose();
+    if (glow)  glow.dispose();
   }, 1600);
   delete this._unitNodes[unit.id];
 };
