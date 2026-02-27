@@ -22,26 +22,44 @@
     </div>
   </div>
 
-  <!-- ══════════════ CREATE SCREEN ══════════════ -->
+  <!-- ══════════════ CHARACTER WIZARD ══════════════ -->
   <div id="screen-create" class="screen hidden">
-    <div class="create-container">
-      <h2 class="section-title">Create Your Hero</h2>
+    <div class="wizard-shell">
 
-      <div class="selection-section">
-        <h3>Choose Your Race</h3>
-        <div class="cards-grid" id="race-cards"></div>
+      <!-- Top bar: member label + step dots -->
+      <div class="wizard-topbar">
+        <div class="wizard-member-label" id="wizard-member-label">⚔ HERO · MEMBER 1 OF 3</div>
+        <div class="wizard-step-dots" id="wizard-step-dots"></div>
       </div>
 
-      <div class="selection-section">
-        <h3>Choose Your Class</h3>
-        <div class="cards-grid" id="class-cards"></div>
+      <!-- Step heading -->
+      <div class="wizard-step-heading">
+        <h2 class="wizard-step-title" id="wizard-step-title">Choose Your Race</h2>
+        <p class="wizard-step-sub" id="wizard-step-sub">Your heritage shapes your innate abilities.</p>
       </div>
 
-      <div class="stats-preview" id="stats-preview">
-        <div class="stats-placeholder">← Select a race and class to preview stats</div>
+      <!-- Dynamic content region (filled by JS) -->
+      <div class="wizard-content" id="wizard-content"></div>
+
+      <!-- Navigation row -->
+      <div class="wizard-nav">
+        <button class="btn-secondary" id="btn-wizard-back">← Cancel</button>
+        <button class="btn-primary" id="btn-wizard-next" disabled>Next →</button>
       </div>
 
-      <button class="btn-primary btn-large" id="btn-start-battle" disabled>⚔ BEGIN ADVENTURE!</button>
+    </div>
+  </div>
+
+  <!-- ══════════════ PARTY REVIEW SCREEN ══════════════ -->
+  <div id="screen-party-review" class="screen hidden">
+    <div class="review-container">
+      <h2 class="section-title">Your Party</h2>
+      <p class="review-subtitle">Review your adventurers before heading into battle.</p>
+      <div class="review-party-grid" id="review-party-grid"></div>
+      <div class="review-actions">
+        <button class="btn-secondary" id="btn-review-back">← Recreate Party</button>
+        <button class="btn-primary btn-large" id="btn-start-battle">⚔ BEGIN ADVENTURE!</button>
+      </div>
     </div>
   </div>
 

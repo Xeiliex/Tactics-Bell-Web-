@@ -10,6 +10,7 @@ var game = (function () {
   var g = {
     selectedRace:  null,
     selectedClass: null,
+    partyConfig:   null,   // Array of 3 party-member config objects
     stage:         1,
     player:        null,   // Character — the player's hero
     allies:        [],     // Character[] — CPU allies
@@ -76,14 +77,28 @@ var game = (function () {
   function saveProgress() {
     if (!g.player) return;
     try {
-      var data = {
-        stage:   g.stage,
-        race:    g.player.race,
-        classId: g.player.classId,
-        level:   g.player.level,
-        exp:     g.player.exp,
-        hp:      g.player.hp
-      };
+      var data = { stage: g.stage };
+      if (g.partyConfig && g.partyConfig.length > 0) {
+        data.party = g.partyConfig.map(function (m, i) {
+          var unit = i === 0 ? g.player : g.allies[i - 1];
+          return {
+            name:         m.name,
+            race:         m.race,
+            classId:      m.classId,
+            backgroundId: m.backgroundId || null,
+            colorId:      m.colorId      || 'default',
+            level:        unit ? unit.level : (m.level || 1),
+            exp:          unit ? unit.exp   : (m.exp   || 0),
+            hp:           unit ? unit.hp    : (m.hp    || 0)
+          };
+        });
+      } else {
+        data.race    = g.player.race;
+        data.classId = g.player.classId;
+        data.level   = g.player.level;
+        data.exp     = g.player.exp;
+        data.hp      = g.player.hp;
+      }
       localStorage.setItem(SAVE_KEY, _encodeSave(data));
     } catch (e) {
       // localStorage not available in this environment
@@ -155,10 +170,9 @@ var game = (function () {
     // Title → Create
     document.getElementById('btn-new-game').addEventListener('click', function () {
       clearSave();
-      g.stage = 1;
-      g.player = null;
-      g.selectedRace  = null;
-      g.selectedClass = null;
+      g.stage       = 1;
+      g.player      = null;
+      g.partyConfig = null;
       g.ui.showCreateScreen();
     });
 
@@ -166,16 +180,66 @@ var game = (function () {
     document.getElementById('btn-continue-game').addEventListener('click', function () {
       var save = loadSave();
       if (!save) return;
-      g.stage         = save.stage;
-      g.selectedRace  = save.race;
-      g.selectedClass = save.classId;
-      g._pendingSave  = save;
+      g.stage = save.stage;
+
+      if (save.party && save.party.length > 0) {
+        g.partyConfig = save.party.map(function (m) {
+          return {
+            name:         m.name         || 'Adventurer',
+            race:         m.race,
+            classId:      m.classId,
+            backgroundId: m.backgroundId || null,
+            colorId:      m.colorId      || 'default',
+            level:        m.level        || 1,
+            exp:          m.exp          || 0,
+            hp:           m.hp           || 0
+          };
+        });
+      } else if (save.race) {
+        // Legacy single-hero save: synthesise a partyConfig
+        var legacyParty = [
+          { name: 'Hero', race: save.race, classId: save.classId, backgroundId: null, colorId: 'default', level: save.level || 1, exp: save.exp || 0, hp: save.hp || 0 }
+        ];
+        for (var lp = 0; lp < 2 && lp < ALLY_PRESETS.length; lp++) {
+          legacyParty.push({ name: ALLY_PRESETS[lp].name, race: ALLY_PRESETS[lp].race, classId: ALLY_PRESETS[lp].classId, backgroundId: null, colorId: 'default', level: save.level || 1, exp: 0, hp: 0 });
+        }
+        g.partyConfig = legacyParty;
+      } else {
+        return;
+      }
+
+      g._pendingSave = save;
       startBattle(false);
     });
 
-    // Create → Battle
+    // Wizard navigation
+    document.getElementById('btn-wizard-back').addEventListener('click', function () {
+      var w = g.ui && g.ui._wizard;
+      if (!w || (w.memberIdx === 0 && w.stepIdx === 0)) {
+        // Cancel — return to title
+        g.partyConfig = null;
+        g.ui.showTitleScreen();
+        _updateContinueButton();
+      } else {
+        g.ui.wizardBack();
+      }
+    });
+
+    document.getElementById('btn-wizard-next').addEventListener('click', function () {
+      if (g.ui) g.ui.wizardNext();
+    });
+
+    // Party Review → Recreate
+    document.getElementById('btn-review-back').addEventListener('click', function () {
+      // Restart wizard at step 0, member 0, preserving existing choices
+      g.ui.showCreateScreen();
+    });
+
+    // Party Review → Battle
     document.getElementById('btn-start-battle').addEventListener('click', function () {
-      if (!g.selectedRace || !g.selectedClass) return;
+      if (!g.partyConfig || !g.partyConfig[0] || !g.partyConfig[0].race || !g.partyConfig[0].classId) {
+        return;
+      }
       startBattle(true);
     });
 
@@ -244,25 +308,62 @@ var game = (function () {
 
     // 2. Create/preserve player character
     if (isNewGame) {
-      g.player = createPlayerCharacter(g.selectedRace, g.selectedClass);
+      // Use partyConfig hero slot (index 0) if available
+      var heroSlot = g.partyConfig && g.partyConfig[0];
+      if (heroSlot && heroSlot.race && heroSlot.classId) {
+        g.player = createPartyMember({
+          name:         heroSlot.name || 'Hero',
+          race:         heroSlot.race,
+          classId:      heroSlot.classId,
+          backgroundId: heroSlot.backgroundId || null,
+          colorId:      heroSlot.colorId,
+          level:        1,
+          exp:          0,
+          isPlayer:     true
+        });
+      } else {
+        g.player = createPlayerCharacter(g.selectedRace, g.selectedClass);
+      }
     } else if (g._pendingSave) {
       // Restore from localStorage save
       var save = g._pendingSave;
       g._pendingSave = null;
-      g.player = new Character({
-        name:     'Hero',
-        raceId:   save.race,
-        classId:  save.classId,
-        level:    save.level,
-        exp:      save.exp,
-        isPlayer: true
-      });
-      // Apply the same 50 % partial heal used on stage transitions
-      g.player.hp = Math.min(g.player.maxHp, save.hp + Math.floor(g.player.maxHp * 0.5));
+      var hero = g.partyConfig && g.partyConfig[0];
+      if (hero && hero.race) {
+        g.player = createPartyMember({
+          name:         hero.name || 'Hero',
+          race:         hero.race,
+          classId:      hero.classId,
+          backgroundId: hero.backgroundId || null,
+          colorId:      hero.colorId,
+          level:        hero.level || 1,
+          exp:          hero.exp   || 0,
+          isPlayer:     true
+        });
+        var savedHp = hero.hp || g.player.maxHp;
+        g.player.hp = Math.min(g.player.maxHp, savedHp + Math.floor(g.player.maxHp * 0.5));
+      } else {
+        // Legacy save format
+        g.player = new Character({
+          name:     'Hero',
+          raceId:   save.race,
+          classId:  save.classId,
+          level:    save.level,
+          exp:      save.exp,
+          isPlayer: true
+        });
+        g.player.hp = Math.min(g.player.maxHp, save.hp + Math.floor(g.player.maxHp * 0.5));
+      }
     } else if (g.player) {
-      // Restore HP for the new stage (partial heal — 50 % of max)
+      // Stage transition: restore HP for the new stage (partial heal — 50 % of max)
       g.player.hp = Math.min(g.player.maxHp, g.player.hp + Math.floor(g.player.maxHp * 0.5));
       g.player.startTurn();
+      // Sync player's current stats back to partyConfig
+      if (g.partyConfig && g.partyConfig[0]) {
+        g.partyConfig[0].level = g.player.level;
+        g.partyConfig[0].exp   = g.player.exp;
+        g.partyConfig[0].hp    = g.player.hp;
+      }
     } else {
       g.player = createPlayerCharacter(g.selectedRace, g.selectedClass);
     }
@@ -270,20 +371,44 @@ var game = (function () {
     // 3. Generate stage
     g.grid = generateStage(g.stage);
 
-    // 4. Create allies
-    var numAllies = Math.min(3, ALLY_PRESETS.length);
+    // 4. Create allies from partyConfig (slots 1 and 2), falling back to AI presets
     g.allies = [];
-    for (var a = 0; a < numAllies; a++) {
-      var ally = createAlly(ALLY_PRESETS[a], g.player.level);
-      g.allies.push(ally);
+    if (g.partyConfig && g.partyConfig.length > 1) {
+      for (var a = 1; a < g.partyConfig.length; a++) {
+        var m = g.partyConfig[a];
+        if (m && m.race && m.classId) {
+          var allyLevel = isNewGame ? g.player.level : (m.level || g.player.level);
+          var allyChar  = createPartyMember({
+            name:         m.name,
+            race:         m.race,
+            classId:      m.classId,
+            backgroundId: m.backgroundId || null,
+            colorId:      m.colorId,
+            level:        allyLevel,
+            exp:          isNewGame ? 0 : (m.exp || 0),
+            isAlly:       true
+          });
+          if (!isNewGame) {
+            var aHp = m.hp || allyChar.maxHp;
+            allyChar.hp = Math.min(allyChar.maxHp, aHp + Math.floor(allyChar.maxHp * 0.5));
+          }
+          g.allies.push(allyChar);
+        }
+      }
+    }
+    // Pad with AI presets if partyConfig did not fill all ally slots
+    var aiIdx = 0;
+    while (g.allies.length < 2 && aiIdx < ALLY_PRESETS.length) {
+      g.allies.push(createAlly(ALLY_PRESETS[aiIdx], g.player.level));
+      aiIdx++;
     }
 
-    // 5. Create enemies (scales with stage)
-    var numEnemies = Math.min(3 + Math.floor(g.stage / 2), ENEMY_PRESETS.length);
+    // 5. Create enemies from stage-specific composition (scales with stage)
+    var enemyTeam  = _getEnemyTeamForStage(g.stage);
+    var numEnemies = Math.min(enemyTeam.length, 2 + Math.floor(g.stage / 2));
     g.enemies = [];
-    var shuffled = shuffleArray(ENEMY_PRESETS.slice());
     for (var e = 0; e < numEnemies; e++) {
-      g.enemies.push(createEnemy(shuffled[e % shuffled.length], g.stage));
+      g.enemies.push(createEnemy(enemyTeam[e % enemyTeam.length], g.stage));
     }
 
     // 6. Place all units on grid
@@ -348,11 +473,43 @@ var game = (function () {
     g.ui.hideLoadingScreen();
   }
 
+  // ─── Select enemy team for a given stage ────────────────────────────────────
+
+  function _getEnemyTeamForStage(stage) {
+    for (var i = 0; i < STAGE_ENEMY_CONFIGS.length; i++) {
+      var cfg = STAGE_ENEMY_CONFIGS[i];
+      if (stage >= cfg.minStage && (cfg.maxStage === null || stage <= cfg.maxStage)) {
+        return cfg.team;
+      }
+    }
+    return ENEMY_PRESETS;
+  }
+
   // ─── Victory ─────────────────────────────────────────────────────────────────
 
   function onVictory(expGained) {
     // gainExp returns the stat-gains object on level-up, or null
     var gains = expGained > 0 ? g.player.gainExp(expGained) : null;
+
+    // Grant surviving allies 75 % of the EXP earned
+    g.allies.forEach(function (ally, i) {
+      if (expGained > 0 && ally.isAlive()) {
+        ally.gainExp(Math.floor(expGained * 0.75));
+      }
+      // Sync to partyConfig
+      if (g.partyConfig && g.partyConfig[i + 1]) {
+        g.partyConfig[i + 1].level = ally.level;
+        g.partyConfig[i + 1].exp   = ally.exp;
+        g.partyConfig[i + 1].hp    = ally.hp;
+      }
+    });
+
+    // Sync hero to partyConfig
+    if (g.partyConfig && g.partyConfig[0]) {
+      g.partyConfig[0].level = g.player.level;
+      g.partyConfig[0].exp   = g.player.exp;
+      g.partyConfig[0].hp    = g.player.hp;
+    }
 
     if (gains) {
       g.ui.showLevelUpScreen(g.player, gains, function () {
@@ -385,8 +542,9 @@ var game = (function () {
 
   function onBackToTitle() {
     if (g.scene) { g.scene.dispose(); g.scene = null; }
-    g.stage  = 1;
-    g.player = null;
+    g.stage       = 1;
+    g.player      = null;
+    g.partyConfig = null;
     // Stop the memory monitor when the player leaves the battle
     if (typeof AssetCache !== 'undefined') AssetCache.stopMemoryMonitor();
     if (g.ui) g.ui.hideMemoryWarning();
