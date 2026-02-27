@@ -41,6 +41,14 @@ function GameUI(game) {
   this.game = game;
   this._currentScreen = null;
   this._party = [];
+  this._memWarnTimer = null;
+
+  // Allow the user to manually dismiss the memory warning
+  var self = this;
+  var closeBtn = document.getElementById('memory-warning-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function () { self.hideMemoryWarning(); });
+  }
 }
 
 // ─── Screen switching ─────────────────────────────────────────────────────────
@@ -472,4 +480,47 @@ GameUI.prototype.showDefeatScreen = function (onRetry, onMenu) {
 
   document.getElementById('btn-retry').onclick       = onRetry || null;
   document.getElementById('btn-title-defeat').onclick = onMenu  || null;
+};
+
+// ─── Memory-usage warning toast ───────────────────────────────────────────────
+
+// How long (ms) the memory warning stays visible before auto-dismissing.
+var MEMORY_WARNING_AUTO_DISMISS_MS = 8000;
+
+/**
+ * Show (or refresh) the memory-warning toast.
+ * @param {{ used: number, total: number, ratio: number }} info
+ */
+GameUI.prototype.showMemoryWarning = function (info) {
+  var el = document.getElementById('memory-warning');
+  if (!el) return;
+
+  var pct = Math.round(info.ratio * 100);
+  var usedMB  = Math.round(info.used  / (1024 * 1024));
+  var totalMB = Math.round(info.total / (1024 * 1024));
+
+  document.getElementById('memory-warning-text').textContent =
+    '⚠ High memory usage: ' + pct + '% (' + usedMB + ' / ' + totalMB + ' MB). ' +
+    'Performance may be affected.';
+
+  el.classList.remove('hidden');
+  el.style.opacity = 0;
+  anime({ targets: el, opacity: [0, 1], duration: 350, easing: 'easeOutQuart' });
+
+  // Auto-dismiss after the configured delay
+  var self = this;
+  clearTimeout(this._memWarnTimer);
+  this._memWarnTimer = setTimeout(function () { self.hideMemoryWarning(); }, MEMORY_WARNING_AUTO_DISMISS_MS);
+};
+
+/** Dismiss the memory-warning toast. */
+GameUI.prototype.hideMemoryWarning = function () {
+  var el = document.getElementById('memory-warning');
+  if (!el) return;
+  var self = this;
+  anime({
+    targets: el, opacity: [1, 0], duration: 300, easing: 'easeInQuart',
+    complete: function () { el.classList.add('hidden'); }
+  });
+  clearTimeout(self._memWarnTimer);
 };

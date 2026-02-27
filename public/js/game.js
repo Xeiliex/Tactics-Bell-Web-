@@ -106,6 +106,14 @@ var game = (function () {
       return;
     }
 
+    // Start (or keep running) the memory monitor while a battle is active.
+    // The warning fires if used JS heap exceeds 75 % of the heap size limit.
+    if (typeof AssetCache !== 'undefined') {
+      AssetCache.startMemoryMonitor(function (info) {
+        if (g.ui) g.ui.showMemoryWarning(info);
+      });
+    }
+
     // Show battle screen first so canvas exists in DOM
     g.ui.showBattleScreen();
 
@@ -244,6 +252,9 @@ var game = (function () {
     if (g.scene) { g.scene.dispose(); g.scene = null; }
     g.stage  = 1;
     g.player = null;
+    // Stop the memory monitor when the player leaves the battle
+    if (typeof AssetCache !== 'undefined') AssetCache.stopMemoryMonitor();
+    if (g.ui) g.ui.hideMemoryWarning();
     g.ui.showTitleScreen();
   }
 
@@ -264,7 +275,6 @@ var game = (function () {
   } else {
     init();
   }
-
   return g; // expose for debugging
 
 }());

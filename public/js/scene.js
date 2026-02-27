@@ -214,12 +214,22 @@ GameScene.prototype._upgradeToModels = function (grid) {
   var self = this;
 
   Object.keys(TERRAIN_MODEL_FILES).forEach(function (terrainName) {
-    var fileName = TERRAIN_MODEL_FILES[terrainName];
+    var fileName  = TERRAIN_MODEL_FILES[terrainName];
+    var cacheKey  = 'models/terrain/' + fileName;
+
+    // Prefer the in-memory blob URL (avoids network round-trip on repeated stage
+    // loads).  When the blob URL is available we also supply the '.obj'
+    // pluginExtension so that Babylon can identify the file format without an
+    // extension in the blob: URL scheme.
+    var useBlob      = typeof AssetCache !== 'undefined' && AssetCache.hasCached(cacheKey);
+    var rootUrl      = useBlob ? ''                  : 'models/terrain/';
+    var srcFile      = useBlob ? AssetCache.getCachedUrl(cacheKey) : fileName;
+    var pluginExt    = useBlob ? '.obj'              : null;
 
     BABYLON.SceneLoader.ImportMesh(
-      '',                      // import all meshes
-      'models/terrain/',       // root URL (relative to index.html)
-      fileName,                // OBJ filename
+      '',          // import all meshes
+      rootUrl,     // root URL — empty when using a blob: URL
+      srcFile,     // blob: URL (cached) or OBJ filename (first load)
       self.scene,
       function (meshes) {
         if (!meshes || !meshes.length || !self.scene) return;
@@ -292,7 +302,8 @@ GameScene.prototype._upgradeToModels = function (grid) {
       },
       null,           // progress callback — not needed
       function () {   // error callback — model file absent, keep fallback boxes
-      }
+      },
+      pluginExt       // force OBJ plugin when loading from a blob: URL
     );
   });
 };
