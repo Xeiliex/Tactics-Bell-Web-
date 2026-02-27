@@ -476,7 +476,6 @@ GameScene.prototype.spawnUnit = function (unit) {
     diameter: 0.65, thickness: 0.07, tessellation: 18
   }, this.scene);
   glow.position = new BABYLON.Vector3(pos.x, 0.03, pos.z);
-  glow.rotation.x = Math.PI / 2;
   var gMat = new BABYLON.StandardMaterial('gmat_' + unit.id, this.scene);
   gMat.emissiveColor = new BABYLON.Color3(1, 0.9, 0.1);
   gMat.alpha = 0;
@@ -490,6 +489,19 @@ GameScene.prototype.setUnitGlow = function (unit, visible) {
   var node = this._unitNodes[unit.id];
   if (!node) return;
   node.glow.material.alpha = visible ? 0.9 : 0;
+  if (visible) {
+    if (!node.glow._spinObs) {
+      var engine = this.scene.getEngine();
+      node.glow._spinObs = this.scene.onBeforeRenderObservable.add(function () {
+        node.glow.rotation.y += 1.8 * (engine.getDeltaTime() / 1000);
+      });
+    }
+  } else {
+    if (node.glow._spinObs) {
+      this.scene.onBeforeRenderObservable.remove(node.glow._spinObs);
+      node.glow._spinObs = null;
+    }
+  }
 };
 
 // Teleport unit mesh to grid position (no animation)
@@ -676,6 +688,10 @@ GameScene.prototype.removeUnit = function (unit) {
   var body  = node.body;
   var head  = node.head;
   var glow  = node.glow;
+  if (glow && glow._spinObs) {
+    this.scene.onBeforeRenderObservable.remove(glow._spinObs);
+    glow._spinObs = null;
+  }
   setTimeout(function () {
     if (model) model.dispose();
     if (body)  body.dispose();
