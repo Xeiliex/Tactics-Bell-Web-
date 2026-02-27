@@ -37,6 +37,12 @@ if (typeof anime === 'undefined') {
   window.anime.stagger = function () { return 0; };
 }
 
+// Minimal HTML-attribute escaper — prevents quote break-out when user-typed
+// strings are placed inside double-quoted HTML attributes.
+function _htmlAttr(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
 function GameUI(game) {
   this.game = game;
   this._currentScreen = null;
@@ -538,7 +544,7 @@ GameUI.prototype.showPartyReviewScreen = function () {
 
     // Use captured portrait if available, otherwise fall back to class emoji
     var portraitHtml = member.portrait
-      ? '<img class="review-portrait" src="' + member.portrait + '" alt="' + (member.name || 'Adventurer') + '">'
+      ? '<img class="review-portrait" src="' + member.portrait + '" alt="' + _htmlAttr(member.name || 'Adventurer') + '">'
       : '<div class="review-member-emoji">' + CLASSES[member.classId].emoji + '</div>';
 
     var card = document.createElement('div');
@@ -753,7 +759,7 @@ GameUI.prototype._buildPartyCard = function (unit) {
   var bgPos  = (1 - unit.hpRatio()) * 100;
   // Use portrait if available, otherwise fall back to emoji
   var iconHtml = unit.portrait
-    ? '<img class="party-portrait" src="' + unit.portrait + '" alt="' + unit.name + '">'
+    ? '<img class="party-portrait" src="' + unit.portrait + '" alt="' + _htmlAttr(unit.name) + '">'
     : '<span class="party-card-emoji">' + unit.emoji + '</span>';
   card.innerHTML =
     '<div class="party-card-header">' +
