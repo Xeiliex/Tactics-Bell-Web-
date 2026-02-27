@@ -116,13 +116,34 @@ function expToNextLevel(level) {
 
 // ═══════════════════════════════════════
 //  ENEMY PRESETS  (auto-scaled to stage)
+//  Varied humans, animals, and monsters.
 // ═══════════════════════════════════════
 var ENEMY_PRESETS = [
-  { race: 'human',    classId: 'warrior', name: 'Dark Knight',   emoji: '🗡️',  mr: 0.7, mg: 0.1, mb: 0.1 },
-  { race: 'elf',      classId: 'mage',    name: 'Shadow Mage',   emoji: '🌑',  mr: 0.3, mg: 0.1, mb: 0.5 },
-  { race: 'dwarf',    classId: 'warrior', name: 'Orc Crusher',   emoji: '👹',  mr: 0.2, mg: 0.5, mb: 0.1 },
-  { race: 'beastkin', classId: 'archer',  name: 'Shadow Archer', emoji: '🎯',  mr: 0.2, mg: 0.2, mb: 0.2 },
-  { race: 'human',    classId: 'healer',  name: 'Dark Witch',    emoji: '🧙',  mr: 0.6, mg: 0.1, mb: 0.4 }
+  // ── Humans ──────────────────────────────────────────────────────────────────
+  { race: 'human',    classId: 'warrior', name: 'Dark Knight',   emoji: '🗡️', mr: 0.70, mg: 0.10, mb: 0.10 },
+  { race: 'human',    classId: 'warrior', name: 'Bandit',        emoji: '🔪', mr: 0.55, mg: 0.35, mb: 0.15 },
+  { race: 'human',    classId: 'warrior', name: 'Iron Guard',    emoji: '⚔️', mr: 0.50, mg: 0.50, mb: 0.55 },
+  { race: 'human',    classId: 'archer',  name: 'Mercenary',     emoji: '🏹', mr: 0.45, mg: 0.40, mb: 0.20 },
+  { race: 'human',    classId: 'archer',  name: 'Assassin',      emoji: '🎯', mr: 0.10, mg: 0.10, mb: 0.15 },
+  { race: 'human',    classId: 'mage',    name: 'Cultist',       emoji: '🌀', mr: 0.20, mg: 0.10, mb: 0.40 },
+  { race: 'human',    classId: 'healer',  name: 'Dark Priest',   emoji: '☠️', mr: 0.30, mg: 0.05, mb: 0.35 },
+  { race: 'human',    classId: 'healer',  name: 'Dark Witch',    emoji: '🧙', mr: 0.60, mg: 0.10, mb: 0.40 },
+  // ── Animals ─────────────────────────────────────────────────────────────────
+  { race: 'beastkin', classId: 'warrior', name: 'Wolf',          emoji: '🐺', mr: 0.45, mg: 0.45, mb: 0.50 },
+  { race: 'beastkin', classId: 'warrior', name: 'Panther',       emoji: '🐆', mr: 0.15, mg: 0.15, mb: 0.20 },
+  { race: 'beastkin', classId: 'archer',  name: 'Hawk',          emoji: '🦅', mr: 0.60, mg: 0.50, mb: 0.20 },
+  { race: 'dwarf',    classId: 'warrior', name: 'Bear',          emoji: '🐻', mr: 0.55, mg: 0.35, mb: 0.20 },
+  // ── Monsters ────────────────────────────────────────────────────────────────
+  { race: 'beastkin', classId: 'warrior', name: 'Goblin',        emoji: '👺', mr: 0.20, mg: 0.55, mb: 0.15 },
+  { race: 'beastkin', classId: 'archer',  name: 'Goblin Scout',  emoji: '🏹', mr: 0.25, mg: 0.50, mb: 0.10 },
+  { race: 'dwarf',    classId: 'warrior', name: 'Orc',           emoji: '👹', mr: 0.15, mg: 0.50, mb: 0.15 },
+  { race: 'dwarf',    classId: 'warrior', name: 'Troll',         emoji: '👾', mr: 0.25, mg: 0.45, mb: 0.25 },
+  { race: 'human',    classId: 'warrior', name: 'Skeleton',      emoji: '💀', mr: 0.85, mg: 0.85, mb: 0.80 },
+  { race: 'elf',      classId: 'mage',    name: 'Wraith',        emoji: '👻', mr: 0.40, mg: 0.35, mb: 0.55 },
+  { race: 'elf',      classId: 'mage',    name: 'Shadow Mage',   emoji: '🌑', mr: 0.30, mg: 0.10, mb: 0.50 },
+  { race: 'elf',      classId: 'healer',  name: 'Necromancer',   emoji: '💠', mr: 0.20, mg: 0.10, mb: 0.45 },
+  { race: 'dwarf',    classId: 'warrior', name: 'Orc Crusher',   emoji: '🪨', mr: 0.20, mg: 0.50, mb: 0.10 },
+  { race: 'beastkin', classId: 'archer',  name: 'Shadow Archer', emoji: '🏹', mr: 0.20, mg: 0.20, mb: 0.20 }
 ];
 
 // ═══════════════════════════════════════
@@ -197,41 +218,97 @@ var BODY_COLORS = [
 
 // ═══════════════════════════════════════
 //  STAGE ENEMY CONFIGURATIONS
-//  Mixed enemy teams that scale with story progression
+//  Themed enemy parties that scale with story progression.
+//  Party names reflect the narrative encounter type.
 // ═══════════════════════════════════════
 var STAGE_ENEMY_CONFIGS = [
   {
-    minStage: 1, maxStage: 2,
+    // Stage 1-2 — Bandit Ambush: a pair of human thugs
+    minStage: 1, maxStage: 2, partyName: 'Bandit Ambush',
     team: [
-      { race: 'human', classId: 'warrior', name: 'Dark Knight', emoji: '🗡️', mr: 0.7, mg: 0.1, mb: 0.1 },
-      { race: 'human', classId: 'warrior', name: 'Iron Guard',  emoji: '⚔️',  mr: 0.5, mg: 0.1, mb: 0.1 }
+      { race: 'human', classId: 'warrior', name: 'Bandit',     emoji: '🔪', mr: 0.55, mg: 0.35, mb: 0.15 },
+      { race: 'human', classId: 'archer',  name: 'Mercenary',  emoji: '🏹', mr: 0.45, mg: 0.40, mb: 0.20 }
     ]
   },
   {
-    minStage: 3, maxStage: 5,
+    // Stage 3-4 — Goblin Raid: small monsters with a wolf companion
+    minStage: 3, maxStage: 4, partyName: 'Goblin Raid',
     team: [
-      { race: 'human',    classId: 'warrior', name: 'Dark Knight',   emoji: '🗡️', mr: 0.7, mg: 0.1, mb: 0.1 },
-      { race: 'elf',      classId: 'mage',    name: 'Shadow Mage',   emoji: '🌑', mr: 0.3, mg: 0.1, mb: 0.5 },
-      { race: 'beastkin', classId: 'archer',  name: 'Shadow Archer', emoji: '🎯', mr: 0.2, mg: 0.2, mb: 0.2 }
+      { race: 'beastkin', classId: 'warrior', name: 'Goblin',     emoji: '👺', mr: 0.20, mg: 0.55, mb: 0.15 },
+      { race: 'beastkin', classId: 'warrior', name: 'Wolf',       emoji: '🐺', mr: 0.45, mg: 0.45, mb: 0.50 },
+      { race: 'beastkin', classId: 'archer',  name: 'Goblin Scout', emoji: '🏹', mr: 0.25, mg: 0.50, mb: 0.10 }
     ]
   },
   {
-    minStage: 6, maxStage: 9,
+    // Stage 5-6 — Mercenary Company: mixed human fighters
+    minStage: 5, maxStage: 6, partyName: 'Mercenary Company',
     team: [
-      { race: 'human',    classId: 'warrior', name: 'Dark Knight',   emoji: '🗡️', mr: 0.7, mg: 0.1, mb: 0.1 },
-      { race: 'elf',      classId: 'mage',    name: 'Shadow Mage',   emoji: '🌑', mr: 0.3, mg: 0.1, mb: 0.5 },
-      { race: 'beastkin', classId: 'archer',  name: 'Shadow Archer', emoji: '🎯', mr: 0.2, mg: 0.2, mb: 0.2 },
-      { race: 'human',    classId: 'healer',  name: 'Dark Witch',    emoji: '🧙', mr: 0.6, mg: 0.1, mb: 0.4 }
+      { race: 'human', classId: 'warrior', name: 'Dark Knight', emoji: '🗡️', mr: 0.70, mg: 0.10, mb: 0.10 },
+      { race: 'human', classId: 'archer',  name: 'Assassin',    emoji: '🎯', mr: 0.10, mg: 0.10, mb: 0.15 },
+      { race: 'human', classId: 'healer',  name: 'Dark Priest', emoji: '☠️', mr: 0.30, mg: 0.05, mb: 0.35 }
     ]
   },
   {
-    minStage: 10, maxStage: null,
+    // Stage 7-8 — Dark Cult: mages and undead
+    minStage: 7, maxStage: 8, partyName: 'Dark Cult',
     team: [
-      { race: 'dwarf',    classId: 'warrior', name: 'Orc Crusher',   emoji: '👹', mr: 0.2, mg: 0.5, mb: 0.1 },
-      { race: 'elf',      classId: 'mage',    name: 'Shadow Mage',   emoji: '🌑', mr: 0.3, mg: 0.1, mb: 0.5 },
-      { race: 'beastkin', classId: 'archer',  name: 'Shadow Archer', emoji: '🎯', mr: 0.2, mg: 0.2, mb: 0.2 },
-      { race: 'human',    classId: 'healer',  name: 'Dark Witch',    emoji: '🧙', mr: 0.6, mg: 0.1, mb: 0.4 },
-      { race: 'human',    classId: 'warrior', name: 'Dark Knight',   emoji: '🗡️', mr: 0.7, mg: 0.1, mb: 0.1 }
+      { race: 'human',    classId: 'warrior', name: 'Skeleton',    emoji: '💀', mr: 0.85, mg: 0.85, mb: 0.80 },
+      { race: 'elf',      classId: 'mage',    name: 'Wraith',      emoji: '👻', mr: 0.40, mg: 0.35, mb: 0.55 },
+      { race: 'human',    classId: 'mage',    name: 'Cultist',     emoji: '🌀', mr: 0.20, mg: 0.10, mb: 0.40 },
+      { race: 'elf',      classId: 'healer',  name: 'Necromancer', emoji: '💠', mr: 0.20, mg: 0.10, mb: 0.45 }
+    ]
+  },
+  {
+    // Stage 9-11 — Beast Horde: animals and beastkin warriors
+    minStage: 9, maxStage: 11, partyName: 'Beast Horde',
+    team: [
+      { race: 'beastkin', classId: 'warrior', name: 'Panther',  emoji: '🐆', mr: 0.15, mg: 0.15, mb: 0.20 },
+      { race: 'dwarf',    classId: 'warrior', name: 'Bear',     emoji: '🐻', mr: 0.55, mg: 0.35, mb: 0.20 },
+      { race: 'beastkin', classId: 'archer',  name: 'Hawk',     emoji: '🦅', mr: 0.60, mg: 0.50, mb: 0.20 },
+      { race: 'beastkin', classId: 'warrior', name: 'Wolf',     emoji: '🐺', mr: 0.45, mg: 0.45, mb: 0.50 }
+    ]
+  },
+  {
+    // Stage 12+ — Elite Forces: full mixed team of the hardest enemies
+    minStage: 12, maxStage: null, partyName: 'Elite Forces',
+    team: [
+      { race: 'dwarf',    classId: 'warrior', name: 'Orc Crusher',   emoji: '🪨', mr: 0.20, mg: 0.50, mb: 0.10 },
+      { race: 'elf',      classId: 'mage',    name: 'Shadow Mage',   emoji: '🌑', mr: 0.30, mg: 0.10, mb: 0.50 },
+      { race: 'beastkin', classId: 'archer',  name: 'Shadow Archer', emoji: '🏹', mr: 0.20, mg: 0.20, mb: 0.20 },
+      { race: 'human',    classId: 'healer',  name: 'Dark Witch',    emoji: '🧙', mr: 0.60, mg: 0.10, mb: 0.40 },
+      { race: 'human',    classId: 'warrior', name: 'Dark Knight',   emoji: '🗡️', mr: 0.70, mg: 0.10, mb: 0.10 }
+    ]
+  }
+];
+
+// ═══════════════════════════════════════
+//  QUICK MATCH HERO PARTIES
+//  Pre-built party configurations for the Quick Match feature.
+//  Each entry has a label and an array of 3 party-member configs.
+// ═══════════════════════════════════════
+var QUICK_MATCH_HERO_PARTIES = [
+  {
+    label: 'Warriors',
+    members: [
+      { name: 'Grunt',   race: 'human',    classId: 'warrior', backgroundId: 'soldier',  colorId: 'crimson'  },
+      { name: 'Scout',   race: 'beastkin', classId: 'archer',  backgroundId: 'wanderer', colorId: 'emerald'  },
+      { name: 'Cleric',  race: 'human',    classId: 'healer',  backgroundId: 'mystic',   colorId: 'default'  }
+    ]
+  },
+  {
+    label: 'Mages',
+    members: [
+      { name: 'Wizard',  race: 'elf',   classId: 'mage',    backgroundId: 'scholar',  colorId: 'violet'   },
+      { name: 'Guard',   race: 'dwarf', classId: 'warrior', backgroundId: 'soldier',  colorId: 'amber'    },
+      { name: 'Sage',    race: 'elf',   classId: 'healer',  backgroundId: 'mystic',   colorId: 'sapphire' }
+    ]
+  },
+  {
+    label: 'Rangers',
+    members: [
+      { name: 'Ranger',  race: 'beastkin', classId: 'archer',  backgroundId: 'wanderer', colorId: 'emerald'  },
+      { name: 'Knight',  race: 'human',    classId: 'warrior', backgroundId: 'noble',    colorId: 'amber'    },
+      { name: 'Shaman',  race: 'elf',      classId: 'mage',    backgroundId: 'mystic',   colorId: 'violet'   }
     ]
   }
 ];

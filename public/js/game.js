@@ -196,6 +196,14 @@ var game = (function () {
       g.ui.showCreateScreen();
     });
 
+    // Title → Quick Match
+    document.getElementById('btn-quick-match').addEventListener('click', function () {
+      clearSave();
+      g.stage  = 1;
+      g.player = null;
+      _startQuickMatch();
+    });
+
     // Title → Continue
     document.getElementById('btn-continue-game').addEventListener('click', function () {
       var save = loadSave();
@@ -602,6 +610,45 @@ var game = (function () {
       var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
     }
     return arr;
+  }
+
+  // ─── Quick Match ─────────────────────────────────────────────────────────────
+
+  /**
+   * Assign a random predefined hero party from QUICK_MATCH_HERO_PARTIES and
+   * immediately start a stage-1 battle — bypassing the character-creation wizard.
+   */
+  function _startQuickMatch() {
+    var pool  = QUICK_MATCH_HERO_PARTIES;
+    var party = pool.length
+      ? pool[Math.floor(Math.random() * pool.length)]
+      : null;
+
+    if (party && party.members && party.members.length >= 3) {
+      g.partyConfig = party.members.map(function (m, i) {
+        return {
+          name:         m.name         || (i === 0 ? 'Hero' : 'Ally'),
+          race:         m.race         || 'human',
+          classId:      m.classId      || 'warrior',
+          backgroundId: m.backgroundId || null,
+          colorId:      m.colorId      || 'default',
+          level: 1, exp: 0,
+          hp: 0   // placeholder — Character constructor sets hp = maxHp on creation
+        };
+      });
+      // First member is the player hero
+      g.partyConfig[0].isPlayer = true;
+    } else {
+      // Fallback: use a minimal preset party
+      g.partyConfig = [
+        { name: 'Hero',    race: 'human',    classId: 'warrior', backgroundId: null, colorId: 'default', level: 1, exp: 0, hp: 0 },
+        { name: 'Ally I',  race: 'elf',      classId: 'mage',    backgroundId: null, colorId: 'default', level: 1, exp: 0, hp: 0 },
+        { name: 'Ally II', race: 'beastkin', classId: 'archer',  backgroundId: null, colorId: 'default', level: 1, exp: 0, hp: 0 }
+      ];
+      g.partyConfig[0].isPlayer = true;
+    }
+
+    startBattle(true);
   }
 
   // ─── Boot on DOMContentLoaded ────────────────────────────────────────────────
