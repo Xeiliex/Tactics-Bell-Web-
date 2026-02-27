@@ -19,6 +19,7 @@ var game = (function () {
     scene:         null,   // GameScene
     combat:        null,   // Combat
     ui:            null,   // GameUI
+    weather:       null,   // current WEATHER_TYPES entry
     _pendingSave:  null    // Temporary holder for continue-game restore data
   };
 
@@ -350,6 +351,13 @@ var game = (function () {
     // 1. Tear down any previous scene
     if (g.scene) { g.scene.dispose(); g.scene = null; }
 
+    // 1b. Pick a random weather for this stage and start the game loop.
+    g.weather = selectRandomWeather();
+    if (typeof gameLoop !== 'undefined') {
+      gameLoop.stop();   // clear any leftover callbacks from the previous battle
+      gameLoop.start();
+    }
+
     // 2. Create/preserve player character
     if (isNewGame) {
       // Use partyConfig hero slot (index 0) if available
@@ -486,6 +494,8 @@ var game = (function () {
     if (g.scene.engine) { g.scene.engine.resize(); }
     g.scene.renderGrid(g.grid);
     g.scene.renderUnits(allUnits);
+    // Apply weather visuals (particles / fog) to the scene.
+    g.scene.setWeather(g.weather.id);
 
     // 8. Set up click handler
     g.scene.setClickHandler(function (row, col) {
@@ -499,7 +509,8 @@ var game = (function () {
       g.scene,
       g.ui,
       onVictory,
-      onDefeat
+      onDefeat,
+      g.weather
     );
 
     // 10. Update HUD
@@ -514,6 +525,14 @@ var game = (function () {
       hwBadge.textContent = HARDWARE_TIER === 'high' ? '🖥 GPU: High Quality' : '⚙ CPU: Low Quality';
       hwBadge.style.opacity = '1';
       setTimeout(function () { hwBadge.style.opacity = '0'; }, 3000);
+    }
+
+    // 11b. Show weather badge persistently for the whole battle.
+    var weatherBadge = document.getElementById('weather-badge');
+    if (weatherBadge && g.weather) {
+      weatherBadge.textContent = g.weather.emoji + ' ' + g.weather.name;
+      weatherBadge.title = g.weather.description;
+      weatherBadge.className = 'weather-' + g.weather.id;
     }
 
     // 12. Start
@@ -592,9 +611,11 @@ var game = (function () {
 
   function onBackToTitle() {
     if (g.scene) { g.scene.dispose(); g.scene = null; }
+    if (typeof gameLoop !== 'undefined') gameLoop.stop();
     g.stage       = 1;
     g.player      = null;
     g.partyConfig = null;
+    g.weather     = null;
     // Stop the memory monitor when the player leaves the battle
     if (typeof AssetCache !== 'undefined') AssetCache.stopMemoryMonitor();
     if (g.ui) g.ui.hideMemoryWarning();
@@ -610,6 +631,13 @@ var game = (function () {
       var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
     }
     return arr;
+  }
+
+  // Returns a randomly selected WEATHER_TYPES entry.
+  // Extracted so stage-specific weather probabilities can be added here later.
+  function selectRandomWeather() {
+    var keys = Object.keys(WEATHER_TYPES);
+    return WEATHER_TYPES[keys[Math.floor(Math.random() * keys.length)]];
   }
 
   // ─── Quick Match ─────────────────────────────────────────────────────────────

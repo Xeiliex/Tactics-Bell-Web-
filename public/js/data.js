@@ -15,6 +15,24 @@ var TERRAIN = {
 };
 
 // ═══════════════════════════════════════
+//  WEATHER TYPES
+// ═══════════════════════════════════════
+//
+// spdMod — subtracted from each unit's effective move range (min 1 tile).
+//          Snow buries the field (−2), Rain soaks gear (−1).
+// hitMod — added to the d20 attack roll before the hit check.
+//          Negative values make attacks harder to land.
+//          Fog (−3) severely obscures targeting; Wind (−2) deflects shots.
+//
+var WEATHER_TYPES = {
+  clear: { id: 'clear', name: 'Clear', emoji: '\u2600\uFE0F',  description: 'Clear skies.',                                    spdMod:  0, hitMod:  0 },
+  rain:  { id: 'rain',  name: 'Rain',  emoji: '\uD83C\uDF27\uFE0F', description: 'Rain slows movement and soaks gear.',             spdMod: -1, hitMod: -1 },
+  snow:  { id: 'snow',  name: 'Snow',  emoji: '\u2744\uFE0F',  description: 'Snow buries the field and chills everyone.',      spdMod: -2, hitMod:  0 },
+  wind:  { id: 'wind',  name: 'Wind',  emoji: '\uD83D\uDCA8',  description: 'Howling winds throw off every shot.',             spdMod:  0, hitMod: -2 },
+  fog:   { id: 'fog',   name: 'Fog',   emoji: '\uD83C\uDF2B\uFE0F', description: 'Thick fog makes targeting nearly impossible.', spdMod:  0, hitMod: -3 }
+};
+
+// ═══════════════════════════════════════
 //  RACES
 // ═══════════════════════════════════════
 var RACES = {

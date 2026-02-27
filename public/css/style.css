@@ -492,6 +492,27 @@ html, body {
 #phase-display { color: var(--cyan); font-size: 20px; }
 #turn-counter  { color: #aaa; }
 
+/* Weather badge — shows the current weather type in the top bar */
+#weather-badge {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 2px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.07);
+  color: #ddd;
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+}
+#weather-badge.weather-clear  { color: var(--gold); }
+#weather-badge.weather-rain   { color: #63b3ed; border-color: rgba(99,179,237,0.4); background: rgba(49,130,206,0.15); }
+#weather-badge.weather-snow   { color: #e2e8f0; border-color: rgba(226,232,240,0.4); background: rgba(160,174,192,0.12); }
+#weather-badge.weather-wind   { color: #a0aec0; border-color: rgba(160,174,192,0.4); background: rgba(74,85,104,0.15); }
+#weather-badge.weather-fog    { color: #b8c4ce; border-color: rgba(184,196,206,0.4); background: rgba(113,128,150,0.18); }
+
 /* Turn order bar */
 #turn-order-bar {
   display: flex; align-items: center;
