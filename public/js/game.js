@@ -26,6 +26,12 @@ var game = (function () {
     g.ui = new GameUI(g);
     g.ui.showTitleScreen();
 
+    // Begin pre-fetching terrain model files in the background so that stage
+    // transitions can serve them from memory instead of making network requests.
+    if (typeof AssetCache !== 'undefined') {
+      AssetCache.preloadTerrainModels();
+    }
+
     // Title → Create
     document.getElementById('btn-new-game').addEventListener('click', function () {
       g.stage = 1;
@@ -78,6 +84,14 @@ var game = (function () {
     if (typeof BABYLON === 'undefined') {
       alert('Babylon.js could not be loaded.\nPlease check your internet connection and reload.');
       return;
+    }
+
+    // Start (or keep running) the memory monitor while a battle is active.
+    // The warning fires if used JS heap exceeds 75 % of the heap size limit.
+    if (typeof AssetCache !== 'undefined') {
+      AssetCache.startMemoryMonitor(function (info) {
+        if (g.ui) g.ui.showMemoryWarning(info);
+      });
     }
 
     // Show battle screen first so canvas exists in DOM
@@ -210,6 +224,9 @@ var game = (function () {
     if (g.scene) { g.scene.dispose(); g.scene = null; }
     g.stage  = 1;
     g.player = null;
+    // Stop the memory monitor when the player leaves the battle
+    if (typeof AssetCache !== 'undefined') AssetCache.stopMemoryMonitor();
+    if (g.ui) g.ui.hideMemoryWarning();
     g.ui.showTitleScreen();
   }
 
@@ -230,7 +247,6 @@ var game = (function () {
   } else {
     init();
   }
-
   return g; // expose for debugging
 
 }());
