@@ -19,6 +19,7 @@
       <p class="tagline">Battle · Level Up · Conquer</p>
       <button class="btn-primary btn-large" id="btn-new-game">⚔ NEW GAME</button>
       <button class="btn-secondary btn-large hidden" id="btn-continue-game">▶ CONTINUE</button>
+      <button class="btn-gfx-toggle" id="btn-gfx-toggle" title="Toggle graphics quality"></button>
     </div>
   </div>
 
@@ -36,6 +37,12 @@
       <div class="wizard-step-heading">
         <h2 class="wizard-step-title" id="wizard-step-title">Choose Your Race</h2>
         <p class="wizard-step-sub" id="wizard-step-sub">Your heritage shapes your innate abilities.</p>
+      </div>
+
+      <!-- 3-D rotating character model preview (shown on class & identity steps) -->
+      <div class="wizard-preview-wrap hidden" id="wizard-preview-wrap">
+        <canvas id="char-preview-canvas" width="220" height="220"></canvas>
+        <p class="preview-hint">Drag to rotate</p>
       </div>
 
       <!-- Dynamic content region (filled by JS) -->
@@ -176,8 +183,10 @@
   <!-- Babylon.js (babylonjs@7.38.0) + Oimo.js physics plugin (oimo@1.0.9) -->
   <script src="vendor/babylon.js"></script>
   <script src="vendor/oimo.min.js"></script>
-  <!-- OBJ file loader (babylonjs-loaders@7.38.0) — enables terrain model import -->
+  <!-- OBJ file loader (babylonjs-loaders@7.38.0) — used for low-quality OBJ fallback -->
   <script src="vendor/babylon.objFileLoader.min.js"></script>
+  <!-- glTF 2.0 file loader (babylonjs-loaders@7.38.0) — loads high-quality character models -->
+  <script src="vendor/babylon.glTF2FileLoader.min.js"></script>
   <!-- anime.js 3.2.1 -->
   <script src="vendor/anime.min.js"></script>
   <!-- Game modules (order matters) -->

@@ -37,11 +37,19 @@ if (typeof anime === 'undefined') {
   window.anime.stagger = function () { return 0; };
 }
 
+// Minimal HTML-attribute escaper — prevents quote break-out when user-typed
+// strings are placed inside double-quoted HTML attributes.
+function _htmlAttr(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
 function GameUI(game) {
   this.game = game;
   this._currentScreen = null;
   this._party = [];
   this._memWarnTimer = null;
+  this._charPreview   = null;   // CharacterPreviewScene — active during wizard
+  this._charPortraits = {};     // memberIdx → portrait data-URL
 
   // Allow the user to manually dismiss the memory warning
   var self = this;
@@ -84,6 +92,7 @@ GameUI.prototype._showScreenIn = function (id) {
 // ─── Title screen ─────────────────────────────────────────────────────────────
 
 GameUI.prototype.showTitleScreen = function () {
+  this._disposePreview();
   this.showScreen('screen-title');
   // Animate bell and title on load
   anime({
@@ -124,6 +133,8 @@ var WIZARD_MEMBER_META = [
 
 GameUI.prototype.showCreateScreen = function () {
   var game = this.game;
+  this._disposePreview();
+  this._charPortraits = {};
 
   // Initialise partyConfig if this is a fresh visit
   if (!game.partyConfig) {
@@ -202,6 +213,17 @@ GameUI.prototype._renderWizardStep = function () {
     else                      this._buildWizardIdentityStep(content, member, w.memberIdx, mmeta);
   }
 
+  // Show the 3-D preview canvas on class (1) and identity (3) steps;
+  // hide it on race (0) and background (2) steps.
+  var previewWrap = document.getElementById('wizard-preview-wrap');
+  if (previewWrap) {
+    if (w.stepIdx === 1 || w.stepIdx === 3) {
+      previewWrap.classList.remove('hidden');
+    } else {
+      previewWrap.classList.add('hidden');
+    }
+  }
+
   anime({ targets: '#wizard-content', opacity: [0, 1], translateY: [12, 0],
     duration: 280, easing: 'easeOutQuart' });
 };
@@ -224,6 +246,18 @@ GameUI.prototype.wizardNext = function () {
   var isLastMember = w.memberIdx === game.partyConfig.length - 1;
   var isLastStep   = w.stepIdx   === WIZARD_STEP_META.length - 1;
 
+  // Capture portrait on identity step before advancing
+  if (w.stepIdx === WIZARD_STEP_META.length - 1 && this._charPreview) {
+    var portrait = this._charPreview.capturePortrait();
+    if (portrait) {
+      this._charPortraits[w.memberIdx] = portrait;
+      if (game.partyConfig[w.memberIdx]) {
+        game.partyConfig[w.memberIdx].portrait = portrait;
+      }
+    }
+    this._disposePreview();
+  }
+
   if (isLastMember && isLastStep) {
     this.showPartyReviewScreen();
     return;
@@ -240,6 +274,9 @@ GameUI.prototype.wizardNext = function () {
 
 GameUI.prototype.wizardBack = function () {
   var w = this._wizard;
+  // Going back from class step (1) to race step (0) — dispose the preview
+  if (w.stepIdx === 1) { this._disposePreview(); }
+
   if (w.stepIdx === 0 && w.memberIdx > 0) {
     w.memberIdx--;
     w.stepIdx = WIZARD_STEP_META.length - 1;
@@ -250,6 +287,38 @@ GameUI.prototype.wizardBack = function () {
 };
 
 // ─── Wizard step renderers ────────────────────────────────────────────────────
+
+/** Tear down the character preview Babylon scene and hide the canvas wrap. */
+GameUI.prototype._disposePreview = function () {
+  if (this._charPreview) {
+    this._charPreview.dispose();
+    this._charPreview = null;
+  }
+  var wrap = document.getElementById('wizard-preview-wrap');
+  if (wrap) wrap.classList.add('hidden');
+};
+
+/**
+ * Initialise (or reuse) the CharacterPreviewScene and load the given model.
+ * Uses a short setTimeout so Babylon initialises after the canvas is painted.
+ */
+GameUI.prototype._ensurePreview = function (classId, colorId, raceId) {
+  if (typeof GRAPHICS_QUALITY !== 'undefined' && GRAPHICS_QUALITY === 'low') return;
+  if (typeof CharacterPreviewScene === 'undefined') return;
+  var self = this;
+  if (!this._charPreview) {
+    this._charPreview = new CharacterPreviewScene();
+    var preview = this._charPreview;
+    setTimeout(function () {
+      if (preview !== self._charPreview) return; // disposed while waiting
+      if (preview.init('char-preview-canvas') && classId) {
+        preview.loadModel(classId, colorId || 'default', raceId || 'human');
+      }
+    }, 80);
+  } else if (classId) {
+    this._charPreview.loadModel(classId, colorId || 'default', raceId || 'human');
+  }
+};
 
 GameUI.prototype._buildWizardRaceStep = function (container, member) {
   var grid = document.createElement('div');
@@ -288,6 +357,7 @@ GameUI.prototype._buildWizardRaceStep = function (container, member) {
 };
 
 GameUI.prototype._buildWizardClassStep = function (container, member) {
+  var self = this;
   var grid = document.createElement('div');
   grid.className = 'cards-grid';
 
@@ -308,12 +378,20 @@ GameUI.prototype._buildWizardClassStep = function (container, member) {
       var nb = document.getElementById('btn-wizard-next');
       if (nb) nb.disabled = false;
       anime({ targets: card, scale: [0.95, 1.0], duration: 200, easing: 'easeOutBack' });
+      // Update the 3-D preview to show this class
+      self._ensurePreview(cls.id, member.colorId, member.race);
     });
 
     grid.appendChild(card);
   });
 
   container.appendChild(grid);
+
+  // If a class was already selected (e.g. navigating back), show it in the preview
+  if (member.classId) {
+    self._ensurePreview(member.classId, member.colorId, member.race);
+  }
+
   anime({ targets: grid.querySelectorAll('.card'), translateY: [16, 0], opacity: [0, 1],
     duration: 340, easing: 'easeOutQuart', delay: anime.stagger(50) });
 };
@@ -356,6 +434,7 @@ GameUI.prototype._buildWizardBackgroundStep = function (container, member) {
 };
 
 GameUI.prototype._buildWizardIdentityStep = function (container, member, memberIdx, mmeta) {
+  var self = this;
   var wrap = document.createElement('div');
   wrap.className = 'wizard-identity';
 
@@ -394,6 +473,10 @@ GameUI.prototype._buildWizardIdentityStep = function (container, member, memberI
       swatch.classList.add('selected');
       member.colorId = color.id;
       anime({ targets: swatch, scale: [0.85, 1.0], duration: 200, easing: 'easeOutBack' });
+      // Update the 3-D preview colour in real-time
+      if (self._charPreview) {
+        self._charPreview.applyColor(color.id, member.race);
+      }
     });
 
     swatchRow.appendChild(swatch);
@@ -426,6 +509,11 @@ GameUI.prototype._buildWizardIdentityStep = function (container, member, memberI
 
   container.appendChild(wrap);
 
+  // Ensure the 3-D preview shows the current class with the current colour
+  if (member.classId) {
+    self._ensurePreview(member.classId, member.colorId, member.race);
+  }
+
   // Auto-focus the name input after render
   setTimeout(function () { nameInput.focus(); }, 50);
 };
@@ -454,11 +542,16 @@ GameUI.prototype.showPartyReviewScreen = function () {
       ? '<div class="review-member-bg">' + bg.emoji + ' ' + bg.name + '</div>'
       : '';
 
+    // Use captured portrait if available, otherwise fall back to class emoji
+    var portraitHtml = member.portrait
+      ? '<img class="review-portrait" src="' + member.portrait + '" alt="' + _htmlAttr(member.name || 'Adventurer') + '">'
+      : '<div class="review-member-emoji">' + CLASSES[member.classId].emoji + '</div>';
+
     var card = document.createElement('div');
     card.className = 'review-member-card' + (i === 0 ? ' hero-card' : '');
     card.innerHTML =
       '<div class="review-member-role">' + memberTitles[i] + '</div>' +
-      '<div class="review-member-emoji">' + CLASSES[member.classId].emoji + '</div>' +
+      portraitHtml +
       '<div class="review-member-name">' + (member.name || 'Adventurer') + '</div>' +
       '<div class="review-member-subtitle">' +
         RACES[member.race].name + ' · ' + CLASSES[member.classId].name +
@@ -483,6 +576,7 @@ GameUI.prototype.showPartyReviewScreen = function () {
 // ─── Battle screen ────────────────────────────────────────────────────────────
 
 GameUI.prototype.showBattleScreen = function () {
+  this._disposePreview();
   this.showScreen('screen-battle');
 };
 
@@ -663,9 +757,13 @@ GameUI.prototype._buildPartyCard = function (unit) {
   card.className = 'party-card' + (unit.isPlayer ? ' party-card-player' : '');
   var ratio = unit.hpRatio() * 100;
   var bgPos  = (1 - unit.hpRatio()) * 100;
+  // Use portrait if available, otherwise fall back to emoji
+  var iconHtml = unit.portrait
+    ? '<img class="party-portrait" src="' + unit.portrait + '" alt="' + _htmlAttr(unit.name) + '">'
+    : '<span class="party-card-emoji">' + unit.emoji + '</span>';
   card.innerHTML =
     '<div class="party-card-header">' +
-      '<span class="party-card-emoji">' + unit.emoji + '</span>' +
+      iconHtml +
       '<span class="party-card-name">' + unit.name + '</span>' +
     '</div>' +
     '<div class="party-card-sub">' +

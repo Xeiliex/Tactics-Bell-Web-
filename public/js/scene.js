@@ -7,10 +7,32 @@
 
 var TILE_STEP = 1.15;   // world-space units per grid cell
 
+// ─── Graphics quality setting ─────────────────────────────────────────────────
+// 'high' (default): load OBJ models for characters and terrain.
+// 'low': skip OBJ loading and use procedural fallback meshes only.
+// Initialised from the hardware-tier detection; can be overridden by the user
+// via the title-screen toggle (stored in localStorage as 'tactics-bell-gfx').
+var GRAPHICS_QUALITY = (function () {
+  try {
+    var stored = localStorage.getItem('tactics-bell-gfx');
+    if (stored === 'low' || stored === 'high') return stored;
+  } catch (e) {}
+  return (typeof HARDWARE_TIER !== 'undefined' && HARDWARE_TIER === 'low') ? 'low' : 'high';
+}());
+
 // ─── Character model configuration ───────────────────────────────────────────
-// Maps class IDs to OBJ filenames in public/models/character/.
-// Any class not listed here keeps its procedural cylinder + sphere appearance.
+// Maps class IDs to glTF filenames in public/models/character/ (high quality).
+// Modular character outfits from the Assets folder, converted to web-ready glTF.
 var CHARACTER_MODEL_FILES = {
+  warrior: 'Male_Peasant.gltf',
+  mage:    'Female_Ranger.gltf',
+  archer:  'Male_Ranger.gltf',
+  healer:  'Female_Peasant.gltf'
+};
+
+// Low-graphics fallback: procedural OBJ models (used when GRAPHICS_QUALITY='low').
+// Any class not present keeps its procedural cylinder + sphere appearance.
+var CHARACTER_MODEL_FILES_LOW = {
   warrior: 'character-warrior.obj',
   mage:    'character-mage.obj',
   archer:  'character-archer.obj',
@@ -234,6 +256,7 @@ GameScene.prototype.renderGrid = function (grid) {
 // the box is silently kept, so the game always remains playable.
 
 GameScene.prototype._upgradeToModels = function (grid) {
+  if (typeof GRAPHICS_QUALITY !== 'undefined' && GRAPHICS_QUALITY === 'low') return;
   if (!BABYLON.SceneLoader || typeof BABYLON.SceneLoader.ImportMesh !== 'function') return;
 
   var self = this;
@@ -347,17 +370,21 @@ GameScene.prototype.renderUnits = function (units) {
 };
 
 // ─── Character model loading ──────────────────────────────────────────────────
-// Tries to load a class-specific OBJ from public/models/character/ for each
-// unit.  On success the procedural cylinder + sphere are hidden and replaced
-// with a cloned copy of the OBJ mesh coloured by the unit's race.  On failure
-// (file missing, loader absent) the procedural shapes are silently kept.
+// Loads glTF character models (high quality) or OBJ fallbacks (low quality).
+// On success the procedural cylinder + sphere are hidden.  On failure the
+// procedural shapes remain, so the game is always playable.
 
 GameScene.prototype._upgradeUnitsToModels = function (units) {
+  if (typeof GRAPHICS_QUALITY !== 'undefined' && GRAPHICS_QUALITY === 'low') return;
   if (!BABYLON.SceneLoader || typeof BABYLON.SceneLoader.ImportMesh !== 'function') return;
 
   var self = this;
 
-  // Group units by classId so each OBJ is loaded only once per class.
+  // Select the file map based on quality: glTF for high, OBJ for low.
+  // (GRAPHICS_QUALITY === 'low' was already caught above, so this is always high.)
+  var modelFiles = CHARACTER_MODEL_FILES;
+
+  // Group units by classId so each model is loaded only once per class.
   var classBuckets = {};
   units.forEach(function (unit) {
     var cid = unit.classId;
@@ -366,13 +393,17 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
   });
 
   Object.keys(classBuckets).forEach(function (classId) {
-    var fileName = CHARACTER_MODEL_FILES[classId];
+    var fileName = modelFiles[classId];
     if (!fileName) return;
 
-    var cacheKey  = 'models/character/' + fileName;
-    var useBlob   = typeof AssetCache !== 'undefined' && AssetCache.hasCached(cacheKey);
+    var isGltf = fileName.indexOf('.gltf') !== -1 || fileName.indexOf('.glb') !== -1;
+
+    // glTF models must always load from the server because their external .bin
+    // and texture files cannot be served from a single blob: URL.
+    // OBJ models use the blob cache when available to avoid repeat network hits.
+    var useBlob   = !isGltf && typeof AssetCache !== 'undefined' && AssetCache.hasCached('models/character/' + fileName);
     var rootUrl   = useBlob ? ''                    : 'models/character/';
-    var srcFile   = useBlob ? AssetCache.getCachedUrl(cacheKey) : fileName;
+    var srcFile   = useBlob ? AssetCache.getCachedUrl('models/character/' + fileName) : fileName;
     var pluginExt = useBlob ? '.obj'                : null;
 
     BABYLON.SceneLoader.ImportMesh(
@@ -395,12 +426,13 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
           CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
         );
 
-        // Clone template once per unit of this class, applying the unit's race colour.
+        // Clone template once per unit of this class.
+        // For glTF models the texture-based materials are preserved.
+        // For OBJ models a solid PBR colour is applied per unit.
         classBuckets[classId].forEach(function (unit) {
           var node = self._unitNodes[unit.id];
           if (!node) return;
 
-          var c   = unit.meshColor();
           var pos = self.gridToWorld(unit.gridRow, unit.gridCol);
 
           var clone = template.clone('charmodel_' + unit.id);
@@ -409,17 +441,20 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
           clone.isPickable = false;
           clone.receiveShadows = true;
 
-          // Apply unit race colour as PBR material.
-          var pbrMat = new BABYLON.PBRMaterial('charpbr_' + unit.id, self.scene);
-          pbrMat.albedoColor  = new BABYLON.Color3(c.r, c.g, c.b);
-          pbrMat.metallic     = CHARACTER_PBR_METALLIC;
-          pbrMat.roughness    = CHARACTER_PBR_ROUGHNESS;
-          pbrMat.emissiveColor = BABYLON.Color3.Black();
-          clone.material = pbrMat;
+          if (!isGltf) {
+            // OBJ path: override material with unit race/custom colour.
+            var c = unit.meshColor();
+            var pbrMat = new BABYLON.PBRMaterial('charpbr_' + unit.id, self.scene);
+            pbrMat.albedoColor   = new BABYLON.Color3(c.r, c.g, c.b);
+            pbrMat.metallic      = CHARACTER_PBR_METALLIC;
+            pbrMat.roughness     = CHARACTER_PBR_ROUGHNESS;
+            pbrMat.emissiveColor = BABYLON.Color3.Black();
+            clone.material = pbrMat;
+          }
 
           if (self._shadowGenerator) { self._shadowGenerator.addShadowCaster(clone, true); }
 
-          // Hide the procedural fallback meshes — the OBJ model takes their place.
+          // Hide the procedural fallback meshes.
           node.body.setEnabled(false);
           node.head.setEnabled(false);
 
@@ -778,3 +813,193 @@ GameScene.prototype.dispose = function () {
   }
   this._frameCount = 0;
 };
+
+// ─── Character creator preview scene ─────────────────────────────────────────
+// A lightweight Babylon.js scene rendered onto a small canvas inside the
+// character-creation wizard.  Shows the selected class OBJ model spinning in
+// place; the colour updates in real-time as the player picks body colours.
+// Created lazily when a class is first selected; disposed when the wizard exits.
+
+function CharacterPreviewScene() {
+  this.engine          = null;
+  this.scene           = null;
+  this._camera         = null;
+  this._model          = null;
+  this._fallback       = null;
+  this._rotObs         = null;
+  this._pendingClassId = null;
+}
+
+/** Initialise Babylon on the given canvas.  Returns true on success. */
+CharacterPreviewScene.prototype.init = function (canvasId) {
+  if (typeof BABYLON === 'undefined') return false;
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return false;
+  try {
+    this.engine = new BABYLON.Engine(canvas, true, {}, true);
+    this.scene  = new BABYLON.Scene(this.engine);
+    this.scene.clearColor = new BABYLON.Color4(0.08, 0.10, 0.22, 1);
+
+    this._camera = new BABYLON.ArcRotateCamera(
+      'prevCam', -Math.PI / 2, Math.PI / 3.2, 2.8,
+      new BABYLON.Vector3(0, 0.4, 0), this.scene
+    );
+    this._camera.attachControl(canvas, true);
+
+    var dir  = new BABYLON.DirectionalLight('pDir', new BABYLON.Vector3(-1, -2, -1), this.scene);
+    dir.intensity = 1.2;
+    dir.diffuse   = new BABYLON.Color3(1, 0.95, 0.8);
+    var hemi = new BABYLON.HemisphericLight('pHemi', new BABYLON.Vector3(0, 1, 0), this.scene);
+    hemi.intensity   = 0.55;
+    hemi.diffuse     = new BABYLON.Color3(0.5, 0.6, 1.0);
+    hemi.groundColor = new BABYLON.Color3(0.15, 0.08, 0.2);
+
+    var cam  = this._camera;
+    this._rotObs = this.scene.onBeforeRenderObservable.add(function () {
+      cam.alpha += 0.015;
+    });
+
+    var self = this;
+    this.engine.runRenderLoop(function () { if (self.scene) self.scene.render(); });
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+/** Load (or reload) the glTF/OBJ model for classId with the given colour. */
+CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId) {
+  if (!this.scene) return;
+  var self = this;
+  this._pendingClassId = classId;
+
+  if (this._model)    { this._model.dispose();    this._model    = null; }
+  if (this._fallback) { this._fallback.dispose(); this._fallback = null; }
+
+  var col = _resolvePreviewColor(colorId, raceId);
+
+  // Procedural fallback shown immediately while the model loads (or if unavailable)
+  var fb    = BABYLON.MeshBuilder.CreateCylinder('pfb', {
+    height: 0.8, diameter: 0.5, tessellation: 12
+  }, this.scene);
+  fb.position = BABYLON.Vector3.Zero();
+  var fbMat = new BABYLON.PBRMaterial('pfbmat', this.scene);
+  fbMat.albedoColor = new BABYLON.Color3(col.r, col.g, col.b);
+  fbMat.metallic    = 0.35;
+  fbMat.roughness   = 0.60;
+  fb.material = fbMat;
+  this._fallback = fb;
+
+  var fileName = CHARACTER_MODEL_FILES[classId];
+  if (!fileName || !BABYLON.SceneLoader) return;
+
+  var isGltf    = fileName.indexOf('.gltf') !== -1 || fileName.indexOf('.glb') !== -1;
+  // glTF must always load directly from the server (external .bin + textures)
+  var useBlob   = !isGltf && typeof AssetCache !== 'undefined' && AssetCache.hasCached('models/character/' + fileName);
+  var rootUrl   = useBlob ? ''                    : 'models/character/';
+  var srcFile   = useBlob ? AssetCache.getCachedUrl('models/character/' + fileName) : fileName;
+  var pluginExt = useBlob ? '.obj'                : null;
+
+  BABYLON.SceneLoader.ImportMesh('', rootUrl, srcFile, self.scene,
+    function (meshes) {
+      if (!meshes || !meshes.length || !self.scene) return;
+      // Discard if the class was changed while loading
+      if (self._pendingClassId !== classId) {
+        meshes.forEach(function (m) { m.dispose(); });
+        return;
+      }
+      if (self._fallback) { self._fallback.dispose(); self._fallback = null; }
+
+      // For glTF, use the first root mesh; for OBJ, merge sub-meshes.
+      var model;
+      if (isGltf) {
+        // glTF imports as a hierarchy; find the first real mesh
+        model = meshes[0];
+        for (var mi = 0; mi < meshes.length; mi++) {
+          if (meshes[mi].getTotalVertices() > 0) { model = meshes[mi]; break; }
+        }
+      } else {
+        model = meshes.length === 1
+          ? meshes[0]
+          : BABYLON.Mesh.MergeMeshes(meshes, true, true, undefined, false, true);
+      }
+      if (!model) return;
+
+      model.position = BABYLON.Vector3.Zero();
+      model.scaling  = new BABYLON.Vector3(
+        CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
+      );
+
+      // glTF models keep their texture materials; OBJ models get solid PBR colour.
+      if (!isGltf) {
+        var mat = new BABYLON.PBRMaterial('prevpbr_' + classId, self.scene);
+        mat.albedoColor = new BABYLON.Color3(col.r, col.g, col.b);
+        mat.metallic    = CHARACTER_PBR_METALLIC;
+        mat.roughness   = CHARACTER_PBR_ROUGHNESS;
+        model.material  = mat;
+      }
+
+      self._model = model;
+    },
+    null,
+    function () { /* OBJ absent — keep procedural fallback */ },
+    pluginExt
+  );
+};
+
+/** Update the model/fallback colour without reloading the mesh. */
+CharacterPreviewScene.prototype.applyColor = function (colorId, raceId) {
+  var col  = _resolvePreviewColor(colorId, raceId);
+  var mesh = this._model || this._fallback;
+  if (mesh && mesh.material) {
+    mesh.material.albedoColor = new BABYLON.Color3(col.r, col.g, col.b);
+  }
+};
+
+/** Capture the current frame as a PNG data-URL (used as character portrait). */
+CharacterPreviewScene.prototype.capturePortrait = function () {
+  if (!this.engine) return null;
+  try {
+    if (this.scene) this.scene.render();
+    return this.engine.getRenderingCanvas().toDataURL('image/png');
+  } catch (e) { return null; }
+};
+
+/** Tear down the preview scene and free all GPU resources. */
+CharacterPreviewScene.prototype.dispose = function () {
+  if (this.scene && this._rotObs) {
+    this.scene.onBeforeRenderObservable.remove(this._rotObs);
+    this._rotObs = null;
+  }
+  if (this._camera) {
+    try { this._camera.detachControl(); } catch (e) {}
+    this._camera = null;
+  }
+  if (this.engine) {
+    this.engine.stopRenderLoop();
+    if (this.scene) this.scene.dispose();
+    this.engine.dispose();
+    this.engine = null;
+    this.scene  = null;
+  }
+  this._model          = null;
+  this._fallback       = null;
+  this._pendingClassId = null;
+};
+
+/** Resolve a display colour from colorId (BODY_COLORS) then raceId (RACES). */
+function _resolvePreviewColor(colorId, raceId) {
+  if (colorId && colorId !== 'default') {
+    for (var i = 0; i < BODY_COLORS.length; i++) {
+      var bc = BODY_COLORS[i];
+      if (bc.id === colorId && bc.r !== null) {
+        return { r: bc.r, g: bc.g, b: bc.b };
+      }
+    }
+  }
+  if (raceId && RACES[raceId]) {
+    var rc = RACES[raceId];
+    return { r: rc.mr, g: rc.mg, b: rc.mb };
+  }
+  return { r: 0.80, g: 0.70, b: 0.50 };
+}
