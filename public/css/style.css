@@ -928,3 +928,160 @@ html, body {
   object-fit: cover;
   border: 2px solid var(--border);
 }
+
+/* ────────────────────────────────────────
+   STORY MODE BUTTON  (title screen)
+──────────────────────────────────────── */
+.btn-story {
+  background: linear-gradient(135deg, var(--purple) 0%, #7b2fd4 100%);
+  color: #fff;
+  border: none; border-radius: 12px;
+  font-family: var(--font-title);
+  font-size: 22px;
+  letter-spacing: 2px;
+  padding: 14px 40px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(187,134,252,0.4), 0 2px 0 #5d1fa3;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.btn-story:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(187,134,252,0.6), 0 2px 0 #5d1fa3;
+}
+.btn-story:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 10px rgba(187,134,252,0.4);
+}
+
+/* ────────────────────────────────────────
+   CUTSCENE SCREEN
+──────────────────────────────────────── */
+#screen-cutscene {
+  background: #000;
+  flex-direction: column;
+  justify-content: space-between;
+  z-index: 200;
+}
+
+.cutscene-letterbox {
+  flex-shrink: 0;
+  height: 14vh;
+  background: #000;
+}
+
+.cutscene-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 20px 20px;
+  background: linear-gradient(to bottom, #0a0e27 0%, #12173a 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.cutscene-chapter-title {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-title);
+  font-size: clamp(14px, 2.8vw, 26px);
+  letter-spacing: 4px;
+  color: var(--gold);
+  text-shadow: 0 0 15px rgba(255,215,0,0.5);
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.cutscene-dialog-box {
+  width: 100%;
+  max-width: 860px;
+  background: rgba(10, 14, 39, 0.92);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 28px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cutscene-speaker {
+  font-family: var(--font-title);
+  font-size: 20px;
+  letter-spacing: 2px;
+  color: var(--gold);
+  min-height: 24px;
+}
+
+.cutscene-text {
+  font-size: 17px;
+  line-height: 1.6;
+  color: #eee;
+  min-height: 54px;
+}
+
+.cutscene-advance {
+  align-self: flex-end;
+  padding: 8px 28px;
+  font-size: 16px;
+}
+
+/* ────────────────────────────────────────
+   BATTLE EVENT DIALOG  (mid-battle banner)
+──────────────────────────────────────── */
+#battle-event-dialog {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  padding: 14px 20px;
+  background: rgba(10, 14, 39, 0.95);
+  border-top: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 300;
+  animation: slideUpIn 0.3s ease-out;
+  pointer-events: auto;
+}
+#battle-event-dialog.hidden { display: none; }
+
+@keyframes slideUpIn {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.battle-event-speaker {
+  font-family: var(--font-title);
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: var(--gold);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 90px;
+}
+
+.battle-event-text {
+  font-size: 15px;
+  color: #eee;
+  flex: 1;
+  line-height: 1.4;
+}
+
+.battle-event-btn {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--cyan);
+  font-size: 16px;
+  padding: 6px 16px;
+  cursor: pointer;
+  font-family: var(--font-title);
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+.battle-event-btn:hover {
+  background: rgba(0,229,255,0.12);
+  border-color: var(--cyan);
+}

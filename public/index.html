@@ -18,6 +18,7 @@
       <h1 class="game-title">TACTICS BELL</h1>
       <p class="tagline">Battle · Level Up · Conquer</p>
       <button class="btn-primary btn-large" id="btn-new-game">⚔ NEW GAME</button>
+      <button class="btn-story btn-large" id="btn-story-mode">📖 STORY MODE</button>
       <button class="btn-accent btn-large" id="btn-quick-match">⚡ QUICK MATCH</button>
       <button class="btn-secondary btn-large hidden" id="btn-continue-game">▶ CONTINUE</button>
       <button class="btn-gfx-toggle" id="btn-gfx-toggle" title="Toggle graphics quality"></button>
@@ -180,6 +181,28 @@
     </div>
   </div>
 
+  <!-- ══════════════ CUTSCENE SCREEN ══════════════ -->
+  <div id="screen-cutscene" class="screen hidden">
+    <div class="cutscene-letterbox cutscene-top"></div>
+    <div class="cutscene-body">
+      <div class="cutscene-chapter-title" id="cutscene-chapter-title"></div>
+      <div class="cutscene-dialog-box">
+        <div class="cutscene-speaker" id="cutscene-speaker"></div>
+        <div class="cutscene-text" id="cutscene-text"></div>
+        <button class="btn-primary cutscene-advance" id="btn-cutscene-advance">▶ Continue</button>
+      </div>
+    </div>
+    <div class="cutscene-letterbox cutscene-bottom"></div>
+  </div>
+
+  <!-- ══════════════ BATTLE EVENT DIALOG ══════════════ -->
+  <!-- Shown as a fixed banner over the battle screen during mid-battle story events -->
+  <div id="battle-event-dialog" class="hidden">
+    <div class="battle-event-speaker" id="battle-event-speaker"></div>
+    <div class="battle-event-text" id="battle-event-text"></div>
+    <button class="battle-event-btn" id="btn-battle-event-next">▶</button>
+  </div>
+
   <!-- ══════════════ SCRIPTS ══════════════ -->
   <!-- Vendored libraries — served locally so the game works fully offline. -->
   <!-- Babylon.js (babylonjs@7.38.0) + Oimo.js physics plugin (oimo@1.0.9) -->
@@ -201,6 +224,7 @@
   <script src="js/scene.js"></script>
   <script src="js/combat.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/story.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>
