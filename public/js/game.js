@@ -20,12 +20,16 @@ var game = (function () {
     combat:        null,   // Combat
     ui:            null,   // GameUI
     weather:       null,   // current WEATHER_TYPES entry
+    story:         null,   // StoryManager — set when story mode is active
     _pendingSave:  null    // Temporary holder for continue-game restore data
   };
 
   // ─── Local save helpers ──────────────────────────────────────────────────────
 
   var SAVE_KEY = 'tactics-bell-save';
+
+  // Fraction of hero EXP granted to surviving allies after a battle.
+  var ALLY_EXP_SHARE = 0.75;
 
   /**
    * Compute a simple djb2-style checksum for lightweight tamper detection.
@@ -194,6 +198,16 @@ var game = (function () {
       g.stage       = 1;
       g.player      = null;
       g.partyConfig = null;
+      g.story       = null;
+      g.ui.showCreateScreen();
+    });
+
+    // Title → Story Mode
+    document.getElementById('btn-story-mode').addEventListener('click', function () {
+      g.stage       = 1;
+      g.player      = null;
+      g.partyConfig = null;
+      g.story       = new StoryManager(g);
       g.ui.showCreateScreen();
     });
 
@@ -269,7 +283,12 @@ var game = (function () {
       if (!g.partyConfig || !g.partyConfig[0] || !g.partyConfig[0].race || !g.partyConfig[0].classId) {
         return;
       }
-      startBattle(true);
+      if (g.story) {
+        // Story mode: play opening cutscene for chapter 1 then start battle
+        g.story.startStory(0);
+      } else {
+        startBattle(true);
+      }
     });
 
     // Action menu
@@ -538,6 +557,15 @@ var game = (function () {
     // 12. Start
     g.combat.start();
 
+    // 12b. Attach story battle-event hook (fired at the start of each new round)
+    if (g.story) {
+      g.combat.onNewRound = function (turnNum) {
+        var liveEnemies = g.enemies.filter(function (e) { return e.isAlive(); });
+        var lines = g.story.checkBattleEvents(turnNum, liveEnemies);
+        if (lines) { g.ui.showBattleEventDialog(lines, null); }
+      };
+    }
+
     // 13. Dismiss loading overlay now that the battle is ready
     g.ui.hideLoadingScreen();
   }
@@ -554,18 +582,22 @@ var game = (function () {
     return ENEMY_PRESETS;
   }
 
-  // ─── Victory ─────────────────────────────────────────────────────────────────
+  // ─── Shared EXP helper ───────────────────────────────────────────────────────
 
-  function onVictory(expGained) {
-    // gainExp returns the stat-gains object on level-up, or null
+  /**
+   * Grant expGained to the player and a share to surviving allies.
+   * Syncs all results back to partyConfig.
+   * Returns the level-up stat gains for the hero (or null if no level-up).
+   * @param {number} expGained
+   * @returns {object|null}
+   */
+  function distributeExp(expGained) {
     var gains = expGained > 0 ? g.player.gainExp(expGained) : null;
 
-    // Grant surviving allies 75 % of the EXP earned
     g.allies.forEach(function (ally, i) {
       if (expGained > 0 && ally.isAlive()) {
-        ally.gainExp(Math.floor(expGained * 0.75));
+        ally.gainExp(Math.floor(expGained * ALLY_EXP_SHARE));
       }
-      // Sync to partyConfig
       if (g.partyConfig && g.partyConfig[i + 1]) {
         g.partyConfig[i + 1].level = ally.level;
         g.partyConfig[i + 1].exp   = ally.exp;
@@ -573,12 +605,25 @@ var game = (function () {
       }
     });
 
-    // Sync hero to partyConfig
     if (g.partyConfig && g.partyConfig[0]) {
       g.partyConfig[0].level = g.player.level;
       g.partyConfig[0].exp   = g.player.exp;
       g.partyConfig[0].hp    = g.player.hp;
     }
+
+    return gains;
+  }
+
+  // ─── Victory ─────────────────────────────────────────────────────────────────
+
+  function onVictory(expGained) {
+    // In story mode the StoryManager handles EXP, level-up, and cutscenes
+    if (g.story) {
+      g.story.onBattleVictory(expGained);
+      return;
+    }
+
+    var gains = distributeExp(expGained);
 
     if (gains) {
       g.ui.showLevelUpScreen(g.player, gains, function () {
@@ -616,6 +661,7 @@ var game = (function () {
     g.player      = null;
     g.partyConfig = null;
     g.weather     = null;
+    g.story       = null;
     // Stop the memory monitor when the player leaves the battle
     if (typeof AssetCache !== 'undefined') AssetCache.stopMemoryMonitor();
     if (g.ui) g.ui.hideMemoryWarning();
@@ -686,6 +732,13 @@ var game = (function () {
   } else {
     init();
   }
+
+  // Expose functions needed by StoryManager
+  g.startBattle   = startBattle;
+  g.onBackToTitle = onBackToTitle;
+  g.saveProgress  = saveProgress;
+  g.distributeExp = distributeExp;
+
   return g; // expose for debugging
 
 }());

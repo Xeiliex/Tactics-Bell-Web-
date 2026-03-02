@@ -45,6 +45,7 @@ function Combat(grid, units, scene, ui, onVictory, onDefeat, weather) {
   this.movableTiles    = [];
   this.targetableTiles = [];
   this.pendingSkill    = null;   // skill being used (null = basic attack)
+  this.onNewRound      = null;   // optional fn(turnNumber) called at the start of each new round
 }
 
 // ─── Weather helper ───────────────────────────────────────────────────────────
@@ -147,6 +148,8 @@ Combat.prototype.nextUnit = function () {
 Combat.prototype.endRound = function () {
   this.turnNumber++;
   this.ui.setTurnNumber(this.turnNumber);
+  // Notify listeners (e.g. story battle events) that a new round has started
+  if (this.onNewRound) { this.onNewRound(this.turnNumber); }
   // Rebuild turn order (units may have died)
   this.buildTurnOrder();
   this.ui.updateTurnOrder(this.turnOrder, this.currentUnit());

@@ -883,6 +883,102 @@ GameUI.prototype.showDefeatScreen = function (onRetry, onMenu) {
 
 // ─── Loading overlay ─────────────────────────────────────────────────────────
 
+// ─── Cutscene / story dialogs ─────────────────────────────────────────────────
+
+// Number of milliseconds before a battle event dialog line auto-advances.
+var BATTLE_EVENT_AUTO_ADVANCE_MS = 5000;
+
+/**
+ * Play a full-screen cutscene sequence (for chapter opening / closing).
+ * The cutscene screen overlays whatever was shown before; when all lines have
+ * been advanced through, onComplete() is called and it is the caller's
+ * responsibility to transition to the next screen.
+ *
+ * @param {string}   chapterTitle  Displayed at the top of the cutscene screen.
+ * @param {Array}    lines         Array of { speaker, text } objects.
+ * @param {Function} onComplete    Called after the last line is dismissed.
+ */
+GameUI.prototype.playCutscene = function (chapterTitle, lines, onComplete) {
+  var self      = this;
+  var idx       = 0;
+  var titleEl   = document.getElementById('cutscene-chapter-title');
+  var speakerEl = document.getElementById('cutscene-speaker');
+  var textEl    = document.getElementById('cutscene-text');
+  var advBtn    = document.getElementById('btn-cutscene-advance');
+
+  if (!speakerEl || !textEl || !advBtn) {
+    if (onComplete) { onComplete(); }
+    return;
+  }
+
+  if (titleEl) { titleEl.textContent = chapterTitle || ''; }
+
+  var showLine = function () {
+    if (idx >= lines.length) {
+      advBtn.onclick = null;
+      if (onComplete) { onComplete(); }
+      return;
+    }
+    var line = lines[idx];
+    speakerEl.textContent = line.speaker || '';
+    textEl.textContent    = line.text    || '';
+    anime({ targets: textEl, opacity: [0, 1], duration: 300, easing: 'easeOutQuart' });
+  };
+
+  advBtn.onclick = function () { idx++; showLine(); };
+
+  this.showScreen('screen-cutscene');
+  showLine();
+};
+
+/**
+ * Show a mid-battle event dialog as a slide-up banner at the bottom of the
+ * screen.  Lines auto-advance after 5 seconds or can be dismissed manually.
+ * Does NOT pause the combat state — it is purely informational.
+ *
+ * @param {Array}    lines      Array of { speaker, text } objects.
+ * @param {Function} onComplete Called after the last line is dismissed.
+ */
+GameUI.prototype.showBattleEventDialog = function (lines, onComplete) {
+  var dialog    = document.getElementById('battle-event-dialog');
+  var speakerEl = document.getElementById('battle-event-speaker');
+  var textEl    = document.getElementById('battle-event-text');
+  var nextBtn   = document.getElementById('btn-battle-event-next');
+
+  if (!dialog || !speakerEl || !textEl || !nextBtn) {
+    if (onComplete) { onComplete(); }
+    return;
+  }
+
+  var idx   = 0;
+  var timer = null;
+
+  var dismiss = function () {
+    if (timer) { clearTimeout(timer); timer = null; }
+    dialog.classList.add('hidden');
+    nextBtn.onclick = null;
+    if (onComplete) { onComplete(); }
+  };
+
+  var showLine = function () {
+    if (idx >= lines.length) { dismiss(); return; }
+    var line = lines[idx];
+    speakerEl.textContent = line.speaker || '';
+    textEl.textContent    = line.text    || '';
+    anime({ targets: textEl, opacity: [0, 1], duration: 250, easing: 'easeOutQuart' });
+    if (timer) { clearTimeout(timer); }
+    // Auto-advance after BATTLE_EVENT_AUTO_ADVANCE_MS so combat is never permanently blocked
+    timer = setTimeout(function () { idx++; showLine(); }, BATTLE_EVENT_AUTO_ADVANCE_MS);
+  };
+
+  nextBtn.onclick = function () { idx++; showLine(); };
+
+  dialog.classList.remove('hidden');
+  showLine();
+};
+
+// ─── Loading overlay ─────────────────────────────────────────────────────────
+
 GameUI.prototype.showLoadingScreen = function (text) {
   var el = document.getElementById('screen-loading');
   if (!el) return;
