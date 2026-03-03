@@ -356,8 +356,9 @@ Combat.prototype.doAttack = function (attacker, target, skill) {
 
   var result    = this.calcDamage(attacker, target, skill);
   var skillType = skill ? skill.type : 'physical';
+  var skillId   = skill ? skill.id   : '';
 
-  this.scene.playHitEffect(target, skillType, function () {
+  this.scene.playAttackAnimation(attacker, target, skillType, skillId, function () {
     if (skillType === 'heal') {
       var healed = target.healHp(result.damage);
       self.ui.showFloatingNumber(target, '+' + healed, '#69FF47');
@@ -593,8 +594,9 @@ Combat.prototype.doEnemyAttack = function (attacker, target, skill) {
   var self      = this;
   var result    = this.calcDamage(attacker, target, skill);
   var skillType = skill ? skill.type : 'physical';
+  var skillId   = skill ? skill.id   : '';
 
-  this.scene.playHitEffect(target, skillType, function () {
+  this.scene.playAttackAnimation(attacker, target, skillType, skillId, function () {
     if (result.miss) {
       self.ui.showFloatingNumber(target, 'MISS', '#aaaaaa');
       self.ui.showMessage(attacker.name + ' attacked ' + target.name + ' — MISSED! (rolled ' + result.roll + ')');
