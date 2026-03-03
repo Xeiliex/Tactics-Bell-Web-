@@ -506,7 +506,7 @@ var game = (function () {
     });
 
     g.enemies.forEach(function (u, i) {
-      var sp = eSpawns[i] || { row: GRID_SIZE - 1 - i, col: GRID_SIZE - 1 };
+      var sp = eSpawns[i] || { row: g.grid.size - 1 - i, col: g.grid.size - 1 };
       u.gridRow = sp.row;
       u.gridCol = sp.col;
       g.grid.tiles[sp.row][sp.col].unit = u;
