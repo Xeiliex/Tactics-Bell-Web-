@@ -21,13 +21,23 @@ var GRAPHICS_QUALITY = (function () {
 }());
 
 // ─── Character model configuration ───────────────────────────────────────────
-// Maps class IDs to glTF filenames in public/models/character/ (high quality).
-// Modular character outfits from the Assets folder, converted to web-ready glTF.
+// Maps gender+class IDs to glTF filenames in public/models/character/ (high quality).
+// Only two base mesh shapes are available (Peasant and Ranger) per gender.
+// Warrior/Healer use the Peasant body; Mage/Archer use the Ranger body.
+// The player's gender choice selects the matching male or female variant.
 var CHARACTER_MODEL_FILES = {
-  warrior: 'Male_Peasant.gltf',
-  mage:    'Female_Ranger.gltf',
-  archer:  'Male_Ranger.gltf',
-  healer:  'Female_Peasant.gltf'
+  male: {
+    warrior: 'Male_Peasant.gltf',
+    mage:    'Male_Ranger.gltf',
+    archer:  'Male_Ranger.gltf',
+    healer:  'Male_Peasant.gltf'
+  },
+  female: {
+    warrior: 'Female_Peasant.gltf',
+    mage:    'Female_Ranger.gltf',
+    archer:  'Female_Ranger.gltf',
+    healer:  'Female_Peasant.gltf'
+  }
 };
 
 // Low-graphics fallback: procedural OBJ models (used when GRAPHICS_QUALITY='low').
@@ -524,6 +534,8 @@ GameScene.prototype.renderUnits = function (units) {
 
 // ─── Character model loading ──────────────────────────────────────────────────
 // Loads glTF character models (high quality) or OBJ fallbacks (low quality).
+// For glTF models the full mesh hierarchy is preserved so the skeleton remains
+// accessible for procedural idle bone animations.
 // On success the procedural cylinder + sphere are hidden.  On failure the
 // procedural shapes remain, so the game is always playable.
 
@@ -533,20 +545,25 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
 
   var self = this;
 
-  // Select the file map based on quality: glTF for high, OBJ for low.
-  // (GRAPHICS_QUALITY === 'low' was already caught above, so this is always high.)
-  var modelFiles = CHARACTER_MODEL_FILES;
-
-  // Group units by classId so each model is loaded only once per class.
-  var classBuckets = {};
+  // Group units by (classId + '_' + gender) so each unique model file is
+  // loaded only once regardless of how many units share it.
+  var buckets = {};
   units.forEach(function (unit) {
-    var cid = unit.classId;
-    if (!classBuckets[cid]) { classBuckets[cid] = []; }
-    classBuckets[cid].push(unit);
+    var gender = unit.gender || 'male';
+    var key    = unit.classId + '_' + gender;
+    if (!buckets[key]) { buckets[key] = { classId: unit.classId, gender: gender, units: [] }; }
+    buckets[key].units.push(unit);
   });
 
-  Object.keys(classBuckets).forEach(function (classId) {
-    var fileName = modelFiles[classId];
+  Object.keys(buckets).forEach(function (bucketKey) {
+    var bucket  = buckets[bucketKey];
+    var classId = bucket.classId;
+    var gender  = bucket.gender;
+
+    // Pick the model file: glTF for high quality (always the case here),
+    // OBJ for low quality (already guarded above).
+    var genderMap = CHARACTER_MODEL_FILES[gender] || CHARACTER_MODEL_FILES.male;
+    var fileName  = genderMap[classId];
     if (!fileName) return;
 
     var isGltf = fileName.indexOf('.gltf') !== -1 || fileName.indexOf('.glb') !== -1;
@@ -567,47 +584,98 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
       function (meshes) {
         if (!meshes || !meshes.length || !self.scene) return;
 
-        // For glTF files the loader returns a hierarchy that may include
-        // abstract TransformNodes (0 vertices).  MergeMeshes fails on these,
-        // returning null and causing the whole model to silently disappear.
-        // Filter down to only BABYLON.Mesh instances with actual geometry.
-        var geoMeshes = isGltf
-          ? meshes.filter(function (m) {
-              return m.getTotalVertices && m.getTotalVertices() > 0;
-            })
-          : meshes;
+        // Filter to geometry meshes only (glTF also returns TransformNodes).
+        var geoMeshes = meshes.filter(function (m) {
+          return m.getTotalVertices && m.getTotalVertices() > 0;
+        });
         if (!geoMeshes.length) return;
 
-        // Merge sub-meshes into a single template mesh.
-        // multiMultiMaterials:true (6th arg) preserves glTF PBR texture maps.
-        var template = geoMeshes.length === 1
-          ? geoMeshes[0]
-          : BABYLON.Mesh.MergeMeshes(geoMeshes, true, true, undefined, false, true);
-        if (!template) return;
+        if (isGltf) {
+          // ── glTF path: keep hierarchy intact to preserve skeleton ──────────
+          // Disable all geometry meshes; we will clone them per unit.
+          geoMeshes.forEach(function (m) {
+            m.setEnabled(false);
+            m.isPickable = false;
+          });
 
-        template.setEnabled(false);
-        template.isPickable = false;
-        template.scaling = new BABYLON.Vector3(
-          CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
-        );
+          // Find the skeleton linked to the loaded geometry.
+          var loadedSkeleton = null;
+          for (var mi = 0; mi < geoMeshes.length; mi++) {
+            if (geoMeshes[mi].skeleton) {
+              loadedSkeleton = geoMeshes[mi].skeleton;
+              break;
+            }
+          }
 
-        // Clone template once per unit of this class.
-        // For glTF models the texture-based PBR materials are preserved on the
-        // clone automatically (Babylon shares the material reference).
-        // For OBJ models a solid PBR colour is applied per unit.
-        classBuckets[classId].forEach(function (unit) {
-          var node = self._unitNodes[unit.id];
-          if (!node) return;
+          bucket.units.forEach(function (unit) {
+            var node = self._unitNodes[unit.id];
+            if (!node) return;
 
-          var pos = self.gridToWorld(unit.gridRow, unit.gridCol);
+            var pos = self.gridToWorld(unit.gridRow, unit.gridCol);
 
-          var clone = template.clone('charmodel_' + unit.id);
-          clone.setEnabled(true);
-          clone.position   = new BABYLON.Vector3(pos.x, 0, pos.z);
-          clone.isPickable = false;
-          clone.receiveShadows = true;
+            // Clone the skeleton for this unit so its bone animations are independent.
+            var unitSkeleton = loadedSkeleton
+              ? loadedSkeleton.clone('skel_' + unit.id)
+              : null;
 
-          if (!isGltf) {
+            // Parent node for all cloned geometry meshes of this unit.
+            var unitRoot = new BABYLON.TransformNode('charroot_' + unit.id, self.scene);
+            unitRoot.position = new BABYLON.Vector3(pos.x, 0, pos.z);
+            unitRoot.scaling  = new BABYLON.Vector3(
+              CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
+            );
+
+            geoMeshes.forEach(function (m, mi) {
+              var clone = m.clone('charpart_' + unit.id + '_' + mi);
+              if (!clone) return;
+              clone.setEnabled(true);
+              clone.isPickable    = false;
+              clone.receiveShadows = true;
+              clone.parent         = unitRoot;
+              if (unitSkeleton) { clone.skeleton = unitSkeleton; }
+              if (self._shadowGenerator) { self._shadowGenerator.addShadowCaster(clone, true); }
+            });
+
+            // Hide the procedural fallback meshes.
+            node.body.setEnabled(false);
+            node.head.setEnabled(false);
+
+            // Store the root node for movement/animation; also keep a direct
+            // reference to the first child mesh for hit-flash and physics.
+            node.model       = unitRoot;
+            node.modelParts  = unitRoot.getChildMeshes ? unitRoot.getChildMeshes(false) : [];
+
+            // Start idle animation: Y-bob on the root + bone breathing cycle.
+            self._startIdleAnim(unit.id, unitRoot, unitSkeleton);
+          });
+
+          // Dispose the loading-only template meshes.
+          geoMeshes.forEach(function (m) { try { m.dispose(); } catch (e) {} });
+
+        } else {
+          // ── OBJ path: merge into a single flat mesh (no skeleton) ──────────
+          var template = geoMeshes.length === 1
+            ? geoMeshes[0]
+            : BABYLON.Mesh.MergeMeshes(geoMeshes, true, true, undefined, false, true);
+          if (!template) return;
+
+          template.setEnabled(false);
+          template.isPickable = false;
+          template.scaling = new BABYLON.Vector3(
+            CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
+          );
+
+          bucket.units.forEach(function (unit) {
+            var node = self._unitNodes[unit.id];
+            if (!node) return;
+
+            var pos   = self.gridToWorld(unit.gridRow, unit.gridCol);
+            var clone = template.clone('charmodel_' + unit.id);
+            clone.setEnabled(true);
+            clone.position   = new BABYLON.Vector3(pos.x, 0, pos.z);
+            clone.isPickable = false;
+            clone.receiveShadows = true;
+
             // OBJ path: override material with unit race/custom colour.
             var c = unit.meshColor();
             var pbrMat = new BABYLON.PBRMaterial('charpbr_' + unit.id, self.scene);
@@ -616,22 +684,20 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
             pbrMat.roughness     = CHARACTER_PBR_ROUGHNESS;
             pbrMat.emissiveColor = BABYLON.Color3.Black();
             clone.material = pbrMat;
-          }
 
-          if (self._shadowGenerator) { self._shadowGenerator.addShadowCaster(clone, true); }
+            if (self._shadowGenerator) { self._shadowGenerator.addShadowCaster(clone, true); }
 
-          // Hide the procedural fallback meshes.
-          node.body.setEnabled(false);
-          node.head.setEnabled(false);
+            node.body.setEnabled(false);
+            node.head.setEnabled(false);
 
-          // Store model reference so animation and effect code can use it.
-          node.model = clone;
+            node.model      = clone;
+            node.modelParts = [clone];
 
-          // Start looping idle breathing animation on the model.
-          self._startIdleAnim(unit.id, clone);
-        });
+            self._startIdleAnim(unit.id, clone, null);
+          });
 
-        template.dispose();
+          template.dispose();
+        }
       },
       null,           // progress callback — not needed
       function () {   // error callback — model file absent, keep procedural fallback
@@ -642,42 +708,78 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
 };
 
 // ─── Character idle animation ─────────────────────────────────────────────────
-// Plays a subtle looping breathing cycle on the character model mesh.
-// Uses a small Y-position oscillation (≈4 cm) at ~0.4 Hz with a per-unit
-// phase offset so all units don't bob in perfect synchrony.
+// Plays a looping idle cycle on the character model.  The root mesh/TransformNode
+// gets a gentle Y-position breathing bob.  When a Babylon skeleton is supplied
+// the spine and upper-arm bones also receive subtle idle oscillations, giving the
+// model life without a pre-authored animation clip.
 //
-// Works on the merged mesh produced by _upgradeUnitsToModels; no skeleton
-// access is required.
+// All animations are staggered by a hash of unitId so units don't bob in sync.
 
-GameScene.prototype._startIdleAnim = function (unitId, mesh) {
+GameScene.prototype._startIdleAnim = function (unitId, mesh, skeleton) {
   if (!this.scene || !mesh) return;
 
+  // Stable per-unit speed offset so units breathe at slightly different rates.
+  var hash = 0;
+  for (var i = 0; i < unitId.length; i++) { hash = (hash * 31 + unitId.charCodeAt(i)) & 0xfffff; }
+  var speed = 0.35 + (hash % 100) / 500;   // 0.35 – 0.55
+
+  var ease = new BABYLON.SineEase();
+  ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+
+  // ── Root mesh: gentle Y-position rise-and-fall (breathing bob) ──────────────
   var idleAnim = new BABYLON.Animation(
     'idle_' + unitId, 'position.y', 60,
     BABYLON.Animation.ANIMATIONTYPE_FLOAT,
     BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE
   );
-
-  var ease = new BABYLON.SineEase();
-  ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
   idleAnim.setEasingFunction(ease);
-
-  // Gentle rise-and-fall: 0 → +0.04 → 0 over 60 frames
   idleAnim.setKeys([
     { frame: 0,  value: 0.00 },
     { frame: 30, value: 0.04 },
     { frame: 60, value: 0.00 }
   ]);
-
   mesh.animations = (mesh.animations || []).concat([idleAnim]);
-
-  // Vary playback speed slightly per unit to desynchronise breathing cycles.
-  // hashCode of unitId gives a stable 0–1 offset.
-  var hash = 0;
-  for (var i = 0; i < unitId.length; i++) { hash = (hash * 31 + unitId.charCodeAt(i)) & 0xfffff; }
-  var speed = 0.35 + (hash % 100) / 500;   // 0.35 – 0.55
-
   this.scene.beginAnimation(mesh, 0, 60, true, speed);
+
+  // ── Skeleton bones: breathing and arm-sway ──────────────────────────────────
+  // These run only when a live skeleton is available (glTF path).
+  if (!skeleton) { return; }
+  var scene = this.scene;
+
+  var boneAnims = [
+    // Chest breathing: spine_02 pitches slightly forward and back.
+    { name: 'spine_02',   prop: 'rotation.x', amp:  0.04,  speedMul: 1.0  },
+    // Shoulder sway: clavicle bones rise and fall in sync with breathing.
+    { name: 'clavicle_l', prop: 'rotation.z', amp: -0.06,  speedMul: 1.0  },
+    { name: 'clavicle_r', prop: 'rotation.z', amp:  0.06,  speedMul: 1.0  },
+    // Arm idle sway: upper arms drift very slightly forward and back,
+    // breaking the static T-pose silhouette.
+    { name: 'upperarm_l', prop: 'rotation.x', amp:  0.10,  speedMul: 0.7  },
+    { name: 'upperarm_r', prop: 'rotation.x', amp:  0.10,  speedMul: 0.7  }
+  ];
+
+  boneAnims.forEach(function (cfg) {
+    var idx = skeleton.getBoneIndexByName(cfg.name);
+    if (idx < 0) { return; }
+    var bone = skeleton.bones[idx];
+
+    var bAnim = new BABYLON.Animation(
+      'idleBone_' + cfg.name + '_' + unitId,
+      cfg.prop, 60,
+      BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+      BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE
+    );
+    var bEase = new BABYLON.SineEase();
+    bEase.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+    bAnim.setEasingFunction(bEase);
+    bAnim.setKeys([
+      { frame: 0,  value: 0         },
+      { frame: 30, value: cfg.amp   },
+      { frame: 60, value: 0         }
+    ]);
+    bone.animations = (bone.animations || []).concat([bAnim]);
+    scene.beginAnimation(bone, 0, 60, true, speed * cfg.speedMul);
+  });
 };
 
 
@@ -845,24 +947,42 @@ GameScene.prototype.playHitEffect = function (unit, skillType, onDone) {
   var node = this._unitNodes[unit.id];
   if (!node) { if (onDone) onDone(); return; }
 
-  // Use the OBJ model material when available, otherwise the procedural body.
-  var targetMesh = node.model || node.body;
-  var origDiff = targetMesh.material.albedoColor.clone();
-  var origEmit = targetMesh.material.emissiveColor.clone();
+  // Collect meshes that have materials to flash.
+  // node.modelParts is set for glTF (array of child meshes);
+  // for OBJ or procedural the model/body mesh is used directly.
+  var flashMeshes;
+  if (node.modelParts && node.modelParts.length) {
+    flashMeshes = node.modelParts.filter(function (m) {
+      return m && m.material && m.material.albedoColor;
+    });
+  }
+  if (!flashMeshes || !flashMeshes.length) {
+    var fb = node.model || node.body;
+    flashMeshes = (fb && fb.material && fb.material.albedoColor) ? [fb] : [node.body];
+  }
 
-  targetMesh.material.albedoColor  = new BABYLON.Color3(1, 1, 1);
-  targetMesh.material.emissiveColor = new BABYLON.Color3(0.9, 0.2, 0.2);
+  // Snapshot original colours and apply flash.
+  var origColors = flashMeshes.map(function (m) {
+    return { diff: m.material.albedoColor.clone(), emit: m.material.emissiveColor.clone() };
+  });
+  flashMeshes.forEach(function (m) {
+    m.material.albedoColor  = new BABYLON.Color3(1, 1, 1);
+    m.material.emissiveColor = new BABYLON.Color3(0.9, 0.2, 0.2);
+  });
 
   // Particle burst
   this._spawnHitParticles(unit, skillType);
 
-  // Shake animation: quick side-to-side Z-rotation, then snap back.
-  this._playHitShake(targetMesh, unit.id);
+  // Shake animation: run on the root model or body (TransformNode.rotation works too).
+  this._playHitShake(node.model || node.body, unit.id);
 
-  var mat = targetMesh.material;
   setTimeout(function () {
-    mat.albedoColor   = origDiff;
-    mat.emissiveColor = origEmit;
+    flashMeshes.forEach(function (m, i) {
+      if (m.material) {
+        m.material.albedoColor  = origColors[i].diff;
+        m.material.emissiveColor = origColors[i].emit;
+      }
+    });
     if (onDone) onDone();
   }, 350);
 };
@@ -932,8 +1052,21 @@ GameScene.prototype.removeUnit = function (unit) {
   var node = this._unitNodes[unit.id];
   if (!node) return;
 
-  // Apply physics impulse to the primary visual mesh (OBJ model or cylinder body).
-  var physMesh   = node.model || node.body;
+  // For glTF models node.model is a TransformNode — PhysicsImpostor needs a
+  // Mesh, so fall back to the first child mesh when available.
+  var physMesh;
+  if (node.model) {
+    if (node.modelParts && node.modelParts.length) {
+      physMesh = node.modelParts[0];
+    } else if (typeof node.model.getChildMeshes === 'function') {
+      var kids = node.model.getChildMeshes(false);
+      physMesh = kids.length ? kids[0] : node.model;
+    } else {
+      physMesh = node.model;
+    }
+  } else {
+    physMesh = node.body;
+  }
   var impostorType = node.model
     ? BABYLON.PhysicsImpostor.BoxImpostor
     : BABYLON.PhysicsImpostor.CylinderImpostor;
@@ -1229,8 +1362,8 @@ CharacterPreviewScene.prototype.init = function (canvasId) {
   }
 };
 
-/** Load (or reload) the glTF/OBJ model for classId with the given colour. */
-CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId) {
+/** Load (or reload) the glTF/OBJ model for classId with the given colour and gender. */
+CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, gender) {
   if (!this.scene) return;
   var self = this;
   this._pendingClassId = classId;
@@ -1252,7 +1385,9 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId) 
   fb.material = fbMat;
   this._fallback = fb;
 
-  var fileName = CHARACTER_MODEL_FILES[classId];
+  var genderKey = (gender === 'female') ? 'female' : 'male';
+  var genderMap = CHARACTER_MODEL_FILES[genderKey] || CHARACTER_MODEL_FILES.male;
+  var fileName  = genderMap[classId];
   if (!fileName || !BABYLON.SceneLoader) return;
 
   var isGltf    = fileName.indexOf('.gltf') !== -1 || fileName.indexOf('.glb') !== -1;
@@ -1272,13 +1407,15 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId) 
       }
       if (self._fallback) { self._fallback.dispose(); self._fallback = null; }
 
-      // For glTF, use the first root mesh; for OBJ, merge sub-meshes.
+      // For glTF, use the first root mesh with geometry; for OBJ, merge sub-meshes.
       var model;
       if (isGltf) {
         // glTF imports as a hierarchy; find the first real mesh
         model = meshes[0];
         for (var mi = 0; mi < meshes.length; mi++) {
-          if (meshes[mi].getTotalVertices() > 0) { model = meshes[mi]; break; }
+          if (meshes[mi].getTotalVertices && meshes[mi].getTotalVertices() > 0) {
+            model = meshes[mi]; break;
+          }
         }
       } else {
         model = meshes.length === 1
@@ -1301,10 +1438,16 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId) 
         model.material  = mat;
       }
 
+      // Apply idle bone animations to the preview skeleton so it doesn't
+      // display as a static T-pose.
+      if (isGltf && model.skeleton) {
+        _applyPreviewIdleAnim(model.skeleton, self.scene);
+      }
+
       self._model = model;
     },
     null,
-    function () { /* OBJ absent — keep procedural fallback */ },
+    function () { /* model absent — keep procedural fallback */ },
     pluginExt
   );
 };
@@ -1348,6 +1491,43 @@ CharacterPreviewScene.prototype.dispose = function () {
   this._fallback       = null;
   this._pendingClassId = null;
 };
+
+/**
+ * Apply looping idle bone animations to a skeleton in the preview scene.
+ * This breaks the static T-pose by adding gentle spine breathing and arm sway.
+ */
+function _applyPreviewIdleAnim(skeleton, scene) {
+  if (!skeleton || !scene) { return; }
+  var ease = new BABYLON.SineEase();
+  ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+
+  var boneAnims = [
+    { name: 'spine_02',   prop: 'rotation.x', amp:  0.04, speed: 0.45 },
+    { name: 'clavicle_l', prop: 'rotation.z', amp: -0.06, speed: 0.45 },
+    { name: 'clavicle_r', prop: 'rotation.z', amp:  0.06, speed: 0.45 },
+    { name: 'upperarm_l', prop: 'rotation.x', amp:  0.10, speed: 0.32 },
+    { name: 'upperarm_r', prop: 'rotation.x', amp:  0.10, speed: 0.32 }
+  ];
+
+  boneAnims.forEach(function (cfg) {
+    var idx = skeleton.getBoneIndexByName(cfg.name);
+    if (idx < 0) { return; }
+    var bone = skeleton.bones[idx];
+    var anim = new BABYLON.Animation(
+      'prevIdle_' + cfg.name, cfg.prop, 60,
+      BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+      BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE
+    );
+    anim.setEasingFunction(ease);
+    anim.setKeys([
+      { frame: 0,  value: 0        },
+      { frame: 30, value: cfg.amp  },
+      { frame: 60, value: 0        }
+    ]);
+    bone.animations = (bone.animations || []).concat([anim]);
+    scene.beginAnimation(bone, 0, 60, true, cfg.speed);
+  });
+}
 
 /** Resolve a display colour from colorId (BODY_COLORS) then raceId (RACES). */
 function _resolvePreviewColor(colorId, raceId) {

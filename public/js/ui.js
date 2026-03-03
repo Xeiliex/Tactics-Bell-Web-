@@ -139,7 +139,7 @@ GameUI.prototype.showCreateScreen = function () {
   // Initialise partyConfig if this is a fresh visit
   if (!game.partyConfig) {
     game.partyConfig = [{
-      name: 'Hero', race: null, classId: null, backgroundId: null, colorId: 'default'
+      name: 'Hero', race: null, classId: null, backgroundId: null, colorId: 'default', gender: 'male'
     }];
     for (var pi = 0; pi < 2 && pi < ALLY_PRESETS.length; pi++) {
       var p = ALLY_PRESETS[pi];
@@ -148,7 +148,7 @@ GameUI.prototype.showCreateScreen = function () {
       // permanently disabled — the user can still change it.
       game.partyConfig.push({
         name: p.name, race: p.race, classId: p.classId,
-        backgroundId: 'soldier', colorId: 'default'
+        backgroundId: 'soldier', colorId: 'default', gender: 'male'
       });
     }
   }
@@ -308,7 +308,7 @@ GameUI.prototype._disposePreview = function () {
  * Initialise (or reuse) the CharacterPreviewScene and load the given model.
  * Uses a short setTimeout so Babylon initialises after the canvas is painted.
  */
-GameUI.prototype._ensurePreview = function (classId, colorId, raceId) {
+GameUI.prototype._ensurePreview = function (classId, colorId, raceId, gender) {
   if (typeof GRAPHICS_QUALITY !== 'undefined' && GRAPHICS_QUALITY === 'low') return;
   if (typeof CharacterPreviewScene === 'undefined') return;
   var self = this;
@@ -318,11 +318,11 @@ GameUI.prototype._ensurePreview = function (classId, colorId, raceId) {
     setTimeout(function () {
       if (preview !== self._charPreview) return; // disposed while waiting
       if (preview.init('char-preview-canvas') && classId) {
-        preview.loadModel(classId, colorId || 'default', raceId || 'human');
+        preview.loadModel(classId, colorId || 'default', raceId || 'human', gender || 'male');
       }
     }, 80);
   } else if (classId) {
-    this._charPreview.loadModel(classId, colorId || 'default', raceId || 'human');
+    this._charPreview.loadModel(classId, colorId || 'default', raceId || 'human', gender || 'male');
   }
 };
 
@@ -397,7 +397,7 @@ GameUI.prototype._buildWizardClassStep = function (container, member) {
       if (nb) nb.disabled = false;
       anime({ targets: card, scale: [0.95, 1.0], duration: 200, easing: 'easeOutBack' });
       // Update the 3-D preview to show this class
-      self._ensurePreview(cls.id, member.colorId, member.race);
+      self._ensurePreview(cls.id, member.colorId, member.race, member.gender);
     });
 
     grid.appendChild(card);
@@ -407,7 +407,7 @@ GameUI.prototype._buildWizardClassStep = function (container, member) {
 
   // If a class was already selected (e.g. navigating back), show it in the preview
   if (member.classId) {
-    self._ensurePreview(member.classId, member.colorId, member.race);
+    self._ensurePreview(member.classId, member.colorId, member.race, member.gender);
   }
 
   anime({ targets: grid.querySelectorAll('.card'), translateY: [16, 0], opacity: [0, 1],
@@ -480,6 +480,38 @@ GameUI.prototype._buildWizardIdentityStep = function (container, member, memberI
   });
   wrap.appendChild(nameInput);
 
+  // Gender toggle
+  var genderLabel = document.createElement('div');
+  genderLabel.className = 'wizard-color-label';
+  genderLabel.textContent = 'Gender';
+  wrap.appendChild(genderLabel);
+
+  var genderRow = document.createElement('div');
+  genderRow.className = 'gender-toggle';
+
+  var currentGender = member.gender || 'male';
+  var genderOptions = [
+    { id: 'male',   label: '♂ Male'   },
+    { id: 'female', label: '♀ Female' }
+  ];
+  genderOptions.forEach(function (opt) {
+    var btn = document.createElement('button');
+    btn.className = 'gender-btn' + (opt.id === currentGender ? ' selected' : '');
+    btn.textContent = opt.label;
+    btn.addEventListener('click', function () {
+      genderRow.querySelectorAll('.gender-btn').forEach(function (b) { b.classList.remove('selected'); });
+      btn.classList.add('selected');
+      member.gender = opt.id;
+      anime({ targets: btn, scale: [0.90, 1.0], duration: 180, easing: 'easeOutBack' });
+      // Reload the 3-D preview with updated gender
+      if (self._charPreview && member.classId) {
+        self._charPreview.loadModel(member.classId, member.colorId || 'default', member.race || 'human', opt.id);
+      }
+    });
+    genderRow.appendChild(btn);
+  });
+  wrap.appendChild(genderRow);
+
   // Colour label
   var colorLabel = document.createElement('div');
   colorLabel.className = 'wizard-color-label';
@@ -541,7 +573,7 @@ GameUI.prototype._buildWizardIdentityStep = function (container, member, memberI
 
   // Ensure the 3-D preview shows the current class with the current colour
   if (member.classId) {
-    self._ensurePreview(member.classId, member.colorId, member.race);
+    self._ensurePreview(member.classId, member.colorId, member.race, member.gender);
   }
 
   // Auto-focus the name input after render

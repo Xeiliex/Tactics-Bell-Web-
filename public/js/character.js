@@ -30,6 +30,7 @@ function Character(opts) {
   this.overrideMeshColor = opts.overrideMeshColor || null;
   this.backgroundId = opts.backgroundId || null;
   this.portrait     = opts.portrait     || null;  // data-URL captured from wizard preview
+  this.gender       = opts.gender       || 'male'; // 'male' or 'female'
 
   // Grid position
   this.gridRow = 0;
@@ -288,6 +289,7 @@ function createPartyMember(opts) {
     raceId:            opts.race,
     classId:           opts.classId,
     backgroundId:      opts.backgroundId || null,
+    gender:            opts.gender   || 'male',
     level:             opts.level    || 1,
     exp:               opts.exp      || 0,
     isPlayer:          !!opts.isPlayer,
