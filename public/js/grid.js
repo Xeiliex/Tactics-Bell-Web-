@@ -128,13 +128,27 @@ Grid.prototype.tilesInRange = function (row, col, range) {
 // ─── PROCEDURAL STAGE GENERATION ────────────────────────────────────────────
 
 /**
+ * Return the grid size appropriate for the given stage number.
+ * Stages 1–4: 10×10 (default)
+ * Stages 5–8: 12×12
+ * Stages 9+:  14×14
+ * @param {number} stage
+ * @returns {number}
+ */
+function gridSizeForStage(stage) {
+  if (stage >= 9) return 14;
+  if (stage >= 5) return 12;
+  return 10;
+}
+
+/**
  * Generate a random battle stage from a randomly chosen known-good map config.
  * @param {number} stage  – stage number (used to filter eligible configs)
  * @returns {Grid}
  */
 function generateStage(stage) {
-  var grid = new Grid(GRID_SIZE);
-  var size = GRID_SIZE;
+  var size = gridSizeForStage(stage);
+  var grid = new Grid(size);
 
   // 1. Fill with grass
   grid.tiles = [];
@@ -145,8 +159,8 @@ function generateStage(stage) {
     }
   }
 
-  // 2. Pick a map config appropriate for this stage
-  var config = selectMapConfig(stage);
+  // 2. Pick a map config appropriate for this stage and grid size
+  var config = selectMapConfig(stage, size);
 
   // 3. Paint terrain clusters from the config's palette
   config.palette.forEach(function (entry) {
@@ -176,11 +190,16 @@ function generateStage(stage) {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
- * Return a random map config eligible for the given stage.
- * Falls back to all configs if none match (should not happen with minStage: 1 entries).
+ * Return a random map config eligible for the given stage and grid size.
+ * Falls back to all configs of the requested size if none match by stage.
  */
-function selectMapConfig(stage) {
-  var eligible = MAP_CONFIGS.filter(function (c) { return c.minStage <= stage; });
+function selectMapConfig(stage, size) {
+  var eligible = MAP_CONFIGS.filter(function (c) {
+    return c.size === size && c.minStage <= stage;
+  });
+  if (!eligible.length) {
+    eligible = MAP_CONFIGS.filter(function (c) { return c.size === size; });
+  }
   if (!eligible.length) eligible = MAP_CONFIGS;
   return eligible[Math.floor(Math.random() * eligible.length)];
 }
