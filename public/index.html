@@ -155,6 +155,7 @@
       <div id="victory-details" class="result-details"></div>
       <div class="result-buttons">
         <button class="btn-primary" id="btn-next-stage">Next Stage ▶</button>
+        <button class="btn-accent" id="btn-manage-party">🔄 Manage Party</button>
         <button class="btn-secondary" id="btn-title-victory">Main Menu</button>
       </div>
     </div>
@@ -201,6 +202,34 @@
     <div class="battle-event-speaker" id="battle-event-speaker"></div>
     <div class="battle-event-text" id="battle-event-text"></div>
     <button class="battle-event-btn" id="btn-battle-event-next">▶</button>
+  </div>
+
+  <!-- ══════════════ CLASS PROMOTION SCREEN ══════════════ -->
+  <div id="screen-promote" class="screen hidden">
+    <div class="promote-container">
+      <div class="promote-burst">⭐</div>
+      <div class="promote-title">CLASS PROMOTION!</div>
+      <div id="promote-unit-name" class="promote-unit-name"></div>
+      <div id="promote-choices" class="promote-choices"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ RECLASS SCREEN ══════════════ -->
+  <div id="screen-reclass" class="screen hidden">
+    <div class="reclass-container">
+      <h2 class="reclass-title">🔄 Manage Party</h2>
+      <div class="reclass-gold-bar">
+        💰 Gold: <span id="reclass-gold-amount">0</span>
+        &nbsp;·&nbsp; Reclass cost: <span id="reclass-cost-label">100</span> per character
+      </div>
+      <div class="reclass-layout">
+        <div id="reclass-members" class="reclass-members"></div>
+        <div id="reclass-class-choices" class="reclass-class-choices hidden"></div>
+      </div>
+      <div class="reclass-actions">
+        <button class="btn-secondary" id="btn-reclass-close">← Back to Victory</button>
+      </div>
+    </div>
   </div>
 
   <!-- ══════════════ SCRIPTS ══════════════ -->

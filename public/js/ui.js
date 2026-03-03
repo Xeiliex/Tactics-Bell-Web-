@@ -367,7 +367,13 @@ GameUI.prototype._buildWizardClassStep = function (container, member) {
   var grid = document.createElement('div');
   grid.className = 'cards-grid';
 
-  Object.values(CLASSES).forEach(function (cls) {
+  // Only show tier-0 base classes during character creation.
+  // Advanced classes are unlocked through promotion (level 10 / 25) or reclass.
+  var baseClasses = Object.values(CLASSES).filter(function (cls) {
+    return (cls.tier || 0) === 0;
+  });
+
+  baseClasses.forEach(function (cls) {
     var card = document.createElement('div');
     card.className = 'card' + (member.classId === cls.id ? ' selected' : '');
 
@@ -860,17 +866,28 @@ GameUI.prototype.showLevelUpScreen = function (unit, gains, onContinue) {
 
 // ─── Victory / defeat screens ─────────────────────────────────────────────────
 
-GameUI.prototype.showVictoryScreen = function (stage, expGained, onNext, onMenu) {
-  document.getElementById('victory-details').innerHTML =
-    'Stage ' + stage + ' cleared!<br>' +
-    '✨ EXP gained: <b style="color:var(--gold)">' + expGained + '</b>';
+GameUI.prototype.showVictoryScreen = function (stage, expGained, goldEarned, onNext, onManageParty, onMenu) {
+  var details = 'Stage ' + stage + ' cleared!';
+  if (expGained !== null && expGained !== undefined) {
+    details += '<br>✨ EXP gained: <b style="color:var(--gold)">' + expGained + '</b>';
+  }
+  if (goldEarned > 0) {
+    details += '<br>💰 Gold earned: <b style="color:var(--gold)">' + goldEarned + '</b>';
+  }
+  document.getElementById('victory-details').innerHTML = details;
 
   this.showScreen('screen-victory');
   anime({ targets: '.result-icon', rotate: [-15, 15], loop: true, direction: 'alternate', duration: 800 });
   anime({ targets: '.victory-title', scale: [0.8, 1], opacity: [0, 1], duration: 600, easing: 'easeOutBack' });
 
-  document.getElementById('btn-next-stage').onclick  = onNext || null;
-  document.getElementById('btn-title-victory').onclick = onMenu || null;
+  document.getElementById('btn-next-stage').onclick       = onNext         || null;
+  document.getElementById('btn-manage-party').onclick     = onManageParty  || null;
+  document.getElementById('btn-title-victory').onclick    = onMenu         || null;
+
+  var manageBtn = document.getElementById('btn-manage-party');
+  if (manageBtn) {
+    manageBtn.classList.toggle('hidden', !onManageParty);
+  }
 };
 
 GameUI.prototype.showDefeatScreen = function (onRetry, onMenu) {
@@ -879,6 +896,156 @@ GameUI.prototype.showDefeatScreen = function (onRetry, onMenu) {
 
   document.getElementById('btn-retry').onclick       = onRetry || null;
   document.getElementById('btn-title-defeat').onclick = onMenu  || null;
+};
+
+// ─── Promotion screen ─────────────────────────────────────────────────────────
+
+/**
+ * Show the class-promotion screen for a unit that has reached a promotion
+ * level threshold.  Presents 2 class choices; calls onChoose(classId) once the
+ * player picks one.
+ *
+ * @param {Character}  unit       The unit being promoted.
+ * @param {Array}      choices    Array of CLASSES entries available for promotion.
+ * @param {Function}   onChoose   Called with the chosen classId string.
+ */
+GameUI.prototype.showPromotionScreen = function (unit, choices, onChoose) {
+  var titleEl   = document.getElementById('promote-unit-name');
+  var choicesEl = document.getElementById('promote-choices');
+  var tierLabel = choices[0] && choices[0].tier === 2 ? 'Elite Class' : 'Advanced Class';
+  if (titleEl) {
+    titleEl.textContent = unit.name + ' · Level ' + unit.level + ' — Choose a ' + tierLabel + '!';
+  }
+  if (choicesEl) {
+    choicesEl.innerHTML = '';
+    choices.forEach(function (cls) {
+      var skillsHtml = cls.skills.map(function (s) {
+        return '<span class="card-skill-tag">' + s.emoji + ' ' + s.name + '</span>';
+      }).join('');
+      var card = document.createElement('div');
+      card.className = 'card promote-card';
+      card.innerHTML =
+        '<div class="card-emoji">' + cls.emoji + '</div>' +
+        '<div class="card-name" style="color:' + cls.color + '">' + cls.name + '</div>' +
+        '<div class="card-desc">' + cls.description + '</div>' +
+        '<div class="card-bonuses">Move ' + cls.moveRange + '  ·  Range ' + cls.attackRange + '</div>' +
+        (skillsHtml ? '<div class="card-skills">' + skillsHtml + '</div>' : '');
+      card.addEventListener('click', function () {
+        if (onChoose) onChoose(cls.id);
+      });
+      choicesEl.appendChild(card);
+    });
+    anime({ targets: choicesEl.querySelectorAll('.card'), translateY: [20, 0], opacity: [0, 1],
+      duration: 380, easing: 'easeOutBack', delay: anime.stagger(80) });
+  }
+  this.showScreen('screen-promote');
+  anime({ targets: '.promote-title', scale: [0.8, 1], opacity: [0, 1], duration: 600, easing: 'easeOutElastic(1, 0.6)' });
+};
+
+// ─── Reclass screen ───────────────────────────────────────────────────────────
+
+/**
+ * Show the reclass screen, allowing the player to change a party member's
+ * class for a gold fee.
+ *
+ * @param {Character[]}  units       All controllable party units.
+ * @param {number}       gold        Current gold balance.
+ * @param {Function}     onReclass   Called with (unitIndex, newClassId) when a reclass is confirmed.
+ * @param {Function}     onClose     Called when the player dismisses the screen.
+ */
+GameUI.prototype.showReclassScreen = function (units, gold, onReclass, onClose) {
+  var self         = this;
+  var membersEl    = document.getElementById('reclass-members');
+  var choicesEl    = document.getElementById('reclass-class-choices');
+  var goldAmountEl = document.getElementById('reclass-gold-amount');
+  var costEl       = document.getElementById('reclass-cost-label');
+
+  if (goldAmountEl) goldAmountEl.textContent = gold;
+  if (costEl) costEl.textContent = RECLASS_COST;
+
+  var currentGold    = gold;
+  var selectedUnitIdx = null;
+
+  function renderMembers() {
+    if (!membersEl) return;
+    membersEl.innerHTML = '';
+    units.forEach(function (unit, idx) {
+      if (!unit || !unit.isAlive()) return;
+      var btn = document.createElement('button');
+      btn.className = 'reclass-member-btn' + (idx === selectedUnitIdx ? ' selected' : '');
+      var cls = CLASSES[unit.classId] || {};
+      var tierLabel = cls.tier === 2 ? '★★' : (cls.tier === 1 ? '★' : '');
+      btn.innerHTML =
+        '<span class="reclass-member-emoji">' + unit.emoji + '</span>' +
+        '<span class="reclass-member-name">' + unit.name + '</span>' +
+        '<span class="reclass-member-sub">' + (cls.name || unit.classId) + ' ' + tierLabel + ' · Lv.' + unit.level + '</span>';
+      btn.addEventListener('click', function () {
+        selectedUnitIdx = idx;
+        renderMembers();
+        renderClassChoices(unit, idx);
+      });
+      membersEl.appendChild(btn);
+    });
+  }
+
+  function renderClassChoices(unit, unitIdx) {
+    if (!choicesEl) return;
+    choicesEl.classList.remove('hidden');
+    choicesEl.innerHTML = '<div class="reclass-choices-title">Available Classes for ' + unit.name + '</div>';
+    var canAfford = currentGold >= RECLASS_COST;
+
+    var availableClasses = Object.values(CLASSES).filter(function (cls) {
+      return unit.level >= (cls.requiresLevel || 1);
+    });
+
+    var grid = document.createElement('div');
+    grid.className = 'cards-grid';
+
+    availableClasses.forEach(function (cls) {
+      var isCurrent = cls.id === unit.classId;
+      var skillsHtml = cls.skills.map(function (s) {
+        return '<span class="card-skill-tag">' + s.emoji + ' ' + s.name + '</span>';
+      }).join('');
+      var tierLabel = cls.tier === 2 ? ' ★★' : (cls.tier === 1 ? ' ★' : '');
+      var card = document.createElement('div');
+      card.className = 'card reclass-card' + (isCurrent ? ' selected current-class' : '') + (!canAfford && !isCurrent ? ' disabled' : '');
+      card.innerHTML =
+        '<div class="card-emoji">' + cls.emoji + '</div>' +
+        '<div class="card-name" style="color:' + cls.color + '">' + cls.name + '<span class="reclass-tier-badge">' + tierLabel + '</span></div>' +
+        '<div class="card-desc">' + cls.description + '</div>' +
+        '<div class="card-bonuses">Move ' + cls.moveRange + '  ·  Range ' + cls.attackRange + '</div>' +
+        (skillsHtml ? '<div class="card-skills">' + skillsHtml + '</div>' : '') +
+        (isCurrent ? '<div class="reclass-current-label">Current</div>' : (!canAfford ? '<div class="reclass-cost-display">Need ' + RECLASS_COST + ' 💰</div>' : '<div class="reclass-cost-display">' + RECLASS_COST + ' 💰</div>'));
+
+      if (!isCurrent && canAfford) {
+        card.addEventListener('click', function () {
+          // onReclass callback (provided by game.js) deducts gold, calls unit.reclass(), and
+          // updates partyConfig — all we need to do here is refresh the display.
+          if (onReclass) onReclass(unitIdx, cls.id);
+          currentGold -= RECLASS_COST;
+          if (currentGold < 0) currentGold = 0;
+          if (goldAmountEl) goldAmountEl.textContent = currentGold;
+          selectedUnitIdx = null;
+          renderMembers();
+          if (choicesEl) choicesEl.classList.add('hidden');
+        });
+      }
+      grid.appendChild(card);
+    });
+
+    choicesEl.appendChild(grid);
+    anime({ targets: grid.querySelectorAll('.card'), translateY: [12, 0], opacity: [0, 1],
+      duration: 280, easing: 'easeOutQuart', delay: anime.stagger(30) });
+  }
+
+  renderMembers();
+  if (choicesEl) choicesEl.classList.add('hidden');
+
+  var closeBtn = document.getElementById('btn-reclass-close');
+  if (closeBtn) closeBtn.onclick = function () { if (onClose) onClose(); };
+
+  this.showScreen('screen-reclass');
+  anime({ targets: '.reclass-title', scale: [0.9, 1], opacity: [0, 1], duration: 400, easing: 'easeOutBack' });
 };
 
 // ─── Loading overlay ─────────────────────────────────────────────────────────

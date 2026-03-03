@@ -194,10 +194,10 @@ StoryManager.prototype.onBattleVictory = function (expGained) {
         });
       } else {
         // Story complete — show a final victory screen then return to title
-        game.ui.showVictoryScreen(game.stage, expGained, function () {
+        game.ui.showVictoryScreen(game.stage, expGained, 0, function () {
           game.story = null;
           game.onBackToTitle();
-        }, function () {
+        }, null, function () {
           game.story = null;
           game.onBackToTitle();
         });
