@@ -983,6 +983,32 @@ GameScene.prototype.playHitEffect = function (unit, skillType, onDone, skillId) 
   }, 350);
 };
 
+GameScene.prototype._playHitShake = function (mesh, unitId) {
+  if (!this.scene || !mesh) return;
+
+  var shakeAnim = new BABYLON.Animation(
+    'hitshake_' + unitId, 'rotation.z', 60,
+    BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+    BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+  );
+
+  var ease = new BABYLON.SineEase();
+  ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+  shakeAnim.setEasingFunction(ease);
+
+  // Quick side-to-side shake: 0 → -0.2 → +0.2 → 0 over 18 frames
+  shakeAnim.setKeys([
+    { frame: 0,  value:  0.00 },
+    { frame: 5,  value: -0.20 },
+    { frame: 11, value:  0.20 },
+    { frame: 18, value:  0.00 }
+  ]);
+
+  mesh.animations = (mesh.animations || []).concat([shakeAnim]);
+  // beginAnimation(target, fromFrame=0, toFrame=18, loop=false, speedRatio=1)
+  this.scene.beginAnimation(mesh, 0, 18, false, 1);
+};
+
 GameScene.prototype._spawnHitParticles = function (unit, skillType, skillId) {
   var pos   = this.gridToWorld(unit.gridRow, unit.gridCol);
   var scene = this.scene;
