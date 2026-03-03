@@ -7,6 +7,11 @@
   <!-- Fonts are vendored locally — no CDN required -->
   <link rel="stylesheet" href="vendor/fonts.css" />
   <link rel="stylesheet" href="css/style.css" />
+  <!-- Google AdSense — replace BOTH placeholders below with your real AdSense IDs:
+       • ca-pub-XXXXXXXXXXXXXXXX → your publisher ID (from AdSense account → Account → Publisher ID)
+       • data-ad-slot="XXXXXXXXXX" → a unique ad-unit slot ID per placement (from AdSense → Ads → By ad unit) -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX"
+    crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -22,6 +27,16 @@
       <button class="btn-accent btn-large" id="btn-quick-match">⚡ QUICK MATCH</button>
       <button class="btn-secondary btn-large hidden" id="btn-continue-game">▶ CONTINUE</button>
       <button class="btn-gfx-toggle" id="btn-gfx-toggle" title="Toggle graphics quality"></button>
+      <!-- AdSense — title screen banner -->
+      <div class="ad-banner ad-banner--title">
+        <ins class="adsbygoogle"
+          style="display:block"
+          data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+          data-ad-slot="XXXXXXXXXX"
+          data-ad-format="auto"
+          data-full-width-responsive="true"></ins>
+        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+      </div>
     </div>
   </div>
 
@@ -158,6 +173,16 @@
         <button class="btn-accent" id="btn-manage-party">🔄 Manage Party</button>
         <button class="btn-secondary" id="btn-title-victory">Main Menu</button>
       </div>
+      <!-- AdSense — victory screen banner -->
+      <div class="ad-banner ad-banner--overlay">
+        <ins class="adsbygoogle"
+          style="display:block"
+          data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+          data-ad-slot="XXXXXXXXXX"
+          data-ad-format="auto"
+          data-full-width-responsive="true"></ins>
+        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+      </div>
     </div>
   </div>
 
@@ -170,6 +195,16 @@
       <div class="result-buttons">
         <button class="btn-primary" id="btn-retry">Retry Stage</button>
         <button class="btn-secondary" id="btn-title-defeat">Main Menu</button>
+      </div>
+      <!-- AdSense — defeat screen banner -->
+      <div class="ad-banner ad-banner--overlay">
+        <ins class="adsbygoogle"
+          style="display:block"
+          data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+          data-ad-slot="XXXXXXXXXX"
+          data-ad-format="auto"
+          data-full-width-responsive="true"></ins>
+        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
       </div>
     </div>
   </div>

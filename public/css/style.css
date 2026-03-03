@@ -1329,3 +1329,25 @@ html, body {
 }
 .btn-accent:active { transform: translateY(1px); }
 .btn-accent.hidden { display: none; }
+
+/* ────────────────────────────────────────
+   AD BANNERS (Google AdSense)
+──────────────────────────────────────── */
+.ad-banner {
+  width: 100%;
+  max-width: 728px;
+  margin: 0 auto;
+  overflow: hidden;
+  background: rgba(0,0,0,0.25);
+  border-radius: 8px;
+}
+
+/* Title screen: pinned to the bottom of the content column */
+.ad-banner--title {
+  margin-top: 20px;
+}
+
+/* Overlay screens (victory / defeat): sits below the action buttons */
+.ad-banner--overlay {
+  margin-top: 16px;
+}
