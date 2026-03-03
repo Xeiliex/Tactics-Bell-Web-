@@ -1121,8 +1121,10 @@ var game = (function () {
     var guestUnits = playerIdx === 0 ? remoteUnits : localUnits;
     var allUnits   = hostUnits.concat(guestUnits);
 
-    // Indices 0-2 belong to the host; 3-5 belong to the guest.
-    var localIndices = new Set(playerIdx === 0 ? [0, 1, 2] : [3, 4, 5]);
+    // Unit slots: indices 0-2 = host team, 3-5 = guest team (constant on both clients).
+    var MP_HOST_INDICES  = [0, 1, 2];
+    var MP_GUEST_INDICES = [3, 4, 5];
+    var localIndices = new Set(playerIdx === 0 ? MP_HOST_INDICES : MP_GUEST_INDICES);
 
     // Set player/ally references for HUD
     g.player  = allUnits[localIndices.values().next().value];
