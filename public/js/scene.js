@@ -42,6 +42,32 @@ var CHARACTER_MODEL_FILES_LOW = {
 // Uniform scale applied to every loaded character model.
 var CHARACTER_MODEL_SCALE = 1.0;
 
+// ─── Weapon model configuration ──────────────────────────────────────────────
+// Maps class IDs to a weapon shape category used to build procedural meshes.
+var WEAPON_CLASS_MAP = {
+  warrior: 'sword', knight: 'sword', paladin: 'sword',
+  berserker: 'axe',  warlord: 'axe',
+  mage: 'staff',    sorcerer: 'staff', sage: 'staff', archmage: 'staff',
+  oracle: 'staff',  healer: 'staff',   cleric: 'staff', archbishop: 'staff',
+  exorcist: 'wand', inquisitor: 'wand',
+  archer: 'bow',    ranger: 'bow',     beastmaster: 'bow',
+  assassin: 'dagger', shadow: 'dagger'
+};
+
+// PBR colours and surface properties per weapon category.
+var WEAPON_PBR = {
+  sword:  { r: 0.75, g: 0.75, b: 0.80, metallic: 0.70, roughness: 0.30 },
+  axe:    { r: 0.40, g: 0.38, b: 0.42, metallic: 0.60, roughness: 0.40 },
+  staff:  { r: 0.50, g: 0.30, b: 0.12, metallic: 0.10, roughness: 0.80 },
+  bow:    { r: 0.58, g: 0.40, b: 0.14, metallic: 0.10, roughness: 0.75 },
+  wand:   { r: 0.55, g: 0.22, b: 0.65, metallic: 0.20, roughness: 0.50 },
+  dagger: { r: 0.30, g: 0.30, b: 0.35, metallic: 0.70, roughness: 0.35 }
+};
+
+// Weapon mesh offset from the unit's grid-world position.
+var WEAPON_OFFSET_X = 0.26;  // right of the body
+var WEAPON_OFFSET_Y = 0.40;  // mid-body height
+
 // PBR material properties for character models.
 // Albedo colour is applied per-unit from unit.meshColor() at load time.
 var CHARACTER_PBR_METALLIC  = 0.35;
@@ -92,6 +118,7 @@ function GameScene() {
   this._tileMeshes    = [];   // flat list
   this._tileMat       = {};   // key → BABYLON.PBRMaterial
   this._unitNodes     = {};   // unitId → { body, head, glow }
+  this._weaponNodes   = {};   // unitId → weapon mesh
   this._hlMeshes      = [];   // highlight overlays
   this._gridSize      = GRID_SIZE;
   this._frameCount    = 0;    // debug frame counter
@@ -538,6 +565,54 @@ GameScene.prototype.spawnUnit = function (unit) {
   glow.isPickable = false;
 
   this._unitNodes[unit.id] = { body: body, head: head, glow: glow };
+  this._spawnWeapon(unit);
+};
+
+// ─── Weapon mesh ─────────────────────────────────────────────────────────────
+// Creates a lightweight procedural weapon shape for each unit and stores it in
+// _weaponNodes[unitId].  The mesh is positioned to the right of the unit body
+// and follows it during moves.
+
+GameScene.prototype._spawnWeapon = function (unit) {
+  var pos        = this.gridToWorld(unit.gridRow, unit.gridCol);
+  var weaponType = WEAPON_CLASS_MAP[unit.classId] || 'sword';
+  var wpbr       = WEAPON_PBR[weaponType] || WEAPON_PBR.sword;
+  var scene      = this.scene;
+  var mesh;
+
+  if (weaponType === 'sword') {
+    mesh = BABYLON.MeshBuilder.CreateBox('wpn_' + unit.id,
+      { width: 0.06, height: 0.44, depth: 0.02 }, scene);
+  } else if (weaponType === 'axe') {
+    mesh = BABYLON.MeshBuilder.CreateBox('wpn_' + unit.id,
+      { width: 0.20, height: 0.30, depth: 0.03 }, scene);
+  } else if (weaponType === 'staff') {
+    mesh = BABYLON.MeshBuilder.CreateCylinder('wpn_' + unit.id,
+      { height: 0.60, diameter: 0.055, tessellation: 8 }, scene);
+  } else if (weaponType === 'bow') {
+    mesh = BABYLON.MeshBuilder.CreateTorus('wpn_' + unit.id,
+      { diameter: 0.32, thickness: 0.035, tessellation: 16 }, scene);
+    mesh.scaling.z = 0.35; // flatten to bow profile
+  } else if (weaponType === 'wand') {
+    mesh = BABYLON.MeshBuilder.CreateCylinder('wpn_' + unit.id,
+      { height: 0.36, diameter: 0.045, tessellation: 8 }, scene);
+  } else { // dagger
+    mesh = BABYLON.MeshBuilder.CreateBox('wpn_' + unit.id,
+      { width: 0.05, height: 0.26, depth: 0.02 }, scene);
+  }
+
+  mesh.position   = new BABYLON.Vector3(pos.x + WEAPON_OFFSET_X, WEAPON_OFFSET_Y, pos.z);
+  mesh.isPickable = false;
+
+  var mat = new BABYLON.PBRMaterial('wpnmat_' + unit.id, scene);
+  mat.albedoColor = new BABYLON.Color3(wpbr.r, wpbr.g, wpbr.b);
+  mat.metallic    = wpbr.metallic;
+  mat.roughness   = wpbr.roughness;
+  mesh.material   = mat;
+
+  if (this._shadowGenerator) { this._shadowGenerator.addShadowCaster(mesh); }
+
+  this._weaponNodes[unit.id] = mesh;
 };
 
 GameScene.prototype.setUnitGlow = function (unit, visible) {
@@ -575,6 +650,11 @@ GameScene.prototype.snapUnit = function (unit) {
   }
   node.glow.position.x = pos.x;
   node.glow.position.z = pos.z;
+  var weapon = this._weaponNodes[unit.id];
+  if (weapon) {
+    weapon.position.x = pos.x + WEAPON_OFFSET_X;
+    weapon.position.z = pos.z;
+  }
 };
 
 // Animate unit to new grid position, call onDone when finished
@@ -613,6 +693,22 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
       { frame: frames, value: new BABYLON.Vector3(pos.x, 0, pos.z) }
     ]);
     animModel.setEasingFunction(ease);
+    // Animate weapon alongside model
+    var weapon = this._weaponNodes[unit.id];
+    if (weapon) {
+      var animWpnM = new BABYLON.Animation(
+        'moveWpn_' + unit.id, 'position', 60,
+        BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+        BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+      );
+      animWpnM.setKeys([
+        { frame: 0,      value: weapon.position.clone() },
+        { frame: frames, value: new BABYLON.Vector3(pos.x + WEAPON_OFFSET_X, weapon.position.y, pos.z) }
+      ]);
+      animWpnM.setEasingFunction(ease);
+      weapon.animations = [animWpnM];
+      scene.beginAnimation(weapon, 0, frames, false, 1);
+    }
     node.model.animations = [animModel];
     scene.beginAnimation(node.model, 0, frames, false, 1, function () {
       if (onDone) onDone();
@@ -642,6 +738,23 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
 
   [animBody, animHead].forEach(function (a) { a.setEasingFunction(ease); });
 
+  // Animate weapon alongside body
+  var weapon = this._weaponNodes[unit.id];
+  if (weapon) {
+    var animWpnB = new BABYLON.Animation(
+      'moveWpn_' + unit.id, 'position', 60,
+      BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+      BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
+    animWpnB.setKeys([
+      { frame: 0,      value: weapon.position.clone() },
+      { frame: frames, value: new BABYLON.Vector3(pos.x + WEAPON_OFFSET_X, weapon.position.y, pos.z) }
+    ]);
+    animWpnB.setEasingFunction(ease);
+    weapon.animations = [animWpnB];
+    scene.beginAnimation(weapon, 0, frames, false, 1);
+  }
+
   node.body.animations = [animBody];
   node.head.animations = [animHead];
 
@@ -652,63 +765,235 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
 };
 
 // Hit flash + particle burst
-GameScene.prototype.playHitEffect = function (unit, skillType, onDone) {
+// skillId (optional 4th arg) selects an elemental particle palette.
+GameScene.prototype.playHitEffect = function (unit, skillType, onDone, skillId) {
   var node = this._unitNodes[unit.id];
   if (!node) { if (onDone) onDone(); return; }
 
   // Use the OBJ model material when available, otherwise the procedural body.
   var targetMesh = node.model || node.body;
-  var origDiff = targetMesh.material.albedoColor.clone();
-  var origEmit = targetMesh.material.emissiveColor.clone();
+  var origDiff = targetMesh.material.albedoColor
+    ? targetMesh.material.albedoColor.clone() : new BABYLON.Color3(1, 1, 1);
+  var origEmit = targetMesh.material.emissiveColor
+    ? targetMesh.material.emissiveColor.clone() : BABYLON.Color3.Black();
 
-  targetMesh.material.albedoColor  = new BABYLON.Color3(1, 1, 1);
-  targetMesh.material.emissiveColor = new BABYLON.Color3(0.9, 0.2, 0.2);
+  if (targetMesh.material.albedoColor)   { targetMesh.material.albedoColor  = new BABYLON.Color3(1, 1, 1); }
+  if (targetMesh.material.emissiveColor) { targetMesh.material.emissiveColor = new BABYLON.Color3(0.9, 0.2, 0.2); }
 
-  // Particle burst
-  this._spawnHitParticles(unit, skillType);
+  // Elemental particle burst
+  this._spawnHitParticles(unit, skillType, skillId);
 
   var mat = targetMesh.material;
   setTimeout(function () {
-    mat.albedoColor   = origDiff;
-    mat.emissiveColor = origEmit;
+    if (mat.albedoColor)  { mat.albedoColor   = origDiff; }
+    if (mat.emissiveColor){ mat.emissiveColor  = origEmit; }
     if (onDone) onDone();
   }, 350);
 };
 
-GameScene.prototype._spawnHitParticles = function (unit, skillType) {
+GameScene.prototype._spawnHitParticles = function (unit, skillType, skillId) {
   var pos   = this.gridToWorld(unit.gridRow, unit.gridCol);
   var scene = this.scene;
+  var isLow = (typeof HARDWARE_TIER !== 'undefined' && HARDWARE_TIER === 'low');
 
-  var particleCount = (typeof HARDWARE_TIER !== 'undefined' && HARDWARE_TIER === 'low') ? 16 : 40;
-  var ps = new BABYLON.ParticleSystem('hit_' + unit.id + '_' + Date.now(), particleCount, scene);
+  // Determine particle count; some big spells get more particles.
+  var baseCount = isLow ? 16 : 40;
+  var bigSpell  = skillId === 'fireball' || skillId === 'meteor' ||
+                  skillId === 'arcaneburst' || skillId === 'titanslash';
+  if (bigSpell) { baseCount = isLow ? 28 : 70; }
+
+  var ps = new BABYLON.ParticleSystem('hit_' + unit.id + '_' + Date.now(), baseCount, scene);
   ps.emitter    = new BABYLON.Vector3(pos.x, 0.5, pos.z);
-  ps.minEmitBox = new BABYLON.Vector3(-0.15, 0, -0.15);
-  ps.maxEmitBox = new BABYLON.Vector3(0.15, 0.2, 0.15);
+  ps.minEmitBox = new BABYLON.Vector3(-0.15, 0,   -0.15);
+  ps.maxEmitBox = new BABYLON.Vector3( 0.15, 0.2,  0.15);
 
-  if (skillType === 'magic') {
+  // ── Per-skill elemental colour palette ──────────────────────────────────────
+  if (skillId === 'fireball' || skillId === 'purge') {
+    // Fire: orange → yellow
+    ps.color1 = new BABYLON.Color4(1.0, 0.35, 0.0, 1);
+    ps.color2 = new BABYLON.Color4(1.0, 0.80, 0.1, 0.5);
+    ps.minSize = 0.08; ps.maxSize = 0.30;
+  } else if (skillId === 'icelance') {
+    // Ice: cyan → white
+    ps.color1 = new BABYLON.Color4(0.30, 0.70, 1.0, 1);
+    ps.color2 = new BABYLON.Color4(0.80, 0.95, 1.0, 0.5);
+    ps.minSize = 0.04; ps.maxSize = 0.18;
+  } else if (skillId === 'thunder' || skillId === 'smite' ||
+             skillId === 'holyjudgment' || skillId === 'divinestrike') {
+    // Lightning: bright yellow
+    ps.color1     = new BABYLON.Color4(1.0, 1.0, 0.2, 1);
+    ps.color2     = new BABYLON.Color4(1.0, 1.0, 0.9, 0.6);
+    ps.minSize    = 0.04; ps.maxSize = 0.16;
+    ps.direction1 = new BABYLON.Vector3(-2, 4, -2);
+    ps.direction2 = new BABYLON.Vector3( 2, 8,  2);
+  } else if (skillId === 'meteor' || skillId === 'titanslash' || skillId === 'battleroar') {
+    // Meteor / power strike: deep orange + brown smoke
+    ps.color1 = new BABYLON.Color4(0.90, 0.40, 0.10, 1);
+    ps.color2 = new BABYLON.Color4(0.55, 0.30, 0.10, 0.5);
+    ps.minSize = 0.10; ps.maxSize = 0.38;
+  } else if (skillId === 'arcaneburst' || skillId === 'arcaneblast' ||
+             skillId === 'timewarp'    || skillId === 'fatecast') {
+    // Arcane: deep purple → lavender
+    ps.color1 = new BABYLON.Color4(0.50, 0.10, 1.0, 1);
+    ps.color2 = new BABYLON.Color4(0.70, 0.40, 1.0, 0.4);
+    ps.minSize = 0.06; ps.maxSize = 0.26;
+  } else if (skillId === 'holylight' || skillId === 'greatheal' ||
+             skillId === 'divinegrace' || skillId === 'prophecy' ||
+             skillId === 'holyblade'  || skillId === 'sacredshield') {
+    // Holy heal: gold → white
+    ps.color1 = new BABYLON.Color4(1.0, 0.95, 0.40, 1);
+    ps.color2 = new BABYLON.Color4(1.0, 1.0,  0.90, 0.4);
+    ps.minSize = 0.06; ps.maxSize = 0.22;
+  } else if (skillId === 'shadowstrike' || skillId === 'deathmark' ||
+             skillId === 'doublecut'    || skillId === 'phantomstep') {
+    // Shadow: dark violet
+    ps.color1 = new BABYLON.Color4(0.30, 0.0, 0.50, 1);
+    ps.color2 = new BABYLON.Color4(0.10, 0.0, 0.20, 0.4);
+    ps.minSize = 0.05; ps.maxSize = 0.20;
+  } else if (skillType === 'magic') {
+    // Generic magic: purple
     ps.color1 = new BABYLON.Color4(0.5, 0.1, 1.0, 1);
     ps.color2 = new BABYLON.Color4(1.0, 0.5, 1.0, 0.4);
   } else if (skillType === 'heal') {
+    // Generic heal: green
     ps.color1 = new BABYLON.Color4(0.2, 1.0, 0.4, 1);
     ps.color2 = new BABYLON.Color4(0.6, 1.0, 0.6, 0.4);
   } else {
+    // Physical: orange-gold
     ps.color1 = new BABYLON.Color4(1.0, 0.6, 0.0, 1);
     ps.color2 = new BABYLON.Color4(1.0, 1.0, 0.0, 0.4);
   }
-  ps.minSize      = 0.05;
-  ps.maxSize      = 0.22;
+
+  if (!ps.minSize)    { ps.minSize  = 0.05; }
+  if (!ps.maxSize)    { ps.maxSize  = 0.22; }
+  if (!ps.direction1) { ps.direction1 = new BABYLON.Vector3(-1.5, 3, -1.5); }
+  if (!ps.direction2) { ps.direction2 = new BABYLON.Vector3( 1.5, 5,  1.5); }
   ps.minLifeTime  = 0.2;
   ps.maxLifeTime  = 0.55;
   ps.emitRate     = 120;
-  ps.direction1   = new BABYLON.Vector3(-1.5, 3, -1.5);
-  ps.direction2   = new BABYLON.Vector3(1.5, 5, 1.5);
   ps.minEmitPower = 1;
   ps.maxEmitPower = 3;
   ps.updateSpeed  = 0.02;
 
   ps.start();
-  setTimeout(function () { ps.stop(); }, 250);
+  setTimeout(function () { ps.stop(); },    250);
   setTimeout(function () { ps.dispose(); }, 1200);
+};
+
+// ─── Attack animation ─────────────────────────────────────────────────────────
+// Plays a weapon-swing (melee) or projectile-arc (ranged/magic) on the attacker
+// then triggers the hit flash + elemental particles on the target.
+// Replaces the old scene.playHitEffect() call in combat.js so the full sequence
+// (swing → projectile → impact) is co-ordinated here.
+
+GameScene.prototype.playAttackAnimation = function (attacker, target, skillType, skillId, onDone) {
+  var self   = this;
+  var weapon = this._weaponNodes[attacker.id];
+
+  // ── Weapon animation ──────────────────────────────────────────────────────
+  if (weapon && this.scene) {
+    var isMagicCast = (skillType === 'magic' || skillType === 'heal');
+    if (isMagicCast) {
+      // Casting: quick scale pulse on the staff/wand
+      var castAnim = new BABYLON.Animation(
+        'cast_' + attacker.id, 'scaling.y', 60,
+        BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+        BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+      );
+      castAnim.setKeys([
+        { frame: 0,  value: 1.0 },
+        { frame: 6,  value: 1.35 },
+        { frame: 12, value: 1.0 }
+      ]);
+      weapon.animations = [castAnim];
+      this.scene.beginAnimation(weapon, 0, 12, false, 2.0);
+    } else {
+      // Melee/ranged: swing rotation around local Z axis
+      var swingAnim = new BABYLON.Animation(
+        'swing_' + attacker.id, 'rotation.z', 60,
+        BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+        BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+      );
+      var startZ = weapon.rotation.z;
+      swingAnim.setKeys([
+        { frame: 0,  value: startZ },
+        { frame: 7,  value: startZ - Math.PI * 0.65 },
+        { frame: 14, value: startZ }
+      ]);
+      weapon.animations = [swingAnim];
+      this.scene.beginAnimation(weapon, 0, 14, false, 2.0);
+    }
+  }
+
+  // ── Impact delivery ───────────────────────────────────────────────────────
+  var isMelee = (attacker.attackRange <= 1);
+  if (isMelee) {
+    // Brief delay so the swing lands before the flash
+    setTimeout(function () {
+      self.playHitEffect(target, skillType, onDone, skillId);
+    }, 200);
+  } else {
+    // Ranged / magic: arc a projectile to the target then trigger impact
+    this._launchProjectile(attacker, target, skillType, skillId, onDone);
+  }
+};
+
+// Spawns a glowing sphere that arcs from the attacker to the target, then
+// calls playHitEffect when it arrives.
+GameScene.prototype._launchProjectile = function (attacker, target, skillType, skillId, onDone) {
+  var self  = this;
+  var scene = this.scene;
+  if (!scene) { this.playHitEffect(target, skillType, onDone, skillId); return; }
+
+  var startPos = this.gridToWorld(attacker.gridRow, attacker.gridCol);
+  var endPos   = this.gridToWorld(target.gridRow,   target.gridCol);
+  startPos.y = 0.55;
+  endPos.y   = 0.55;
+
+  // Pick projectile emissive colour by skill (else-if ensures first match wins)
+  var pr, pg, pb;
+  if      (skillId   === 'fireball')                      { pr = 1.0;  pg = 0.35; pb = 0.0; }
+  else if (skillId   === 'icelance')                      { pr = 0.30; pg = 0.70; pb = 1.0; }
+  else if (skillId   === 'thunder' || skillId === 'smite'){ pr = 1.0;  pg = 1.0;  pb = 0.2; }
+  else if (skillId   === 'meteor')                        { pr = 0.90; pg = 0.40; pb = 0.1; }
+  else if (skillType === 'magic')                         { pr = 0.55; pg = 0.15; pb = 1.0; }
+  else if (skillType === 'heal')                          { pr = 0.20; pg = 1.0;  pb = 0.4; }
+  else                                                    { pr = 1.0;  pg = 0.85; pb = 0.0; }
+
+  var proj = BABYLON.MeshBuilder.CreateSphere(
+    'proj_' + attacker.id + '_' + Date.now(), { diameter: 0.14, segments: 6 }, scene
+  );
+  proj.position  = startPos.clone();
+  proj.isPickable = false;
+
+  var pMat = new BABYLON.StandardMaterial('projmat_' + attacker.id, scene);
+  pMat.emissiveColor   = new BABYLON.Color3(pr, pg, pb);
+  pMat.disableLighting = true;
+  proj.material = pMat;
+
+  // Animate along a gentle arc (mid-point raised)
+  var frames  = 18;
+  var midPos  = new BABYLON.Vector3(
+    (startPos.x + endPos.x) / 2,
+    Math.max(startPos.y, endPos.y) + 0.55,
+    (startPos.z + endPos.z) / 2
+  );
+  var animProj = new BABYLON.Animation(
+    'proj_' + attacker.id, 'position', 60,
+    BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+    BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+  );
+  animProj.setKeys([
+    { frame: 0,          value: startPos.clone() },
+    { frame: frames / 2, value: midPos },
+    { frame: frames,     value: endPos.clone() }
+  ]);
+  proj.animations = [animProj];
+
+  scene.beginAnimation(proj, 0, frames, false, 2.0, function () {
+    proj.dispose();
+    self.playHitEffect(target, skillType, onDone, skillId);
+  });
 };
 
 // Oimo physics ragdoll death
@@ -739,21 +1024,24 @@ GameScene.prototype.removeUnit = function (unit) {
     // Physics not enabled; just fade out
   }
 
-  var model = node.model;
-  var body  = node.body;
-  var head  = node.head;
-  var glow  = node.glow;
+  var model  = node.model;
+  var body   = node.body;
+  var head   = node.head;
+  var glow   = node.glow;
+  var weapon = this._weaponNodes[unit.id];
   if (glow && glow._spinObs) {
     this.scene.onBeforeRenderObservable.remove(glow._spinObs);
     glow._spinObs = null;
   }
   setTimeout(function () {
-    if (model) model.dispose();
-    if (body)  body.dispose();
-    if (head)  head.dispose();
-    if (glow)  glow.dispose();
+    if (model)  model.dispose();
+    if (body)   body.dispose();
+    if (head)   head.dispose();
+    if (glow)   glow.dispose();
+    if (weapon) weapon.dispose();
   }, 1600);
   delete this._unitNodes[unit.id];
+  delete this._weaponNodes[unit.id];
 };
 
 // ─── Tile highlights ─────────────────────────────────────────────────────────
