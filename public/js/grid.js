@@ -238,7 +238,7 @@ function paintCluster(grid, seedRow, seedCol, terrain, spreadChance) {
   }
 }
 
-/** Adds a loose road path connecting two points */
+/** Adds a loose road path connecting two points, with ~25% of tiles as broken road */
 function addRoad(grid, r1, c1, r2, c2) {
   var r = r1, c = c1;
   var size = grid.size;
@@ -246,7 +246,7 @@ function addRoad(grid, r1, c1, r2, c2) {
     if (grid.getTile(r, c)) {
       var t = grid.tiles[r][c];
       if (t.terrain === TERRAIN.GRASS || t.terrain === TERRAIN.CRYSTAL) {
-        t.terrain = TERRAIN.ROAD;
+        t.terrain = (Math.random() < 0.25) ? TERRAIN.BROKEN_ROAD : TERRAIN.ROAD;
       }
     }
     // Randomly step toward target

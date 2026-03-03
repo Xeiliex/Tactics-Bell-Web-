@@ -71,10 +71,12 @@ var TERRAIN_PBR_PROPS = {
   Water:    { metallic: 0.0,  roughness: 0.06, alpha: 0.85 },
   Mountain: { metallic: 0.08, roughness: 0.92 },
   Road:     { metallic: 0.0,  roughness: 0.65 },
-  Lava:     { metallic: 0.0,  roughness: 0.88,
-              emissiveR: 0.8,  emissiveG: 0.12, emissiveB: 0.0, emissiveIntensity: 2.0 },
-  Crystal:  { metallic: 0.25, roughness: 0.05, alpha: 0.85,
-              emissiveR: 0.18, emissiveG: 0.06, emissiveB: 0.28, emissiveIntensity: 0.5 }
+  Lava:         { metallic: 0.0,  roughness: 0.88,
+                  emissiveR: 0.8,  emissiveG: 0.12, emissiveB: 0.0, emissiveIntensity: 2.0 },
+  Crystal:      { metallic: 0.25, roughness: 0.05, alpha: 0.85,
+                  emissiveR: 0.18, emissiveG: 0.06, emissiveB: 0.28, emissiveIntensity: 0.5 },
+  'Broken Road': { metallic: 0.05, roughness: 0.92 },
+  Ruins:         { metallic: 0.10, roughness: 0.96 }
 };
 
 // Noise procedural texture settings for terrain micro-surface variation.
