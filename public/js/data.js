@@ -9,9 +9,11 @@ var TERRAIN = {
   FOREST:   { name: 'Forest',   passable: true,  defBonus: 2, resBonus: 0, hexColor: '#2E7D32', r: 0.18, g: 0.49, b: 0.20 },
   WATER:    { name: 'Water',    passable: false, defBonus: 0, resBonus: 0, hexColor: '#1E88E5', r: 0.12, g: 0.53, b: 0.90 },
   MOUNTAIN: { name: 'Mountain', passable: false, defBonus: 0, resBonus: 0, hexColor: '#78909C', r: 0.47, g: 0.56, b: 0.61 },
-  ROAD:     { name: 'Road',     passable: true,  defBonus: 0, resBonus: 0, hexColor: '#FFF176', r: 0.88, g: 0.84, b: 0.46 },
-  LAVA:     { name: 'Lava',     passable: false, defBonus: 0, resBonus: 0, hexColor: '#FF5722', r: 1.00, g: 0.34, b: 0.13 },
-  CRYSTAL:  { name: 'Crystal',  passable: true,  defBonus: 0, resBonus: 2, hexColor: '#CE93D8', r: 0.81, g: 0.58, b: 0.85 }
+  ROAD:        { name: 'Road',        passable: true,  defBonus: 0, resBonus: 0, hexColor: '#FFF176', r: 0.88, g: 0.84, b: 0.46 },
+  LAVA:        { name: 'Lava',        passable: false, defBonus: 0, resBonus: 0, hexColor: '#FF5722', r: 1.00, g: 0.34, b: 0.13 },
+  CRYSTAL:     { name: 'Crystal',     passable: true,  defBonus: 0, resBonus: 2, hexColor: '#CE93D8', r: 0.81, g: 0.58, b: 0.85 },
+  BROKEN_ROAD: { name: 'Broken Road', passable: true,  defBonus: 0, resBonus: 0, hexColor: '#8D6E63', r: 0.55, g: 0.43, b: 0.39 },
+  RUINS:       { name: 'Ruins',       passable: false, defBonus: 0, resBonus: 0, hexColor: '#6D4C41', r: 0.43, g: 0.30, b: 0.26 }
 };
 
 // ═══════════════════════════════════════
