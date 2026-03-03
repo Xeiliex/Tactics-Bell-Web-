@@ -1085,3 +1085,218 @@ html, body {
   background: rgba(0,229,255,0.12);
   border-color: var(--cyan);
 }
+
+/* ────────────────────────────────────────
+   CLASS PROMOTION SCREEN
+──────────────────────────────────────── */
+#screen-promote {
+  background: rgba(10,14,39,0.92);
+  backdrop-filter: blur(6px);
+  z-index: 150;
+  overflow-y: auto;
+}
+
+.promote-container {
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
+  padding: 40px 24px;
+  max-width: 760px; width: 95%;
+  text-align: center;
+}
+
+.promote-burst {
+  font-size: 64px;
+  animation: burstSpin 1s ease-out;
+}
+
+.promote-title {
+  font-family: var(--font-title);
+  font-size: 48px;
+  letter-spacing: 4px;
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(255,215,0,0.7);
+}
+
+.promote-unit-name {
+  font-size: 20px;
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.promote-choices {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+}
+
+.promote-choices .card {
+  flex: 0 0 auto;
+  width: 220px;
+  cursor: pointer;
+}
+.promote-choices .card:hover {
+  border-color: var(--gold);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 8px 28px rgba(255,215,0,0.2);
+}
+
+/* ────────────────────────────────────────
+   RECLASS SCREEN
+──────────────────────────────────────── */
+#screen-reclass {
+  background: radial-gradient(ellipse at center, #1a1060 0%, #0a0e27 70%);
+  overflow-y: auto;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.reclass-container {
+  width: 100%; max-width: 980px;
+  margin: 0 auto;
+  padding: 28px 20px 36px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+.reclass-title {
+  font-family: var(--font-title);
+  font-size: 32px;
+  letter-spacing: 3px;
+  color: var(--gold);
+  text-align: center;
+}
+
+.reclass-gold-bar {
+  text-align: center;
+  font-size: 15px;
+  color: var(--cyan);
+  font-weight: 600;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.reclass-layout {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.reclass-members {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 200px;
+  flex-shrink: 0;
+}
+
+.reclass-member-btn {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  color: #eee;
+  padding: 12px 16px;
+  cursor: pointer;
+  text-align: left;
+  display: flex; flex-direction: column; gap: 2px;
+  transition: border-color 0.15s, background 0.15s;
+  font-family: var(--font-body);
+}
+.reclass-member-btn:hover {
+  border-color: var(--cyan);
+  background: rgba(0,229,255,0.08);
+}
+.reclass-member-btn.selected {
+  border-color: var(--gold);
+  background: rgba(255,215,0,0.1);
+}
+.reclass-member-emoji { font-size: 24px; }
+.reclass-member-name {
+  font-family: var(--font-title);
+  font-size: 16px;
+  letter-spacing: 1px;
+  color: var(--gold);
+}
+.reclass-member-sub { font-size: 11px; color: #aaa; }
+
+.reclass-class-choices {
+  flex: 1;
+  min-width: 0;
+}
+.reclass-class-choices.hidden { display: none; }
+
+.reclass-choices-title {
+  font-family: var(--font-title);
+  font-size: 16px;
+  letter-spacing: 2px;
+  color: var(--cyan);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.reclass-class-choices .cards-grid {
+  display: flex; flex-wrap: wrap; gap: 12px;
+  justify-content: flex-start;
+}
+
+.reclass-card {
+  width: 190px;
+  cursor: pointer;
+}
+.reclass-card:not(.current-class):not(.disabled):hover {
+  border-color: var(--gold);
+  transform: translateY(-3px);
+}
+.reclass-card.current-class {
+  border-color: rgba(0,229,255,0.6);
+  cursor: default;
+}
+.reclass-card.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.reclass-tier-badge {
+  color: var(--gold);
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.reclass-current-label {
+  font-size: 11px;
+  color: var(--cyan);
+  font-weight: 700;
+  text-align: center;
+  padding-top: 4px;
+}
+
+.reclass-cost-display {
+  font-size: 11px;
+  color: var(--gold);
+  text-align: center;
+  padding-top: 4px;
+}
+
+.reclass-actions {
+  display: flex; justify-content: center; padding-top: 8px;
+}
+
+/* btn-accent used on victory screen Manage Party button */
+.btn-accent {
+  background: linear-gradient(135deg, #FF8A65 0%, #FF6B9D 100%);
+  color: #fff;
+  border: none; border-radius: 12px;
+  font-family: var(--font-title);
+  font-size: 18px;
+  letter-spacing: 2px;
+  padding: 12px 28px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(255,107,157,0.35);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.btn-accent:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(255,107,157,0.55);
+}
+.btn-accent:active { transform: translateY(1px); }
+.btn-accent.hidden { display: none; }

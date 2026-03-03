@@ -206,6 +206,32 @@ Character.prototype.expReward = function () {
   return Math.round(20 * this.level);
 };
 
+/**
+ * Change this character's class and rebuild stats, preserving HP ratio.
+ * @param {string} newClassId  A valid key in CLASSES.
+ */
+Character.prototype.reclass = function (newClassId) {
+  if (!CLASSES[newClassId]) return;
+  var hpRatio = this.maxHp > 0 ? this.hp / this.maxHp : 1;
+  this.classId = newClassId;
+  this.emoji   = CLASSES[newClassId].emoji;
+  this._buildStats();
+  this.hp = Math.max(1, Math.round(this.maxHp * hpRatio));
+};
+
+/**
+ * Returns an array of CLASSES entries that this character can promote into
+ * at their current level (free tier-based advancement).
+ */
+Character.prototype.getPromotionChoices = function () {
+  var self = this;
+  return Object.values(CLASSES).filter(function (cls) {
+    return cls.advancesFrom &&
+      cls.advancesFrom.indexOf(self.classId) !== -1 &&
+      self.level >= cls.requiresLevel;
+  });
+};
+
 /** Mesh body colour (r,g,b 0-1). */
 Character.prototype.meshColor = function () {
   if (this.overrideMeshColor) return this.overrideMeshColor;

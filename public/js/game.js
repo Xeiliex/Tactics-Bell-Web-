@@ -12,6 +12,7 @@ var game = (function () {
     selectedClass: null,
     partyConfig:   null,   // Array of 3 party-member config objects
     stage:         1,
+    gold:          0,      // Player's gold (used for reclassing)
     player:        null,   // Character — the player's hero
     allies:        [],     // Character[] — CPU allies
     enemies:       [],     // Character[] — enemies
@@ -30,6 +31,11 @@ var game = (function () {
 
   // Fraction of hero EXP granted to surviving allies after a battle.
   var ALLY_EXP_SHARE = 0.75;
+
+  // Gold awarded per stage cleared (scales with stage number).
+  function _goldRewardForStage(stage) {
+    return 10 + stage * 5;
+  }
 
   /**
    * Compute a simple djb2-style checksum for lightweight tamper detection.
@@ -82,14 +88,14 @@ var game = (function () {
   function saveProgress() {
     if (!g.player) return;
     try {
-      var data = { stage: g.stage };
+      var data = { stage: g.stage, gold: g.gold || 0 };
       if (g.partyConfig && g.partyConfig.length > 0) {
         data.party = g.partyConfig.map(function (m, i) {
           var unit = i === 0 ? g.player : g.allies[i - 1];
           return {
             name:         m.name,
             race:         m.race,
-            classId:      m.classId,
+            classId:      unit ? unit.classId : m.classId,
             backgroundId: m.backgroundId || null,
             colorId:      m.colorId      || 'default',
             level:        unit ? unit.level : (m.level || 1),
@@ -224,6 +230,7 @@ var game = (function () {
       var save = loadSave();
       if (!save) return;
       g.stage = save.stage;
+      g.gold  = save.gold || 0;
 
       if (save.party && save.party.length > 0) {
         g.partyConfig = save.party.map(function (m) {
@@ -614,6 +621,43 @@ var game = (function () {
     return gains;
   }
 
+  // ─── Promotion helpers ───────────────────────────────────────────────────────
+
+  /**
+   * Build a queue of units that need to choose a class promotion.
+   * A unit qualifies when it has just reached the promotion-level threshold
+   * while still in a class below the maximum tier.
+   */
+  function _buildPromotionQueue() {
+    var units = [g.player].concat(g.allies);
+    var queue = [];
+    units.forEach(function (unit) {
+      if (!unit || !unit.isAlive()) return;
+      var choices = unit.getPromotionChoices();
+      if (choices.length > 0) { queue.push({ unit: unit, choices: choices }); }
+    });
+    return queue;
+  }
+
+  /**
+   * Walk through a promotion queue, showing the promotion screen for each
+   * entry, then call onDone when all are resolved.
+   */
+  function _processPromotionQueue(queue, onDone) {
+    if (!queue || queue.length === 0) { onDone(); return; }
+    var entry = queue.shift();
+    g.ui.showPromotionScreen(entry.unit, entry.choices, function (chosenClassId) {
+      entry.unit.reclass(chosenClassId);
+      // Keep partyConfig in sync
+      var units = [g.player].concat(g.allies);
+      var idx = units.indexOf(entry.unit);
+      if (idx >= 0 && g.partyConfig && g.partyConfig[idx]) {
+        g.partyConfig[idx].classId = chosenClassId;
+      }
+      _processPromotionQueue(queue, onDone);
+    });
+  }
+
   // ─── Victory ─────────────────────────────────────────────────────────────────
 
   function onVictory(expGained) {
@@ -623,14 +667,32 @@ var game = (function () {
       return;
     }
 
+    // Award gold for clearing the stage
+    var goldEarned = _goldRewardForStage(g.stage);
+    g.gold += goldEarned;
+
     var gains = distributeExp(expGained);
 
+    // After EXP and possible level-ups, check whether any unit qualifies for
+    // a class promotion (hit level 10 or 25 while in an appropriate tier class).
+    var promotionQueue = _buildPromotionQueue();
+
+    var showVictory = function () {
+      g.ui.showVictoryScreen(g.stage, expGained, goldEarned, onNextStage, onManageParty, onBackToTitle);
+    };
+
+    var afterPromotions = function () {
+      showVictory();
+    };
+
+    var doPromotions = function () {
+      _processPromotionQueue(promotionQueue, afterPromotions);
+    };
+
     if (gains) {
-      g.ui.showLevelUpScreen(g.player, gains, function () {
-        g.ui.showVictoryScreen(g.stage, expGained, onNextStage, onBackToTitle);
-      });
+      g.ui.showLevelUpScreen(g.player, gains, doPromotions);
     } else {
-      g.ui.showVictoryScreen(g.stage, expGained, onNextStage, onBackToTitle);
+      doPromotions();
     }
   }
 
@@ -638,6 +700,26 @@ var game = (function () {
     g.stage++;
     saveProgress();
     startBattle(false);
+  }
+
+  /**
+   * Called from the victory screen "Manage Party" button.
+   * Shows the reclass UI then returns to the victory summary.
+   */
+  function onManageParty() {
+    var units = [g.player].concat(g.allies);
+    g.ui.showReclassScreen(units, g.gold, function (unitIdx, newClassId) {
+      // Deduct gold and apply reclass
+      g.gold -= RECLASS_COST;
+      if (g.gold < 0) g.gold = 0;
+      units[unitIdx].reclass(newClassId);
+      if (g.partyConfig && g.partyConfig[unitIdx]) {
+        g.partyConfig[unitIdx].classId = newClassId;
+      }
+    }, function () {
+      // After closing reclass, return to the victory screen without re-showing gold/exp
+      g.ui.showVictoryScreen(g.stage, null, null, onNextStage, onManageParty, onBackToTitle);
+    });
   }
 
   // ─── Defeat ──────────────────────────────────────────────────────────────────
@@ -658,6 +740,7 @@ var game = (function () {
     if (g.scene) { g.scene.dispose(); g.scene = null; }
     if (typeof gameLoop !== 'undefined') gameLoop.stop();
     g.stage       = 1;
+    g.gold        = 0;
     g.player      = null;
     g.partyConfig = null;
     g.weather     = null;
