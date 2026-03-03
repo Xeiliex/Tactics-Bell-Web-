@@ -1005,6 +1005,7 @@ GameScene.prototype._playHitShake = function (mesh, unitId) {
   ]);
 
   mesh.animations = (mesh.animations || []).concat([shakeAnim]);
+  // beginAnimation(target, fromFrame=0, toFrame=18, loop=false, speedRatio=1)
   this.scene.beginAnimation(mesh, 0, 18, false, 1);
 };
 
