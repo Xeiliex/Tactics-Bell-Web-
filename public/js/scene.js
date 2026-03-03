@@ -79,6 +79,42 @@ var TERRAIN_PBR_PROPS = {
   Ruins:         { metallic: 0.10, roughness: 0.96 }
 };
 
+// ─── Map prop configuration ───────────────────────────────────────────────────
+// Maps terrain names to arrays of glTF filenames served from public/models/props/.
+// Props are placed decoratively at tile edges — not centre — so they never block
+// unit movement.  Each terrain entry lists candidate files; one is chosen at
+// random (deterministically seeded by tile position).
+var PROP_MODELS = {
+  Grass:        ['Prop_WoodenFence_Single.gltf', 'Prop_Vine1.gltf'],
+  Forest:       ['Prop_Vine1.gltf', 'Prop_Vine2.gltf', 'Prop_Support.gltf'],
+  Mountain:     ['Prop_Brick1.gltf', 'Prop_Brick2.gltf', 'Prop_Brick3.gltf', 'Prop_Brick4.gltf'],
+  Road:         ['Prop_Crate.gltf',  'Prop_Wagon.gltf',  'Prop_WoodenFence_Single.gltf'],
+  Water:        ['Prop_ExteriorBorder_Straight1.gltf', 'Prop_ExteriorBorder_Corner.gltf'],
+  Ruins:        ['Wall_UnevenBrick_Straight.gltf', 'Prop_Brick1.gltf', 'Prop_Vine1.gltf'],
+  'Broken Road':['Prop_Brick1.gltf', 'Prop_Brick3.gltf', 'Prop_Brick4.gltf']
+};
+
+// Probability (0–1) that a given tile spawns a prop.  Kept low to avoid
+// visual clutter while still adding flavour.
+var PROP_SPAWN_PROB = {
+  Grass:         0.15,
+  Forest:        0.25,
+  Mountain:      0.20,
+  Road:          0.18,
+  Water:         0.12,
+  Ruins:         0.28,
+  'Broken Road': 0.22
+};
+
+// Uniform scale applied to every loaded prop model.
+var PROP_MODEL_SCALE = 1.0;
+
+// PBR material properties applied to each prop model (overrides glTF defaults).
+var PROP_PBR_PROPS = {
+  metallic:    0.05,
+  roughness:   0.85
+};
+
 // Noise procedural texture settings for terrain micro-surface variation.
 var TERRAIN_NOISE_SIZE       = 128;
 var TERRAIN_NOISE_OCTAVES    = 4;
@@ -93,6 +129,7 @@ function GameScene() {
   this._tileMat       = {};   // key → BABYLON.PBRMaterial
   this._unitNodes     = {};   // unitId → { body, head, glow }
   this._hlMeshes      = [];   // highlight overlays
+  this._propMeshes    = [];   // environmental prop clones (cleared on new grid)
   this._gridSize      = GRID_SIZE;
   this._frameCount    = 0;    // debug frame counter
   this._fpsEl         = null; // #debug-fps-rate DOM element
@@ -195,6 +232,10 @@ GameScene.prototype.renderGrid = function (grid) {
   this._tileMeshes = [];
   this._tileMat    = {};
 
+  // Dispose old environmental props
+  this._propMeshes.forEach(function (m) { if (m) m.dispose(); });
+  this._propMeshes = [];
+
   var self = this;
 
   for (var r = 0; r < grid.size; r++) {
@@ -254,6 +295,10 @@ GameScene.prototype.renderGrid = function (grid) {
 
   // Asynchronously replace fallback boxes with terrain models when files exist
   this._upgradeToModels(grid);
+
+  // Asynchronously place environmental prop decorations from the medieval-village
+  // megakit glTF models (high-quality only — no-op on low-end hardware).
+  this._addMapProps(grid);
 };
 
 // ─── Terrain model loading ────────────────────────────────────────────────────
@@ -363,7 +408,108 @@ GameScene.prototype._upgradeToModels = function (grid) {
   });
 };
 
-// ─── Unit meshes ─────────────────────────────────────────────────────────────
+// ─── Map prop placement ───────────────────────────────────────────────────────
+// Loads medieval-village-megakit glTF models from public/models/props/ and
+// places decorative clones at tile edges based on terrain type.  Each unique
+// model file is loaded only once; all placements for that file share a single
+// template.  On failure (file absent, low-quality mode) the call is a no-op.
+//
+// Placement is deterministically seeded by tile position so the same map always
+// produces the same decoration layout.
+
+// Seeded pseudo-random float [0,1) for tile (r,c) with an index offset.
+function _propFrand(r, c, idx) {
+  var x = Math.sin(r * 127.1 + c * 311.7 + idx * 74.3) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+GameScene.prototype._addMapProps = function (grid) {
+  if (typeof GRAPHICS_QUALITY !== 'undefined' && GRAPHICS_QUALITY === 'low') return;
+  if (!BABYLON.SceneLoader || typeof BABYLON.SceneLoader.ImportMesh !== 'function') return;
+
+  var self = this;
+
+  // Build placement list: one entry per tile that wins the spawn roll.
+  var placements = [];          // { file, row, col, rotY, ox, oz }
+  var filesToLoad = {};         // fileName → true (deduplicated)
+
+  for (var r = 0; r < grid.size; r++) {
+    for (var c = 0; c < grid.size; c++) {
+      var tile        = grid.tiles[r][c];
+      var terrainName = tile.terrain.name;
+      var candidates  = PROP_MODELS[terrainName];
+      if (!candidates || !candidates.length) continue;
+
+      var spawnProb = PROP_SPAWN_PROB[terrainName] || 0.15;
+      if (_propFrand(r, c, 0) > spawnProb) continue;
+
+      // Pick one candidate file at random.
+      var file  = candidates[Math.floor(_propFrand(r, c, 1) * candidates.length)];
+      // Random rotation around Y.
+      var rotY  = _propFrand(r, c, 2) * Math.PI * 2;
+      // Offset toward the tile edge (≈30–45 % of half-tile width).
+      var angle = _propFrand(r, c, 3) * Math.PI * 2;
+      var dist  = (0.30 + _propFrand(r, c, 4) * 0.15) * TILE_STEP;
+      var ox    = Math.cos(angle) * dist;
+      var oz    = Math.sin(angle) * dist;
+
+      placements.push({ file: file, row: r, col: c, rotY: rotY, ox: ox, oz: oz });
+      filesToLoad[file] = true;
+    }
+  }
+
+  if (!placements.length) return;
+
+  // Load each unique file once, then clone for every matching placement.
+  Object.keys(filesToLoad).forEach(function (fileName) {
+    BABYLON.SceneLoader.ImportMesh(
+      '',
+      'models/props/',
+      fileName,
+      self.scene,
+      function (meshes) {
+        if (!meshes || !meshes.length || !self.scene) return;
+
+        var geoMeshes = meshes.filter(function (m) {
+          return m.getTotalVertices && m.getTotalVertices() > 0;
+        });
+        if (!geoMeshes.length) return;
+
+        var template = geoMeshes.length === 1
+          ? geoMeshes[0]
+          : BABYLON.Mesh.MergeMeshes(geoMeshes, true, true, undefined, false, true);
+        if (!template) return;
+
+        template.setEnabled(false);
+        template.isPickable = false;
+        template.scaling.setAll(PROP_MODEL_SCALE);
+
+        placements.forEach(function (p) {
+          if (p.file !== fileName) return;
+
+          var pos   = self.gridToWorld(p.row, p.col);
+          var clone = template.clone('prop_' + p.row + '_' + p.col);
+          clone.setEnabled(true);
+          clone.isPickable    = false;
+          clone.receiveShadows = true;
+          clone.position      = new BABYLON.Vector3(pos.x + p.ox, 0, pos.z + p.oz);
+          clone.rotation.y    = p.rotY;
+
+          if (self._shadowGenerator) {
+            self._shadowGenerator.addShadowCaster(clone, true);
+          }
+          self._propMeshes.push(clone);
+        });
+
+        template.dispose();
+      },
+      null,
+      function () {} // error: file absent — skip silently, game remains playable
+    );
+  });
+};
+
+
 
 /**
  * Spawn procedural fallback meshes for all units, then asynchronously replace
@@ -480,6 +626,9 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
 
           // Store model reference so animation and effect code can use it.
           node.model = clone;
+
+          // Start looping idle breathing animation on the model.
+          self._startIdleAnim(unit.id, clone);
         });
 
         template.dispose();
@@ -491,6 +640,46 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
     );
   });
 };
+
+// ─── Character idle animation ─────────────────────────────────────────────────
+// Plays a subtle looping breathing cycle on the character model mesh.
+// Uses a small Y-position oscillation (≈4 cm) at ~0.4 Hz with a per-unit
+// phase offset so all units don't bob in perfect synchrony.
+//
+// Works on the merged mesh produced by _upgradeUnitsToModels; no skeleton
+// access is required.
+
+GameScene.prototype._startIdleAnim = function (unitId, mesh) {
+  if (!this.scene || !mesh) return;
+
+  var idleAnim = new BABYLON.Animation(
+    'idle_' + unitId, 'position.y', 60,
+    BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+    BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE
+  );
+
+  var ease = new BABYLON.SineEase();
+  ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+  idleAnim.setEasingFunction(ease);
+
+  // Gentle rise-and-fall: 0 → +0.04 → 0 over 60 frames
+  idleAnim.setKeys([
+    { frame: 0,  value: 0.00 },
+    { frame: 30, value: 0.04 },
+    { frame: 60, value: 0.00 }
+  ]);
+
+  mesh.animations = (mesh.animations || []).concat([idleAnim]);
+
+  // Vary playback speed slightly per unit to desynchronise breathing cycles.
+  // hashCode of unitId gives a stable 0–1 offset.
+  var hash = 0;
+  for (var i = 0; i < unitId.length; i++) { hash = (hash * 31 + unitId.charCodeAt(i)) & 0xfffff; }
+  var speed = 0.35 + (hash % 100) / 500;   // 0.35 – 0.55
+
+  this.scene.beginAnimation(mesh, 0, 60, true, speed);
+};
+
 
 GameScene.prototype.spawnUnit = function (unit) {
   var pos  = this.gridToWorld(unit.gridRow, unit.gridCol);
@@ -651,7 +840,7 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
   scene.beginAnimation(node.head, 0, frames, false, 1);
 };
 
-// Hit flash + particle burst
+// Hit flash + particle burst + shake animation
 GameScene.prototype.playHitEffect = function (unit, skillType, onDone) {
   var node = this._unitNodes[unit.id];
   if (!node) { if (onDone) onDone(); return; }
@@ -667,6 +856,9 @@ GameScene.prototype.playHitEffect = function (unit, skillType, onDone) {
   // Particle burst
   this._spawnHitParticles(unit, skillType);
 
+  // Shake animation: quick side-to-side Z-rotation, then snap back.
+  this._playHitShake(targetMesh, unit.id);
+
   var mat = targetMesh.material;
   setTimeout(function () {
     mat.albedoColor   = origDiff;
@@ -675,9 +867,33 @@ GameScene.prototype.playHitEffect = function (unit, skillType, onDone) {
   }, 350);
 };
 
+GameScene.prototype._playHitShake = function (mesh, unitId) {
+  if (!this.scene || !mesh) return;
+
+  // Quick side-to-side Z rotation over 12 frames (≈0.2 s at 60 fps).
+  var shakeAnim = new BABYLON.Animation(
+    'hitShake_' + unitId, 'rotation.z', 60,
+    BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+    BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+  );
+  shakeAnim.setKeys([
+    { frame: 0,  value: 0.00 },
+    { frame: 3,  value: 0.18 },
+    { frame: 6,  value: -0.18 },
+    { frame: 9,  value: 0.10 },
+    { frame: 12, value: 0.00 }
+  ]);
+
+  mesh.animations = (mesh.animations || []).concat([shakeAnim]);
+  this.scene.beginAnimation(mesh, 0, 12, false, 2.5, function () {
+    // Guarantee rotation is restored if the animation overshoots.
+    if (mesh.rotation) { mesh.rotation.z = 0; }
+  });
+};
+
+
 GameScene.prototype._spawnHitParticles = function (unit, skillType) {
   var pos   = this.gridToWorld(unit.gridRow, unit.gridCol);
-  var scene = this.scene;
 
   var particleCount = (typeof HARDWARE_TIER !== 'undefined' && HARDWARE_TIER === 'low') ? 16 : 40;
   var ps = new BABYLON.ParticleSystem('hit_' + unit.id + '_' + Date.now(), particleCount, scene);
