@@ -259,6 +259,35 @@ html, body {
   color: var(--cyan);
 }
 
+/* Gender toggle buttons */
+.gender-toggle {
+  display: flex;
+  gap: 12px;
+}
+
+.gender-btn {
+  background: rgba(255,255,255,0.07);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  color: #aaa;
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 8px 22px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.gender-btn:hover {
+  background: rgba(0,229,255,0.12);
+  border-color: var(--cyan);
+  color: #fff;
+}
+.gender-btn.selected {
+  background: rgba(0,229,255,0.18);
+  border-color: var(--cyan);
+  color: var(--cyan);
+  box-shadow: 0 0 8px rgba(0,229,255,0.3);
+}
+
 /* Card flavor text (for background cards) */
 .card-flavor {
   font-size: 11px;
