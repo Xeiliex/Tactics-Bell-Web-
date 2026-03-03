@@ -8,21 +8,23 @@
 var game = (function () {
 
   var g = {
-    selectedRace:  null,
-    selectedClass: null,
-    partyConfig:   null,   // Array of 3 party-member config objects
-    stage:         1,
-    gold:          0,      // Player's gold (used for reclassing)
-    player:        null,   // Character — the player's hero
-    allies:        [],     // Character[] — CPU allies
-    enemies:       [],     // Character[] — enemies
-    grid:          null,   // Grid
-    scene:         null,   // GameScene
-    combat:        null,   // Combat
-    ui:            null,   // GameUI
-    weather:       null,   // current WEATHER_TYPES entry
-    story:         null,   // StoryManager — set when story mode is active
-    _pendingSave:  null    // Temporary holder for continue-game restore data
+    selectedRace:       null,
+    selectedClass:      null,
+    partyConfig:        null,   // Array of 3 party-member config objects
+    stage:              1,
+    gold:               0,      // Player's gold (used for reclassing)
+    player:             null,   // Character — the player's hero
+    allies:             [],     // Character[] — CPU allies
+    enemies:            [],     // Character[] — enemies
+    grid:               null,   // Grid
+    scene:              null,   // GameScene
+    combat:             null,   // Combat
+    ui:                 null,   // GameUI
+    weather:            null,   // current WEATHER_TYPES entry
+    story:              null,   // StoryManager — set when story mode is active
+    _pendingSave:       null,   // Temporary holder for continue-game restore data
+    multiplayerActive:  false,  // true while a multiplayer battle is running
+    multiplayerIdx:     -1,     // 0 = host, 1 = guest
   };
 
   // ─── Local save helpers ──────────────────────────────────────────────────────
@@ -224,6 +226,12 @@ var game = (function () {
       g.stage  = 1;
       g.player = null;
       _startQuickMatch();
+    });
+
+    // Title → Multiplayer
+    document.getElementById('btn-multiplayer').addEventListener('click', function () {
+      g.ui.showScreen('screen-lobby');
+      _initLobbyUI();
     });
 
     // Title → Continue
@@ -744,12 +752,15 @@ var game = (function () {
   function onBackToTitle() {
     if (g.scene) { g.scene.dispose(); g.scene = null; }
     if (typeof gameLoop !== 'undefined') gameLoop.stop();
-    g.stage       = 1;
-    g.gold        = 0;
-    g.player      = null;
-    g.partyConfig = null;
-    g.weather     = null;
-    g.story       = null;
+    g.stage             = 1;
+    g.gold              = 0;
+    g.player            = null;
+    g.partyConfig       = null;
+    g.weather           = null;
+    g.story             = null;
+    g.multiplayerActive = false;
+    g.multiplayerIdx    = -1;
+    if (typeof Multiplayer !== 'undefined') Multiplayer.disconnect();
     // Stop the memory monitor when the player leaves the battle
     if (typeof AssetCache !== 'undefined') AssetCache.stopMemoryMonitor();
     if (g.ui) g.ui.hideMemoryWarning();
@@ -811,6 +822,390 @@ var game = (function () {
     }
 
     startBattle(true);
+  }
+
+  // ─── Multiplayer ─────────────────────────────────────────────────────────────
+
+  /**
+   * Build a random Quick-Match party config (3 members, same format as partyConfig).
+   * @returns {Array}
+   */
+  function _buildQuickParty() {
+    var pool  = typeof QUICK_MATCH_HERO_PARTIES !== 'undefined' ? QUICK_MATCH_HERO_PARTIES : [];
+    var party = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+    if (party && party.members && party.members.length >= 3) {
+      return party.members.map(function (m, i) {
+        return {
+          name:         m.name         || (i === 0 ? 'Hero' : 'Ally ' + i),
+          race:         m.race         || 'human',
+          classId:      m.classId      || 'warrior',
+          backgroundId: m.backgroundId || null,
+          colorId:      m.colorId      || 'default',
+          level: 1, exp: 0, hp: 0
+        };
+      });
+    }
+    return [
+      { name: 'Hero',    race: 'human',    classId: 'warrior', backgroundId: null, colorId: 'default', level: 1, exp: 0, hp: 0 },
+      { name: 'Ally I',  race: 'elf',      classId: 'mage',    backgroundId: null, colorId: 'default', level: 1, exp: 0, hp: 0 },
+      { name: 'Ally II', race: 'beastkin', classId: 'archer',  backgroundId: null, colorId: 'default', level: 1, exp: 0, hp: 0 }
+    ];
+  }
+
+  /**
+   * Serialize a Grid to a plain object for transmission.
+   * @param {Grid} grid
+   * @returns {object}
+   */
+  function _serializeGrid(grid) {
+    var tiles = [];
+    for (var r = 0; r < grid.size; r++) {
+      tiles[r] = [];
+      for (var c = 0; c < grid.size; c++) {
+        tiles[r][c] = grid.tiles[r][c].terrain.name;
+      }
+    }
+    return {
+      size:          grid.size,
+      tiles:         tiles,
+      playerSpawns:  grid.playerSpawns,
+      enemySpawns:   grid.enemySpawns,
+    };
+  }
+
+  /**
+   * Reconstruct a Grid from a serialized object.
+   * @param {object} data - produced by _serializeGrid()
+   * @returns {Grid}
+   */
+  function _deserializeGrid(data) {
+    var grid = new Grid(data.size);
+    grid.tiles = [];
+    for (var r = 0; r < data.size; r++) {
+      grid.tiles[r] = [];
+      for (var c = 0; c < data.size; c++) {
+        var terrainName = data.tiles[r][c];
+        var terrain = TERRAIN[terrainName.toUpperCase()] || TERRAIN.GRASS;
+        grid.tiles[r][c] = new Tile(r, c, terrain);
+      }
+    }
+    grid.playerSpawns = data.playerSpawns;
+    grid.enemySpawns  = data.enemySpawns;
+    return grid;
+  }
+
+  /**
+   * Wire up the Multiplayer lobby UI buttons and callbacks.
+   * Called whenever the lobby screen is shown.
+   */
+  function _initLobbyUI() {
+    var statusEl   = document.getElementById('lobby-status');
+    var errorEl    = document.getElementById('lobby-error');
+    var panelConn  = document.getElementById('lobby-panel-connect');
+    var panelWait  = document.getElementById('lobby-panel-waiting');
+    var panelMatch = document.getElementById('lobby-panel-matched');
+    var codeInput  = document.getElementById('mp-code-input');
+    var codeDisp   = document.getElementById('lobby-code-display');
+    var hintEl     = document.getElementById('lobby-matched-hint');
+
+    function showPanel(which) {
+      panelConn.classList.add('hidden');
+      panelWait.classList.add('hidden');
+      panelMatch.classList.add('hidden');
+      which.classList.remove('hidden');
+    }
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.classList.remove('hidden');
+    }
+
+    function clearError() {
+      errorEl.classList.add('hidden');
+      errorEl.textContent = '';
+    }
+
+    // Reset to connect panel
+    showPanel(panelConn);
+    clearError();
+    if (statusEl) statusEl.textContent = 'Challenge a friend to a tactical battle!';
+
+    // ── Event callbacks ──────────────────────────────────────────────────────
+
+    Multiplayer.onRoomCreated = function (code) {
+      codeDisp.textContent = code;
+      showPanel(panelWait);
+      if (statusEl) statusEl.textContent = 'Waiting for opponent…';
+    };
+
+    Multiplayer.onRoomJoined = function () {
+      showPanel(panelWait);
+      if (statusEl) statusEl.textContent = 'Joined! Waiting for host to start…';
+    };
+
+    Multiplayer.onOpponentJoined = function () {
+      // Host: opponent joined → auto-start game
+      showPanel(panelMatch);
+      if (statusEl) statusEl.textContent = 'Opponent connected!';
+      if (hintEl)   hintEl.textContent   = 'Setting up battle…';
+      // Give the UI a moment to render, then start
+      setTimeout(_hostStartMultiplayer, 600);
+    };
+
+    Multiplayer.onGameStart = function (data) {
+      // Guest: receive game data from host and start battle
+      _guestStartMultiplayer(data);
+    };
+
+    Multiplayer.onOpponentLeft = function () {
+      if (g.multiplayerActive) {
+        g.multiplayerActive = false;
+        alert('Your opponent disconnected. Returning to title.');
+        onBackToTitle();
+      } else {
+        showPanel(panelConn);
+        showError('Opponent disconnected.');
+      }
+    };
+
+    Multiplayer.onError = function (msg) {
+      showError(msg || 'An error occurred.');
+    };
+
+    // ── Button handlers ──────────────────────────────────────────────────────
+
+    var btnCreate = document.getElementById('btn-mp-create');
+    var btnJoin   = document.getElementById('btn-mp-join');
+    var btnBack   = document.getElementById('btn-lobby-back');
+
+    btnCreate.onclick = function () {
+      clearError();
+      Multiplayer.connect(function (err) {
+        if (err) { showError('Could not connect to server.'); return; }
+        Multiplayer.createRoom();
+      });
+    };
+
+    btnJoin.onclick = function () {
+      clearError();
+      var code = (codeInput.value || '').trim().toUpperCase();
+      if (code.length !== 4) { showError('Enter a 4-character room code.'); return; }
+      Multiplayer.connect(function (err) {
+        if (err) { showError('Could not connect to server.'); return; }
+        Multiplayer.joinRoom(code);
+      });
+    };
+
+    codeInput.oninput = function () {
+      codeInput.value = codeInput.value.toUpperCase();
+    };
+
+    btnBack.onclick = function () {
+      Multiplayer.disconnect();
+      g.ui.showScreen('screen-title');
+    };
+  }
+
+  /**
+   * Host: build both parties, generate grid, and broadcast game_start.
+   */
+  function _hostStartMultiplayer() {
+    var hostParty  = _buildQuickParty();
+    var guestParty = _buildQuickParty();
+    var rawGrid    = generateStage(1);   // stage 1 for multiplayer
+    var gridData   = _serializeGrid(rawGrid);
+    var weatherKey = (function () {
+      var keys = Object.keys(WEATHER_TYPES);
+      return keys[Math.floor(Math.random() * keys.length)];
+    }());
+
+    Multiplayer.sendGameStart({
+      hostParty:  hostParty,
+      guestParty: guestParty,
+      gridData:   gridData,
+      weatherKey: weatherKey,
+    });
+
+    _launchMultiplayerBattle(hostParty, guestParty, rawGrid, weatherKey, 0);
+  }
+
+  /**
+   * Guest: receive game_start data from host and launch battle.
+   * @param {object} data
+   */
+  function _guestStartMultiplayer(data) {
+    var rawGrid = _deserializeGrid(data.gridData);
+    _launchMultiplayerBattle(data.hostParty, data.guestParty, rawGrid, data.weatherKey, 1);
+  }
+
+  /**
+   * Common entry point for both host and guest.
+   * @param {Array}  hostParty   3-member party config for the host
+   * @param {Array}  guestParty  3-member party config for the guest
+   * @param {Grid}   grid        Pre-generated/deserialized grid
+   * @param {string} weatherKey  Key into WEATHER_TYPES
+   * @param {number} playerIdx   0 = host, 1 = guest
+   */
+  function _launchMultiplayerBattle(hostParty, guestParty, grid, weatherKey, playerIdx) {
+    if (typeof BABYLON === 'undefined') {
+      alert('Babylon.js could not be loaded. Please reload.');
+      return;
+    }
+
+    g.multiplayerActive = true;
+    g.multiplayerIdx    = playerIdx;
+    g.stage             = 1;
+    g.weather           = WEATHER_TYPES[weatherKey] || WEATHER_TYPES.clear;
+
+    // ── Tear down previous scene ──────────────────────────────────────────
+    if (g.scene) { g.scene.dispose(); g.scene = null; }
+    if (typeof gameLoop !== 'undefined') { gameLoop.stop(); gameLoop.start(); }
+
+    // ── Show battle screen ────────────────────────────────────────────────
+    var battleScreenEl = document.getElementById('screen-battle');
+    if (battleScreenEl) {
+      battleScreenEl.classList.remove('hidden');
+      battleScreenEl.classList.add('active');
+      battleScreenEl.style.opacity = '0';
+    }
+    g.ui.showBattleScreen();
+    g.ui.showLoadingScreen('Preparing multiplayer battle…');
+
+    setTimeout(function () {
+      _setupMultiplayerBattle(hostParty, guestParty, grid, playerIdx);
+    }, 80);
+  }
+
+  /**
+   * Build units, place them, init scene + combat for a multiplayer match.
+   */
+  function _setupMultiplayerBattle(hostParty, guestParty, grid, playerIdx) {
+    g.grid = grid;
+
+    var localParty  = playerIdx === 0 ? hostParty  : guestParty;
+    var remoteParty = playerIdx === 0 ? guestParty : hostParty;
+
+    // ── Create local units (player-controlled) ────────────────────────────
+    var localUnits = localParty.map(function (m, i) {
+      return createPartyMember({
+        name:     m.name     || (i === 0 ? 'Hero' : 'Ally ' + i),
+        race:     m.race     || 'human',
+        classId:  m.classId  || 'warrior',
+        colorId:  m.colorId  || 'default',
+        gender:   m.gender   || 'male',
+        level:    1,
+        exp:      0,
+        isPlayer: i === 0,
+        isAlly:   i > 0,
+      });
+    });
+
+    // ── Create remote units (opponent-controlled, appear as enemies) ──────
+    var remoteUnits = remoteParty.map(function (m) {
+      return createPartyMember({
+        name:     m.name    || 'Foe',
+        race:     m.race    || 'human',
+        classId:  m.classId || 'warrior',
+        colorId:  m.colorId || 'default',
+        gender:   m.gender  || 'male',
+        level:    1,
+        exp:      0,
+        isEnemy:  true,
+      });
+    });
+
+    // ── Unit ordering: host units first (0-2), guest units last (3-5) ─────
+    // The "local player indices" are the same set on both clients; what
+    // differs is only the isPlayer/isEnemy flags.
+    var hostUnits  = playerIdx === 0 ? localUnits  : remoteUnits;
+    var guestUnits = playerIdx === 0 ? remoteUnits : localUnits;
+    var allUnits   = hostUnits.concat(guestUnits);
+
+    // Indices 0-2 belong to the host; 3-5 belong to the guest.
+    var localIndices = new Set(playerIdx === 0 ? [0, 1, 2] : [3, 4, 5]);
+
+    // Set player/ally references for HUD
+    g.player  = allUnits[localIndices.values().next().value];
+    g.allies  = Array.from(localIndices).slice(1).map(function (i) { return allUnits[i]; });
+    g.enemies = allUnits.filter(function (u) { return u.isEnemy; });
+
+    // ── Place units on grid ───────────────────────────────────────────────
+    var pSpawns = grid.playerSpawns.slice();
+    var eSpawns = grid.enemySpawns.slice();
+
+    hostUnits.forEach(function (u, i) {
+      var sp = pSpawns[i] || { row: i, col: 0 };
+      u.gridRow = sp.row; u.gridCol = sp.col;
+      grid.tiles[sp.row][sp.col].unit = u;
+    });
+    guestUnits.forEach(function (u, i) {
+      var sp = eSpawns[i] || { row: grid.size - 1 - i, col: grid.size - 1 };
+      u.gridRow = sp.row; u.gridCol = sp.col;
+      grid.tiles[sp.row][sp.col].unit = u;
+    });
+
+    // ── Init scene ────────────────────────────────────────────────────────
+    g.scene = new GameScene();
+    g.scene.init('renderCanvas');
+    if (g.scene.engine) g.scene.engine.resize();
+    g.scene.renderGrid(g.grid);
+    g.scene.renderUnits(allUnits);
+    g.scene.setWeather(g.weather.id);
+    g.scene.setClickHandler(function (row, col) {
+      if (g.combat) g.combat.handleTileClick(row, col);
+    });
+
+    // ── Init combat ───────────────────────────────────────────────────────
+    g.combat = new Combat(
+      g.grid,
+      allUnits,
+      g.scene,
+      g.ui,
+      function () { _onMpVictory(); },
+      function () { _onMpDefeat(); },
+      g.weather
+    );
+    g.combat.localPlayerIndices = localIndices;
+
+    // When the local player takes an action, relay it to the opponent.
+    g.combat.onActionTaken = function (action) {
+      Multiplayer.sendAction(action);
+    };
+
+    // When an action arrives from the opponent, apply it.
+    Multiplayer.onAction = function (action) {
+      if (g.combat) g.combat.receiveRemoteAction(action);
+    };
+
+    // ── HUD ───────────────────────────────────────────────────────────────
+    g.ui.setStageNumber(1);
+    g.ui.setTurnNumber(1);
+    g.ui.showMessage('Multiplayer battle start! Select a unit to act.');
+    g.ui.renderPartyPanel(localUnits);
+
+    var weatherBadge = document.getElementById('weather-badge');
+    if (weatherBadge && g.weather) {
+      weatherBadge.textContent = g.weather.emoji + ' ' + g.weather.name;
+      weatherBadge.title = g.weather.description;
+      weatherBadge.className = 'weather-' + g.weather.id;
+    }
+
+    g.combat.start();
+    g.ui.hideLoadingScreen();
+  }
+
+  function _onMpVictory() {
+    g.multiplayerActive = false;
+    Multiplayer.sendAction({ kind: 'game_over', result: 'defeat' });
+    g.ui.showMessage('You won! 🎉');
+    setTimeout(function () { onBackToTitle(); }, 2500);
+  }
+
+  function _onMpDefeat() {
+    g.multiplayerActive = false;
+    Multiplayer.sendAction({ kind: 'game_over', result: 'victory' });
+    g.ui.showMessage('You were defeated. Better luck next time!');
+    setTimeout(function () { onBackToTitle(); }, 2500);
   }
 
   // ─── Boot on DOMContentLoaded ────────────────────────────────────────────────

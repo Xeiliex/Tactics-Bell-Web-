@@ -2,6 +2,94 @@
 
 const { join, relative, isAbsolute } = require('path');
 
+// ─── WebSocket room management (shared between Bun and Node runtimes) ─────────
+
+/** Active multiplayer rooms.  Key = 4-char room code; value = { players: [ws0, ws1] } */
+const rooms = {};
+
+function _generateRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+function _wsSend(ws, msg) {
+  const str = JSON.stringify(msg);
+  try {
+    if (typeof Bun !== 'undefined') {
+      ws.send(str);
+    } else {
+      if (ws.readyState === 1 /* OPEN */) ws.send(str);
+    }
+  } catch (_) { /* ignore closed sockets */ }
+}
+
+function _handleWsMessage(ws, rawMsg) {
+  let msg;
+  try { msg = JSON.parse(rawMsg); } catch (_) { return; }
+
+  switch (msg.type) {
+    case 'create_room': {
+      let code, attempts = 0;
+      do { code = _generateRoomCode(); attempts++; } while (rooms[code] && attempts < 200);
+      if (attempts >= 200) {
+        _wsSend(ws, { type: 'error', message: 'Server is full — please try again.' });
+        return;
+      }
+      rooms[code] = { players: [ws, null] };
+      ws._roomCode   = code;
+      ws._playerIdx  = 0;
+      _wsSend(ws, { type: 'room_created', code });
+      break;
+    }
+
+    case 'join_room': {
+      const code = (msg.code || '').toString().toUpperCase().trim();
+      const room = rooms[code];
+      if (!room) {
+        _wsSend(ws, { type: 'error', message: 'Room not found.' });
+        return;
+      }
+      if (room.players[1]) {
+        _wsSend(ws, { type: 'error', message: 'Room is already full.' });
+        return;
+      }
+      room.players[1] = ws;
+      ws._roomCode  = code;
+      ws._playerIdx = 1;
+      _wsSend(ws, { type: 'room_joined', playerIdx: 1 });
+      _wsSend(room.players[0], { type: 'opponent_joined' });
+      break;
+    }
+
+    // Messages that are simply relayed to the other player in the same room.
+    case 'game_start':
+    case 'action':
+    case 'game_over': {
+      const room = ws._roomCode ? rooms[ws._roomCode] : null;
+      if (!room) return;
+      const otherIdx = ws._playerIdx === 0 ? 1 : 0;
+      const other    = room.players[otherIdx];
+      if (other) _wsSend(other, msg);
+      break;
+    }
+
+    default: break;
+  }
+}
+
+function _handleWsClose(ws) {
+  const code = ws._roomCode;
+  if (!code) return;
+  const room = rooms[code];
+  if (!room) return;
+  const otherIdx = ws._playerIdx === 0 ? 1 : 0;
+  const other    = room.players[otherIdx];
+  if (other) _wsSend(other, { type: 'opponent_left' });
+  delete rooms[code];
+}
+
 const PORT      = parseInt(process.env.PORT || '8080', 10);
 const publicDir = join(__dirname, 'public');
 
@@ -48,10 +136,25 @@ if (typeof Bun !== 'undefined') {
   Bun.serve({
     port: PORT,
 
-    async fetch(req) {
+    websocket: {
+      open(ws)         { /* nothing on open */ },
+      message(ws, msg) { _handleWsMessage(ws, msg); },
+      close(ws)        { _handleWsClose(ws); },
+    },
+
+    async fetch(req, server) {
       const url      = new URL(req.url);
-      const pathname = url.pathname === '/' ? '/index.html' : url.pathname;
-      const resolved = resolveSafe(pathname);
+      const pathname = url.pathname;
+
+      // WebSocket upgrade for /ws
+      if (pathname === '/ws' && req.headers.get('upgrade') === 'websocket') {
+        const ok = server.upgrade(req);
+        if (ok) return undefined;
+        return new Response('WebSocket upgrade failed', { status: 400 });
+      }
+
+      const filePath = pathname === '/' ? '/index.html' : pathname;
+      const resolved = resolveSafe(filePath);
 
       if (!resolved) return new Response('Forbidden', { status: 403 });
 
@@ -132,6 +235,15 @@ if (typeof Bun !== 'undefined') {
       res.writeHead(500);
       res.end('Internal Server Error');
     }
+  });
+
+  // Attach WebSocket server to the existing HTTP server using the `ws` package.
+  const WebSocket = require('ws');
+  const wss = new WebSocket.Server({ server, path: '/ws' });
+  wss.on('connection', (ws) => {
+    ws.on('message', (raw) => _handleWsMessage(ws, raw.toString()));
+    ws.on('close',   ()    => _handleWsClose(ws));
+    ws.on('error',   ()    => { /* swallow errors on individual sockets */ });
   });
 
   server.listen(PORT, () => {

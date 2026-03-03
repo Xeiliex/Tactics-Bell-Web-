@@ -14,6 +14,7 @@ var COMBAT_STATE = {
   EXECUTING:     'EXECUTING',
   ALLY_TURN:     'ALLY_TURN',
   ENEMY_TURN:    'ENEMY_TURN',
+  REMOTE_TURN:   'REMOTE_TURN',   // waiting for opponent action in multiplayer
   DONE:          'DONE'
 };
 
@@ -46,6 +47,14 @@ function Combat(grid, units, scene, ui, onVictory, onDefeat, weather) {
   this.targetableTiles = [];
   this.pendingSkill    = null;   // skill being used (null = basic attack)
   this.onNewRound      = null;   // optional fn(turnNumber) called at the start of each new round
+
+  // ── Multiplayer fields ────────────────────────────────────────────────────
+  // Set localPlayerIndices to a Set of unit indices controlled by this client.
+  // When null the combat system runs in single-player mode (AI for all non-player units).
+  this.localPlayerIndices = null;
+  // Callback fired whenever this client takes an action, so game.js can relay it
+  // to the opponent.  Signature: fn(actionObject).
+  this.onActionTaken = null;
 }
 
 // ─── Weather helper ───────────────────────────────────────────────────────────
@@ -95,6 +104,37 @@ Combat.prototype.advanceToCurrentUnit = function () {
     return;
   }
 
+  // ── Multiplayer: route by local/remote ownership ──────────────────────────
+  if (this.localPlayerIndices !== null) {
+    var unitIdx = this.units.indexOf(unit);
+    if (this.localPlayerIndices.has(unitIdx)) {
+      // This unit belongs to the local player — use normal player-turn flow.
+      this.state = COMBAT_STATE.PLAYER_SELECT;
+      this.ui.setPhaseDisplay('Your Turn');
+      this.ui.showUnitPanel(unit);
+      if (unit.hasActed) {
+        this.ui.showMessage(unit.name + ' is Stunned — turn skipped! 💫');
+        setTimeout(function () { self.nextUnit(); }, 800);
+      } else {
+        this.ui.showMessage(unit.name + '\'s turn. Select a unit to act.');
+        this.scene.setUnitGlow(unit, true);
+      }
+    } else {
+      // This unit belongs to the remote player — wait for a network action.
+      this.state = COMBAT_STATE.REMOTE_TURN;
+      this.ui.setPhaseDisplay('Opponent\'s Turn');
+      this.ui.showUnitPanel(unit);
+      if (unit.hasActed) {
+        // Stunned remote unit: auto-skip (same as stun skip locally).
+        setTimeout(function () { self.nextUnit(); }, 800);
+      } else {
+        this.ui.showMessage('Waiting for opponent…');
+      }
+    }
+    return;
+  }
+
+  // ── Single-player: original routing ──────────────────────────────────────
   if (unit.isEnemy) {
     this.state = COMBAT_STATE.ENEMY_TURN;
     this.ui.setPhaseDisplay('Enemy Turn');
@@ -191,6 +231,7 @@ Combat.prototype.handleTileClick = function (row, col) {
   if (this.state === COMBAT_STATE.EXECUTING || this.state === COMBAT_STATE.DONE) return;
   if (this.state === COMBAT_STATE.ENEMY_TURN)  return;
   if (this.state === COMBAT_STATE.ALLY_TURN)   return;
+  if (this.state === COMBAT_STATE.REMOTE_TURN) return;
 
   var clickedUnit = this.unitAt(row, col);
 
@@ -294,6 +335,11 @@ Combat.prototype.doMove = function (unit, row, col) {
   newTile.unit  = unit;
   unit.hasMoved = true;
 
+  // Notify multiplayer listener so the action can be sent to the opponent.
+  if (this.onActionTaken) {
+    this.onActionTaken({ kind: 'move', unitIdx: this.units.indexOf(unit), row: row, col: col });
+  }
+
   this.scene.clearHighlights();
   this.state = COMBAT_STATE.EXECUTING;
 
@@ -343,20 +389,36 @@ Combat.prototype.doWait = function () {
   if (unit) {
     unit.hasActed = true;
     this.ui.showMessage(unit.name + ' waits.');
+    if (this.onActionTaken) {
+      this.onActionTaken({ kind: 'wait', unitIdx: this.units.indexOf(unit) });
+    }
   }
   this.nextUnit();
 };
 
-Combat.prototype.doAttack = function (attacker, target, skill) {
+Combat.prototype.doAttack = function (attacker, target, skill, preCalcResult) {
   var self  = this;
   this.state = COMBAT_STATE.EXECUTING;
   this.scene.clearHighlights();
   this.ui.hideActionMenu();
   this.ui.hideSkillMenu();
 
-  var result    = this.calcDamage(attacker, target, skill);
+  // Use a pre-calculated result when supplied (multiplayer: opponent's damage is
+  // authoritative so both clients show the same numbers).  Otherwise calculate locally.
+  var result    = preCalcResult || this.calcDamage(attacker, target, skill);
   var skillType = skill ? skill.type : 'physical';
   var skillId   = skill ? skill.id   : '';
+
+  // Notify multiplayer listener (only when we are the attacker, i.e. no preCalcResult).
+  if (this.onActionTaken && !preCalcResult) {
+    this.onActionTaken({
+      kind:        'attack',
+      unitIdx:     this.units.indexOf(attacker),
+      targetIdx:   this.units.indexOf(target),
+      skillId:     skill ? skill.id : null,
+      result:      result,
+    });
+  }
 
   this.scene.playAttackAnimation(attacker, target, skillType, skillId, function () {
     if (skillType === 'heal') {
@@ -633,4 +695,62 @@ Combat.prototype.unitAt = function (row, col) {
   return this.units.find(function (u) {
     return u.isAlive() && u.gridRow === row && u.gridCol === col;
   }) || null;
+};
+
+// ─── Multiplayer helpers ──────────────────────────────────────────────────────
+
+/**
+ * Apply an action that was received from the remote opponent.
+ * Only executed while state === REMOTE_TURN.
+ *
+ * Supported action kinds:
+ *   { kind:'move',   unitIdx, row, col }
+ *   { kind:'attack', unitIdx, targetIdx, skillId, result }
+ *   { kind:'wait',   unitIdx }
+ *
+ * @param {object} action
+ */
+Combat.prototype.receiveRemoteAction = function (action) {
+  if (this.state !== COMBAT_STATE.REMOTE_TURN) return;
+
+  var self   = this;
+  var unit   = this.units[action.unitIdx];
+  if (!unit || !unit.isAlive()) { this.nextUnit(); return; }
+
+  if (action.kind === 'move') {
+    var oldTile = this.grid.getTile(unit.gridRow, unit.gridCol);
+    var newTile = this.grid.getTile(action.row, action.col);
+    if (!newTile) { this.nextUnit(); return; }
+    oldTile.unit  = null;
+    unit.gridRow  = action.row;
+    unit.gridCol  = action.col;
+    newTile.unit  = unit;
+    unit.hasMoved = true;
+    this.scene.clearHighlights();
+    this.state = COMBAT_STATE.EXECUTING;
+    this.scene.moveUnit(unit, function () {
+      // After the move animation, wait for the follow-up attack/wait action.
+      self.state = COMBAT_STATE.REMOTE_TURN;
+    });
+
+  } else if (action.kind === 'attack') {
+    var target = this.units[action.targetIdx];
+    if (!target || !target.isAlive()) { this.nextUnit(); return; }
+    var skill = this._findSkillById(unit, action.skillId);
+    this.doAttack(unit, target, skill, action.result);
+
+  } else if (action.kind === 'wait') {
+    unit.hasActed = true;
+    this.ui.showMessage(unit.name + ' waits.');
+    this.nextUnit();
+  }
+};
+
+/** Look up a skill on a unit by its id string.  Returns null if not found. */
+Combat.prototype._findSkillById = function (unit, skillId) {
+  if (!skillId || !unit.skills) return null;
+  for (var i = 0; i < unit.skills.length; i++) {
+    if (unit.skills[i].id === skillId) return unit.skills[i];
+  }
+  return null;
 };
