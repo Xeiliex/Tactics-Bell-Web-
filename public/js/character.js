@@ -294,6 +294,7 @@ function createPartyMember(opts) {
     exp:               opts.exp      || 0,
     isPlayer:          !!opts.isPlayer,
     isAlly:            !!opts.isAlly,
+    isEnemy:           !!opts.isEnemy,
     overrideMeshColor: opts.overrideMeshColor || meshColor,
     portrait:          opts.portrait  || null
   });
