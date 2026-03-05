@@ -52,7 +52,29 @@ var CHARACTER_MODEL_FILES_LOW = {
 // Uniform scale applied to every loaded character model.
 var CHARACTER_MODEL_SCALE = 1.0;
 
-// ─── Weapon model configuration ──────────────────────────────────────────────
+// ─── Hair model configuration ─────────────────────────────────────────────────
+// Hair glTF files are stored in models/character/hairstyles/ and use the same
+// 65-bone UE4 skeleton as the outfit models — we rebind them to the unit's
+// existing skeleton so they follow the same procedural idle animations.
+// 'none' is a sentinel for "no hair"; it is never loaded as a file.
+var HAIR_MODEL_DIR = 'models/character/hairstyles/';
+
+// Maps hairColor IDs to the base-colour texture filename in the same directory.
+var HAIR_COLOR_TEXTURES = {
+  dark:   'T_Hair_2_BaseColor.png',
+  golden: 'T_Hair_1_BaseColor.png'
+};
+
+// ─── Models that lack a dedicated skin/face mesh ──────────────────────────────
+// When one of these is loaded we keep the procedural head sphere visible and
+// parent it to the model root so the unit always has a visible face.
+// Key format: '<gender>_<classId>'.
+var MODELS_MISSING_FACE = {
+  female_warrior: true,
+  female_healer:  true
+};
+
+
 // Maps class IDs to a weapon shape category used to build procedural meshes.
 var WEAPON_CLASS_MAP = {
   warrior: 'sword', knight: 'sword', paladin: 'sword',
@@ -634,6 +656,11 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
             }
           }
 
+          // Detect whether this model has a skin/face primitive (MI_Regular_*).
+          // The Female_Peasant model lacks this mesh, so we keep the procedural head.
+          var modelKey = bucket.gender + '_' + bucket.classId;
+          var hasFaceMesh = !MODELS_MISSING_FACE[modelKey];
+
           bucket.units.forEach(function (unit) {
             var node = self._unitNodes[unit.id];
             if (!node) return;
@@ -663,9 +690,19 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
               if (self._shadowGenerator) { self._shadowGenerator.addShadowCaster(clone, true); }
             });
 
-            // Hide the procedural fallback meshes.
+            // Hide the procedural body.  For models that lack a face/skin mesh
+            // (Female_Peasant), keep the head sphere visible and parent it to
+            // the model root so it follows the unit.
             node.body.setEnabled(false);
-            node.head.setEnabled(false);
+            if (hasFaceMesh) {
+              node.head.setEnabled(false);
+            } else {
+              // Reparent the procedural head sphere to the unit root so it
+              // moves with the model.  Adjust Y so it sits on the neck.
+              node.head.parent   = unitRoot;
+              node.head.position = new BABYLON.Vector3(0, 0.78, 0);
+              node.head.setEnabled(true);
+            }
 
             // Store the root node for movement/animation; also keep a direct
             // reference to the first child mesh for hit-flash and physics.
@@ -674,6 +711,12 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
 
             // Start idle animation: Y-bob on the root + bone breathing cycle.
             self._startIdleAnim(unit.id, unitRoot, unitSkeleton);
+
+            // Load and attach hair model for player/ally units.
+            var hairId = unit.hairStyle || 'none';
+            if (hairId !== 'none' && unitSkeleton) {
+              self._attachHairModel(unit, unitRoot, unitSkeleton);
+            }
           });
 
           // Dispose the loading-only template meshes.
@@ -734,11 +777,73 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
   });
 };
 
-// ─── Character idle animation ─────────────────────────────────────────────────
+// ─── Hair model attachment ────────────────────────────────────────────────────
+// Loads the unit's chosen hair glTF, rebinds it to the unit's existing skeleton,
+// and parents the hair mesh to the unit's model root.
+// The hair models share the same 65-bone UE4 skeleton as the outfit meshes so
+// rebinding is a simple skeleton swap — no joint remapping needed.
+
+GameScene.prototype._attachHairModel = function (unit, unitRoot, unitSkeleton) {
+  if (!this.scene || !BABYLON.SceneLoader) return;
+  var hairId = unit.hairStyle || 'none';
+  if (hairId === 'none') return;
+
+  var self      = this;
+  var fileName  = hairId + '.gltf';
+  var colorKey  = unit.hairColor || 'dark';
+  var colorTex  = HAIR_COLOR_TEXTURES[colorKey] || HAIR_COLOR_TEXTURES.dark;
+
+  BABYLON.SceneLoader.ImportMesh('', HAIR_MODEL_DIR, fileName, self.scene,
+    function (meshes) {
+      if (!meshes || !meshes.length || !self.scene) return;
+
+      var hairMeshes = meshes.filter(function (m) {
+        return m.getTotalVertices && m.getTotalVertices() > 0;
+      });
+      if (!hairMeshes.length) { meshes.forEach(function (m) { m.dispose(); }); return; }
+
+      // Apply the chosen hair colour texture.
+      var hairMat = new BABYLON.PBRMaterial('hairmat_' + unit.id + '_' + hairId, self.scene);
+      hairMat.metallic  = 0.05;
+      hairMat.roughness = 0.80;
+      if (typeof BABYLON.Texture !== 'undefined') {
+        hairMat.albedoTexture = new BABYLON.Texture(
+          HAIR_MODEL_DIR + colorTex, self.scene,
+          false, true, BABYLON.Texture.TRILINEAR_SAMPLINGMODE
+        );
+      }
+
+      hairMeshes.forEach(function (hm, hi) {
+        hm.parent      = unitRoot;
+        hm.isPickable  = false;
+        hm.receiveShadows = true;
+        // Rebind to the unit's existing skeleton so the hair follows the same bones.
+        if (unitSkeleton) { hm.skeleton = unitSkeleton; }
+        hm.material    = hairMat;
+        if (self._shadowGenerator) { self._shadowGenerator.addShadowCaster(hm, true); }
+      });
+
+      // Dispose any non-geometry nodes from the hair import (e.g. skeleton nodes).
+      meshes.forEach(function (m) {
+        if (!m.getTotalVertices || m.getTotalVertices() === 0) {
+          try { m.dispose(); } catch (e) {}
+        }
+      });
+    },
+    null,
+    function () {} // hair file absent — skip silently
+  );
+};
+
+
 // Plays a looping idle cycle on the character model.  The root mesh/TransformNode
-// gets a gentle Y-position breathing bob.  When a Babylon skeleton is supplied
-// the spine and upper-arm bones also receive subtle idle oscillations, giving the
-// model life without a pre-authored animation clip.
+// gets a gentle Y-position breathing bob.  When a Babylon skeleton is supplied the
+// spine and arm bones receive resting-pose offsets with subtle oscillations so the
+// character clearly breaks out of the static T-pose.
+//
+// Bone rotation values are additive over the bind pose in Babylon.js 7.x.
+// The upper-arm channels are centred on a "hanging arms" base value so the
+// silhouette reads as a relaxed standing pose rather than a T-pose.
 //
 // All animations are staggered by a hash of unitId so units don't bob in sync.
 
@@ -753,7 +858,7 @@ GameScene.prototype._startIdleAnim = function (unitId, mesh, skeleton) {
   var ease = new BABYLON.SineEase();
   ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
 
-  // ── Root mesh: gentle Y-position rise-and-fall (breathing bob) ──────────────
+  // ── Root mesh: breathing bob (Y-position) ────────────────────────────────────
   var idleAnim = new BABYLON.Animation(
     'idle_' + unitId, 'position.y', 60,
     BABYLON.Animation.ANIMATIONTYPE_FLOAT,
@@ -762,27 +867,35 @@ GameScene.prototype._startIdleAnim = function (unitId, mesh, skeleton) {
   idleAnim.setEasingFunction(ease);
   idleAnim.setKeys([
     { frame: 0,  value: 0.00 },
-    { frame: 30, value: 0.04 },
+    { frame: 30, value: 0.05 },
     { frame: 60, value: 0.00 }
   ]);
   mesh.animations = (mesh.animations || []).concat([idleAnim]);
   this.scene.beginAnimation(mesh, 0, 60, true, speed);
 
-  // ── Skeleton bones: breathing and arm-sway ──────────────────────────────────
+  // ── Skeleton bones: resting pose + subtle oscillation ────────────────────────
   // These run only when a live skeleton is available (glTF path).
   if (!skeleton) { return; }
   var scene = this.scene;
 
+  // Each entry describes one bone animation channel.
+  //   base: the resting-pose value the animation oscillates around.
+  //   amp:  half-amplitude of the oscillation (peak = base + amp, trough = base).
+  // For the upper arms, 'base' lowers them from the horizontal T-pose.
+  // The bone local coordinate system (UE4-style, -90° root): the Z-axis on the
+  // clavicle/upperarm bones corresponds to the adduction/abduction direction.
   var boneAnims = [
-    // Chest breathing: spine_02 pitches slightly forward and back.
-    { name: 'spine_02',   prop: 'rotation.x', amp:  0.04,  speedMul: 1.0  },
-    // Shoulder sway: clavicle bones rise and fall in sync with breathing.
-    { name: 'clavicle_l', prop: 'rotation.z', amp: -0.06,  speedMul: 1.0  },
-    { name: 'clavicle_r', prop: 'rotation.z', amp:  0.06,  speedMul: 1.0  },
-    // Arm idle sway: upper arms drift very slightly forward and back,
-    // breaking the static T-pose silhouette.
-    { name: 'upperarm_l', prop: 'rotation.x', amp:  0.10,  speedMul: 0.7  },
-    { name: 'upperarm_r', prop: 'rotation.x', amp:  0.10,  speedMul: 0.7  }
+    // Spine breathing: pitch the chest forward slightly and back.
+    { name: 'spine_02',   prop: 'rotation.x', base: -0.04, amp:  0.05,  speedMul: 1.0  },
+    // Clavicle lift: shoulders rise and fall with the breath.
+    { name: 'clavicle_l', prop: 'rotation.z', base:  0.12, amp:  0.04,  speedMul: 1.0  },
+    { name: 'clavicle_r', prop: 'rotation.z', base: -0.12, amp: -0.04,  speedMul: 1.0  },
+    // Upper arms: lower from T-pose to a hanging/relaxed stance, then sway.
+    { name: 'upperarm_l', prop: 'rotation.z', base:  0.55, amp:  0.06,  speedMul: 0.7  },
+    { name: 'upperarm_r', prop: 'rotation.z', base: -0.55, amp: -0.06,  speedMul: 0.7  },
+    // Forearm lazy drift for extra life.
+    { name: 'lowerarm_l', prop: 'rotation.z', base:  0.10, amp:  0.04,  speedMul: 0.8  },
+    { name: 'lowerarm_r', prop: 'rotation.z', base: -0.10, amp: -0.04,  speedMul: 0.8  }
   ];
 
   boneAnims.forEach(function (cfg) {
@@ -800,9 +913,9 @@ GameScene.prototype._startIdleAnim = function (unitId, mesh, skeleton) {
     bEase.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
     bAnim.setEasingFunction(bEase);
     bAnim.setKeys([
-      { frame: 0,  value: 0         },
-      { frame: 30, value: cfg.amp   },
-      { frame: 60, value: 0         }
+      { frame: 0,  value: cfg.base            },
+      { frame: 30, value: cfg.base + cfg.amp  },
+      { frame: 60, value: cfg.base            }
     ]);
     bone.animations = (bone.animations || []).concat([bAnim]);
     scene.beginAnimation(bone, 0, 60, true, speed * cfg.speedMul);
@@ -1606,10 +1719,13 @@ CharacterPreviewScene.prototype.init = function (canvasId) {
     this.scene  = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.08, 0.10, 0.22, 1);
 
+    // Target the mid-torso (Y ≈ 0.85) so the full body is centred in the viewport.
     this._camera = new BABYLON.ArcRotateCamera(
-      'prevCam', -Math.PI / 2, Math.PI / 3.2, 2.8,
-      new BABYLON.Vector3(0, 0.4, 0), this.scene
+      'prevCam', -Math.PI / 2, Math.PI / 2.8, 2.4,
+      new BABYLON.Vector3(0, 0.85, 0), this.scene
     );
+    this._camera.lowerRadiusLimit = 1.2;
+    this._camera.upperRadiusLimit = 4.0;
     this._camera.attachControl(canvas, true);
 
     var dir  = new BABYLON.DirectionalLight('pDir', new BABYLON.Vector3(-1, -2, -1), this.scene);
@@ -1634,13 +1750,15 @@ CharacterPreviewScene.prototype.init = function (canvasId) {
 };
 
 /** Load (or reload) the glTF/OBJ model for classId with the given colour and gender. */
-CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, gender) {
+CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, gender, hairStyle, hairColor) {
   if (!this.scene) return;
   var self = this;
   this._pendingClassId = classId;
 
-  if (this._model)    { this._model.dispose();    this._model    = null; }
+  // Dispose the previous model and its hair if present.
+  if (this._model)    { try { this._model.getScene ? this._model.dispose() : null; } catch(e) {} this._model    = null; }
   if (this._fallback) { this._fallback.dispose(); this._fallback = null; }
+  if (this._hairRoot) { try { this._hairRoot.dispose(); } catch(e) {} this._hairRoot = null; }
 
   var col = _resolvePreviewColor(colorId, raceId);
 
@@ -1662,60 +1780,78 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
   if (!fileName || !BABYLON.SceneLoader) return;
 
   var isGltf    = fileName.indexOf('.gltf') !== -1 || fileName.indexOf('.glb') !== -1;
-  // glTF must always load directly from the server (external .bin + textures)
   var useBlob   = !isGltf && typeof AssetCache !== 'undefined' && AssetCache.hasCached('models/character/' + fileName);
   var rootUrl   = useBlob ? ''                    : 'models/character/';
   var srcFile   = useBlob ? AssetCache.getCachedUrl('models/character/' + fileName) : fileName;
   var pluginExt = useBlob ? '.obj'                : null;
 
+  var capturedHairStyle = hairStyle || 'none';
+  var capturedHairColor = hairColor || 'dark';
+
   BABYLON.SceneLoader.ImportMesh('', rootUrl, srcFile, self.scene,
     function (meshes) {
       if (!meshes || !meshes.length || !self.scene) return;
-      // Discard if the class was changed while loading
       if (self._pendingClassId !== classId) {
         meshes.forEach(function (m) { m.dispose(); });
         return;
       }
       if (self._fallback) { self._fallback.dispose(); self._fallback = null; }
 
-      // For glTF, use the first root mesh with geometry; for OBJ, merge sub-meshes.
-      var model;
-      if (isGltf) {
-        // glTF imports as a hierarchy; find the first real mesh
-        model = meshes[0];
-        for (var mi = 0; mi < meshes.length; mi++) {
-          if (meshes[mi].getTotalVertices && meshes[mi].getTotalVertices() > 0) {
-            model = meshes[mi]; break;
+      var geoMeshes = meshes.filter(function (m) {
+        return m.getTotalVertices && m.getTotalVertices() > 0;
+      });
+
+      if (isGltf && geoMeshes.length) {
+        // glTF: create a root TransformNode, parent all geometry to it.
+        var rootNode = new BABYLON.TransformNode('prevroot', self.scene);
+        rootNode.position = BABYLON.Vector3.Zero();
+        rootNode.scaling  = new BABYLON.Vector3(
+          CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
+        );
+        var previewSkeleton = null;
+        geoMeshes.forEach(function (m) {
+          m.parent = rootNode;
+          m.isPickable = false;
+          if (!previewSkeleton && m.skeleton) { previewSkeleton = m.skeleton; }
+        });
+        // Dispose any non-geometry nodes from the import.
+        meshes.forEach(function (m) {
+          if (!m.getTotalVertices || m.getTotalVertices() === 0) {
+            try { m.dispose(); } catch (e) {}
           }
+        });
+
+        if (previewSkeleton) {
+          _applyPreviewIdleAnim(previewSkeleton, self.scene);
         }
+
+        self._model = rootNode;
+
+        // Load hair in preview if requested.
+        if (capturedHairStyle !== 'none' && BABYLON.SceneLoader && previewSkeleton) {
+          _loadPreviewHair(capturedHairStyle, capturedHairColor, rootNode, previewSkeleton, self.scene, function (hr) {
+            self._hairRoot = hr;
+          });
+        }
+
       } else {
-        model = meshes.length === 1
-          ? meshes[0]
-          : BABYLON.Mesh.MergeMeshes(meshes, true, true, undefined, false, true);
-      }
-      if (!model) return;
-
-      model.position = BABYLON.Vector3.Zero();
-      model.scaling  = new BABYLON.Vector3(
-        CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
-      );
-
-      // glTF models keep their texture materials; OBJ models get solid PBR colour.
-      if (!isGltf) {
+        // OBJ path
+        var model = geoMeshes.length === 1
+          ? geoMeshes[0]
+          : BABYLON.Mesh.MergeMeshes(geoMeshes, true, true, undefined, false, true);
+        if (!model) return;
+        model.position = BABYLON.Vector3.Zero();
+        model.scaling  = new BABYLON.Vector3(
+          CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
+        );
         var mat = new BABYLON.PBRMaterial('prevpbr_' + classId, self.scene);
         mat.albedoColor = new BABYLON.Color3(col.r, col.g, col.b);
         mat.metallic    = CHARACTER_PBR_METALLIC;
         mat.roughness   = CHARACTER_PBR_ROUGHNESS;
         model.material  = mat;
+        model.isPickable = false;
+        self._model = model;
       }
-
-      // Apply idle bone animations to the preview skeleton so it doesn't
-      // display as a static T-pose.
-      if (isGltf && model.skeleton) {
-        _applyPreviewIdleAnim(model.skeleton, self.scene);
-      }
-
-      self._model = model;
     },
     null,
     function () { /* model absent — keep procedural fallback */ },
@@ -1760,12 +1896,14 @@ CharacterPreviewScene.prototype.dispose = function () {
   }
   this._model          = null;
   this._fallback       = null;
+  this._hairRoot       = null;
   this._pendingClassId = null;
 };
 
 /**
  * Apply looping idle bone animations to a skeleton in the preview scene.
- * This breaks the static T-pose by adding gentle spine breathing and arm sway.
+ * Bones are given a resting-pose offset so the model visibly breaks out of
+ * the horizontal T-pose, then oscillate gently around that offset.
  */
 function _applyPreviewIdleAnim(skeleton, scene) {
   if (!skeleton || !scene) { return; }
@@ -1773,11 +1911,13 @@ function _applyPreviewIdleAnim(skeleton, scene) {
   ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
 
   var boneAnims = [
-    { name: 'spine_02',   prop: 'rotation.x', amp:  0.04, speed: 0.45 },
-    { name: 'clavicle_l', prop: 'rotation.z', amp: -0.06, speed: 0.45 },
-    { name: 'clavicle_r', prop: 'rotation.z', amp:  0.06, speed: 0.45 },
-    { name: 'upperarm_l', prop: 'rotation.x', amp:  0.10, speed: 0.32 },
-    { name: 'upperarm_r', prop: 'rotation.x', amp:  0.10, speed: 0.32 }
+    { name: 'spine_02',   prop: 'rotation.x', base: -0.04, amp:  0.05, speed: 0.45 },
+    { name: 'clavicle_l', prop: 'rotation.z', base:  0.12, amp:  0.04, speed: 0.45 },
+    { name: 'clavicle_r', prop: 'rotation.z', base: -0.12, amp: -0.04, speed: 0.45 },
+    { name: 'upperarm_l', prop: 'rotation.z', base:  0.55, amp:  0.06, speed: 0.32 },
+    { name: 'upperarm_r', prop: 'rotation.z', base: -0.55, amp: -0.06, speed: 0.32 },
+    { name: 'lowerarm_l', prop: 'rotation.z', base:  0.10, amp:  0.04, speed: 0.36 },
+    { name: 'lowerarm_r', prop: 'rotation.z', base: -0.10, amp: -0.04, speed: 0.36 }
   ];
 
   boneAnims.forEach(function (cfg) {
@@ -1791,13 +1931,55 @@ function _applyPreviewIdleAnim(skeleton, scene) {
     );
     anim.setEasingFunction(ease);
     anim.setKeys([
-      { frame: 0,  value: 0        },
-      { frame: 30, value: cfg.amp  },
-      { frame: 60, value: 0        }
+      { frame: 0,  value: cfg.base           },
+      { frame: 30, value: cfg.base + cfg.amp },
+      { frame: 60, value: cfg.base           }
     ]);
     bone.animations = (bone.animations || []).concat([anim]);
     scene.beginAnimation(bone, 0, 60, true, cfg.speed);
   });
+}
+
+/**
+ * Load a hair glTF into the preview scene and bind it to the given skeleton.
+ * Calls onDone(hairRootNode) when complete (may be null on error).
+ */
+function _loadPreviewHair(hairStyle, hairColor, parentNode, skeleton, scene, onDone) {
+  if (!BABYLON.SceneLoader || hairStyle === 'none') { onDone(null); return; }
+  var fileName = hairStyle + '.gltf';
+  var colorTex = HAIR_COLOR_TEXTURES[hairColor] || HAIR_COLOR_TEXTURES.dark;
+  BABYLON.SceneLoader.ImportMesh('', HAIR_MODEL_DIR, fileName, scene,
+    function (meshes) {
+      if (!meshes || !meshes.length || !scene) { onDone(null); return; }
+      var hairMeshes = meshes.filter(function (m) {
+        return m.getTotalVertices && m.getTotalVertices() > 0;
+      });
+      if (!hairMeshes.length) { meshes.forEach(function (m) { m.dispose(); }); onDone(null); return; }
+      var hairMat = new BABYLON.PBRMaterial('prevhairmat', scene);
+      hairMat.metallic  = 0.05;
+      hairMat.roughness = 0.80;
+      if (typeof BABYLON.Texture !== 'undefined') {
+        hairMat.albedoTexture = new BABYLON.Texture(
+          HAIR_MODEL_DIR + colorTex, scene,
+          false, true, BABYLON.Texture.TRILINEAR_SAMPLINGMODE
+        );
+      }
+      hairMeshes.forEach(function (hm) {
+        hm.parent    = parentNode;
+        hm.isPickable = false;
+        if (skeleton) { hm.skeleton = skeleton; }
+        hm.material  = hairMat;
+      });
+      meshes.forEach(function (m) {
+        if (!m.getTotalVertices || m.getTotalVertices() === 0) {
+          try { m.dispose(); } catch (e) {}
+        }
+      });
+      onDone(hairMeshes[0] || null);
+    },
+    null,
+    function () { onDone(null); }
+  );
 }
 
 /** Resolve a display colour from colorId (BODY_COLORS) then raceId (RACES). */

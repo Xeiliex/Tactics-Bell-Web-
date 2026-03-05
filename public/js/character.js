@@ -31,6 +31,8 @@ function Character(opts) {
   this.backgroundId = opts.backgroundId || null;
   this.portrait     = opts.portrait     || null;  // data-URL captured from wizard preview
   this.gender       = opts.gender       || 'male'; // 'male' or 'female'
+  this.hairStyle    = opts.hairStyle    || 'none'; // hair style id (matches HAIR_STYLES)
+  this.hairColor    = opts.hairColor    || 'dark'; // 'dark' or 'golden'
 
   // Grid position
   this.gridRow = 0;
@@ -290,6 +292,8 @@ function createPartyMember(opts) {
     classId:           opts.classId,
     backgroundId:      opts.backgroundId || null,
     gender:            opts.gender   || 'male',
+    hairStyle:         opts.hairStyle || 'none',
+    hairColor:         opts.hairColor || 'dark',
     level:             opts.level    || 1,
     exp:               opts.exp      || 0,
     isPlayer:          !!opts.isPlayer,
