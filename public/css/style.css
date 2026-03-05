@@ -532,7 +532,22 @@ html, body {
 }
 #stage-display { color: var(--gold); }
 #phase-display { color: #c8a850; font-size: 20px; }
-#turn-counter  { color: #7a6a50; }
+#turn-counter {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 18px;
+  font-family: var(--font-title);
+  font-size: 16px;
+  letter-spacing: 1px;
+  color: #7a6a50;
+  pointer-events: none;
+  white-space: nowrap;
+}
 
 /* Weather badge — shows the current weather type in the top bar */
 #weather-badge {
