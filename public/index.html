@@ -30,6 +30,18 @@
       </div>
       <button class="btn-secondary btn-large hidden" id="btn-continue-game">▶ CONTINUE</button>
       <button class="btn-gfx-toggle" id="btn-gfx-toggle" title="Toggle graphics quality"></button>
+
+      <!-- SSO auth area — visible once GOOGLE_CLIENT_ID is configured on the server -->
+      <div id="sso-auth-area">
+        <!-- Shown when signed in -->
+        <div id="sso-user-widget" class="hidden">
+          <div class="sso-avatar"></div>
+          <span class="sso-name"></span>
+          <button id="btn-sso-logout" class="sso-logout-btn">Sign Out</button>
+        </div>
+        <!-- Rendered as a Google Sign-In button by GSI when signed out -->
+        <div id="sso-signin-btn"></div>
+      </div>
       <!-- AdSense — title screen banner -->
       <div class="ad-banner ad-banner--title">
         <ins class="adsbygoogle"
@@ -334,5 +346,6 @@
   <script src="js/ui.js"></script>
   <script src="js/story.js"></script>
   <script src="js/game.js"></script>
+  <script src="js/auth.js"></script>
 </body>
 </html>

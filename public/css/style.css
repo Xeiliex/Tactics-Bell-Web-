@@ -939,6 +939,73 @@ html, body {
 }
 
 /* ────────────────────────────────────────
+   SSO AUTH WIDGET  (title screen)
+──────────────────────────────────────── */
+#sso-auth-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+}
+
+#sso-user-widget {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(14,12,8,0.80);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  padding: 5px 16px 5px 5px;
+}
+#sso-user-widget.hidden { display: none; }
+
+.sso-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-title);
+  font-size: 18px;
+  color: var(--dark);
+  flex-shrink: 0;
+}
+.sso-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sso-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e8dcc8;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sso-logout-btn {
+  background: transparent;
+  border: 1px solid rgba(201,162,39,0.35);
+  color: var(--gold);
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: var(--font-body);
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.sso-logout-btn:hover { background: rgba(201,162,39,0.12); }
+
+#sso-signin-btn { min-height: 44px; }
+#sso-signin-btn.hidden { display: none; }
+
+/* ────────────────────────────────────────
    CHARACTER CREATOR 3-D PREVIEW CANVAS
 ──────────────────────────────────────── */
 .wizard-preview-wrap {
