@@ -467,6 +467,30 @@ var BODY_COLORS = [
 ];
 
 // ═══════════════════════════════════════
+//  HAIR STYLES  (character customisation)
+// ═══════════════════════════════════════
+// id must match the glTF filename stem in public/models/character/hairstyles/.
+// Styles marked maleOnly/femaleOnly will be hidden for the other gender.
+var HAIR_STYLES = [
+  { id: 'none',         name: 'None',          emoji: '🔵', maleOnly: false, femaleOnly: false },
+  { id: 'Hair_Buzzed',  name: 'Buzzed',         emoji: '💈', maleOnly: true,  femaleOnly: false },
+  { id: 'Hair_BuzzedFemale', name: 'Short',     emoji: '✂️', maleOnly: false, femaleOnly: true  },
+  { id: 'Hair_SimpleParted', name: 'Parted',    emoji: '🪮', maleOnly: false, femaleOnly: false },
+  { id: 'Hair_Long',    name: 'Long',           emoji: '💇', maleOnly: false, femaleOnly: false },
+  { id: 'Hair_Buns',    name: 'Buns',           emoji: '🎀', maleOnly: false, femaleOnly: true  },
+  { id: 'Hair_Beard',   name: 'Beard',          emoji: '🧔', maleOnly: true,  femaleOnly: false }
+];
+
+// ═══════════════════════════════════════
+//  HAIR COLOUR PRESETS  (character customisation)
+// ═══════════════════════════════════════
+// textureFile references files in public/models/character/hairstyles/.
+var HAIR_COLORS = [
+  { id: 'dark',   name: 'Dark',   hex: '#3E2723', textureFile: 'T_Hair_2_BaseColor.png' },
+  { id: 'golden', name: 'Golden', hex: '#F9A825', textureFile: 'T_Hair_1_BaseColor.png' }
+];
+
+// ═══════════════════════════════════════
 //  STAGE ENEMY CONFIGURATIONS
 //  Themed enemy parties that scale with story progression.
 //  Party names reflect the narrative encounter type.

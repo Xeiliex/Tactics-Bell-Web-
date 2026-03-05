@@ -122,7 +122,8 @@ var WIZARD_STEP_META = [
   { title: 'Choose Your Race',      sub: 'Your heritage shapes your innate abilities.' },
   { title: 'Choose Your Class',     sub: 'Your training defines your role in battle.' },
   { title: 'Choose a Background',   sub: 'Your past grants unique advantages.' },
-  { title: 'Name & Appearance',     sub: 'Give your adventurer an identity.' }
+  { title: 'Name & Appearance',     sub: 'Give your adventurer an identity.' },
+  { title: 'Hairstyle',             sub: 'How does your adventurer style their hair?' }
 ];
 
 var WIZARD_MEMBER_META = [
@@ -213,17 +214,18 @@ GameUI.prototype._renderWizardStep = function () {
     if (w.stepIdx === 0)      this._buildWizardRaceStep(content, member);
     else if (w.stepIdx === 1) this._buildWizardClassStep(content, member);
     else if (w.stepIdx === 2) this._buildWizardBackgroundStep(content, member);
-    else                      this._buildWizardIdentityStep(content, member, w.memberIdx, mmeta);
+    else if (w.stepIdx === 3) this._buildWizardIdentityStep(content, member, w.memberIdx, mmeta);
+    else                      this._buildWizardHairStep(content, member);
   }
 
-  // Show the 3-D preview canvas on class (1) and identity (3) steps;
+  // Show the 3-D preview canvas on class (1), identity (3), and hair (4) steps;
   // hide it on race (0) and background (2) steps, and always hide it when
   // GRAPHICS_QUALITY is 'low' (CharacterPreviewScene is not initialised in
   // that mode, which would leave a blank dark box visible to the user).
   var previewWrap = document.getElementById('wizard-preview-wrap');
   if (previewWrap) {
     var previewEnabled = (typeof GRAPHICS_QUALITY === 'undefined' || GRAPHICS_QUALITY !== 'low');
-    if (previewEnabled && (w.stepIdx === 1 || w.stepIdx === 3)) {
+    if (previewEnabled && (w.stepIdx === 1 || w.stepIdx === 3 || w.stepIdx === 4)) {
       previewWrap.classList.remove('hidden');
     } else {
       previewWrap.classList.add('hidden');
@@ -239,7 +241,7 @@ GameUI.prototype._wizardStepComplete = function (memberIdx, stepIdx) {
   if (stepIdx === 0) return !!m.race;
   if (stepIdx === 1) return !!m.classId;
   if (stepIdx === 2) return !!m.backgroundId;
-  return true; // identity always completable
+  return true; // identity and hair steps are always completable
 };
 
 // ─── Wizard navigation ────────────────────────────────────────────────────────
@@ -580,7 +582,107 @@ GameUI.prototype._buildWizardIdentityStep = function (container, member, memberI
   setTimeout(function () { nameInput.focus(); }, 50);
 };
 
-// ─── Party review screen ──────────────────────────────────────────────────────
+// ─── Hairstyle wizard step ────────────────────────────────────────────────────
+
+GameUI.prototype._buildWizardHairStep = function (container, member) {
+  var self = this;
+  var gender = member.gender || 'male';
+
+  var wrap = document.createElement('div');
+  wrap.className = 'wizard-hair';
+
+  // ── Hair style grid ──────────────────────────────────────────────────────────
+  var styleLabel = document.createElement('div');
+  styleLabel.className = 'wizard-color-label';
+  styleLabel.textContent = 'Hairstyle';
+  wrap.appendChild(styleLabel);
+
+  var styleGrid = document.createElement('div');
+  styleGrid.className = 'hair-style-grid';
+
+  var currentStyle = member.hairStyle || 'none';
+
+  HAIR_STYLES.forEach(function (style) {
+    // Hide gender-exclusive styles for the opposite gender
+    if (style.maleOnly   && gender !== 'male')   return;
+    if (style.femaleOnly && gender !== 'female') return;
+
+    var card = document.createElement('div');
+    card.className = 'hair-style-card' + (style.id === currentStyle ? ' selected' : '');
+    card.dataset.style = style.id;
+    card.innerHTML =
+      '<div class="hair-style-emoji">' + style.emoji + '</div>' +
+      '<div class="hair-style-name">' + style.name + '</div>';
+
+    card.addEventListener('click', function () {
+      styleGrid.querySelectorAll('.hair-style-card').forEach(function (c) { c.classList.remove('selected'); });
+      card.classList.add('selected');
+      member.hairStyle = style.id;
+      anime({ targets: card, scale: [0.90, 1.0], duration: 180, easing: 'easeOutBack' });
+      // Refresh 3-D preview hair
+      if (self._charPreview && member.classId) {
+        self._charPreview.loadModel(
+          member.classId, member.colorId || 'default', member.race || 'human',
+          member.gender || 'male', member.hairStyle, member.hairColor || 'dark'
+        );
+      }
+    });
+
+    styleGrid.appendChild(card);
+  });
+  wrap.appendChild(styleGrid);
+
+  // ── Hair colour swatches ─────────────────────────────────────────────────────
+  var colorLabel = document.createElement('div');
+  colorLabel.className = 'wizard-color-label';
+  colorLabel.textContent = 'Hair Colour';
+  wrap.appendChild(colorLabel);
+
+  var colorRow = document.createElement('div');
+  colorRow.className = 'color-swatches';
+  var currentColor = member.hairColor || 'dark';
+
+  HAIR_COLORS.forEach(function (hc) {
+    var swatch = document.createElement('div');
+    swatch.className = 'color-swatch' + (hc.id === currentColor ? ' selected' : '');
+    swatch.title = hc.name;
+    swatch.style.backgroundColor = hc.hex;
+
+    swatch.addEventListener('click', function () {
+      colorRow.querySelectorAll('.color-swatch').forEach(function (s) { s.classList.remove('selected'); });
+      swatch.classList.add('selected');
+      member.hairColor = hc.id;
+      anime({ targets: swatch, scale: [0.85, 1.0], duration: 200, easing: 'easeOutBack' });
+      // Refresh 3-D preview with new hair colour
+      if (self._charPreview && member.classId) {
+        self._charPreview.loadModel(
+          member.classId, member.colorId || 'default', member.race || 'human',
+          member.gender || 'male', member.hairStyle || 'none', member.hairColor
+        );
+      }
+    });
+    colorRow.appendChild(swatch);
+  });
+  wrap.appendChild(colorRow);
+
+  container.appendChild(wrap);
+
+  anime({ targets: styleGrid.querySelectorAll('.hair-style-card'), translateY: [12, 0], opacity: [0, 1],
+    duration: 300, easing: 'easeOutQuart', delay: anime.stagger(50) });
+
+  // Refresh preview with current hair
+  if (member.classId) {
+    self._ensurePreview(member.classId, member.colorId, member.race, member.gender);
+    if (self._charPreview) {
+      self._charPreview.loadModel(
+        member.classId, member.colorId || 'default', member.race || 'human',
+        member.gender || 'male', member.hairStyle || 'none', member.hairColor || 'dark'
+      );
+    }
+  }
+};
+
+
 
 GameUI.prototype.showPartyReviewScreen = function () {
   var game  = this.game;
