@@ -605,8 +605,8 @@ GameScene.prototype._addMapProps = function (grid) {
           var clone = template.clone('prop_' + p.row + '_' + p.col);
           clone.setEnabled(true);
           clone.isPickable    = false;
-          clone.receiveShadows = true;
-          clone.position      = new BABYLON.Vector3(pos.x + p.ox, 0, pos.z + p.oz);
+          clone.receiveShadows = true; // Set to true if props should receive shadows
+          clone.position      = new BABYLON.Vector3(pos.x + p.ox, 0.05, pos.z + p.oz);
           clone.rotation.y    = p.rotY;
 
           if (self._shadowGenerator) {
@@ -978,7 +978,7 @@ GameScene.prototype._attachHairMesh = function (unit, rootMesh) {
   // head is at Y 0.73 (absolute), but since we parent to the model root
   // with scale 1 we use 1.80 (top of head sphere) for glTF models.
   var isGltf = rootMesh.getClassName && rootMesh.getClassName() === 'TransformNode';
-  var headY   = isGltf ? 1.82 : 0.87;
+  var headY   = isGltf ? 1.82 : 0.8;
 
   var mesh;
   if (styleId === 'short') {
@@ -986,7 +986,7 @@ GameScene.prototype._attachHairMesh = function (unit, rootMesh) {
     mesh = BABYLON.MeshBuilder.CreateSphere('hair_' + unit.id, {
       diameter: 0.30, segments: 8, slice: 0.55
     }, this.scene);
-    mesh.position = new BABYLON.Vector3(0, headY, 0);
+    mesh.position = new BABYLON.Vector3(0, headY - 0.07, 0);
   } else if (styleId === 'medium') {
     // Medium hair: slightly taller hemisphere.
     mesh = BABYLON.MeshBuilder.CreateSphere('hair_' + unit.id, {
@@ -998,13 +998,13 @@ GameScene.prototype._attachHairMesh = function (unit, rootMesh) {
     var cap = BABYLON.MeshBuilder.CreateSphere('hairCap_' + unit.id, {
       diameter: 0.32, segments: 8, slice: 0.70
     }, this.scene);
-    cap.position = new BABYLON.Vector3(0, headY - 0.01, 0);
+    cap.position = new BABYLON.Vector3(0, headY - 0.08, 0);
     cap.parent   = rootMesh;
     cap.material = mat;
     cap.isPickable = false;
 
     var trail = BABYLON.MeshBuilder.CreateCylinder('hairTrail_' + unit.id, {
-      height: isGltf ? 0.55 : 0.30, diameter: 0.14, tessellation: 8
+      height: isGltf ? 0.55 : 0.25, diameter: 0.14, tessellation: 8
     }, this.scene);
     trail.position = new BABYLON.Vector3(0, headY - (isGltf ? 0.40 : 0.22), (isGltf ? -0.12 : -0.07));
     trail.parent   = rootMesh;
@@ -1016,7 +1016,7 @@ GameScene.prototype._attachHairMesh = function (unit, rootMesh) {
     mesh = BABYLON.MeshBuilder.CreateSphere('hair_' + unit.id, {
       diameter: 0.20, segments: 7
     }, this.scene);
-    mesh.position = new BABYLON.Vector3(0, headY + 0.02, (isGltf ? -0.10 : -0.06));
+    mesh.position = new BABYLON.Vector3(0, headY - 0.05, (isGltf ? -0.10 : -0.06));
   } else {
     return;
   }
@@ -1037,7 +1037,7 @@ GameScene.prototype.spawnUnit = function (unit) {
   var body = BABYLON.MeshBuilder.CreateCylinder('body_' + unit.id, {
     height: 0.6, diameter: 0.45, tessellation: 16
   }, this.scene);
-  body.position = new BABYLON.Vector3(pos.x, 0.3, pos.z);
+  body.position = new BABYLON.Vector3(pos.x, 0.35, pos.z);
   var bMat = new BABYLON.PBRMaterial('bmat_' + unit.id, this.scene);
   bMat.albedoColor  = bodyColor;
   bMat.metallic     = 0.45;
@@ -1052,7 +1052,7 @@ GameScene.prototype.spawnUnit = function (unit) {
   var head = BABYLON.MeshBuilder.CreateSphere('head_' + unit.id, {
     diameter: 0.28, segments: 12
   }, this.scene);
-  head.position = new BABYLON.Vector3(pos.x, 0.73, pos.z);
+  head.position = new BABYLON.Vector3(pos.x, 0.78, pos.z);
   var hMat = new BABYLON.PBRMaterial('hmat_' + unit.id, this.scene);
   hMat.albedoColor  = new BABYLON.Color3(1.0, 0.86, 0.70);
   hMat.metallic     = 0.0;
@@ -1199,7 +1199,7 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
     );
     animModel.setKeys([
       { frame: 0,      value: node.model.position.clone() },
-      { frame: frames, value: new BABYLON.Vector3(pos.x, 0, pos.z) }
+      { frame: frames, value: new BABYLON.Vector3(pos.x, 0.05, pos.z) }
     ]);
     animModel.setEasingFunction(ease);
     // Animate weapon alongside model
@@ -1232,7 +1232,7 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
   );
   animBody.setKeys([
     { frame: 0,      value: node.body.position.clone() },
-    { frame: frames, value: new BABYLON.Vector3(pos.x, 0.3, pos.z) }
+    { frame: frames, value: new BABYLON.Vector3(pos.x, 0.35, pos.z) }
   ]);
 
   var animHead = new BABYLON.Animation(
@@ -1242,7 +1242,7 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
   );
   animHead.setKeys([
     { frame: 0,      value: node.head.position.clone() },
-    { frame: frames, value: new BABYLON.Vector3(pos.x, 0.73, pos.z) }
+    { frame: frames, value: new BABYLON.Vector3(pos.x, 0.78, pos.z) }
   ]);
 
   [animBody, animHead].forEach(function (a) { a.setEasingFunction(ease); });
@@ -1870,7 +1870,7 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
   var fb    = BABYLON.MeshBuilder.CreateCylinder('pfb', {
     height: 0.8, diameter: 0.5, tessellation: 12
   }, this.scene);
-  fb.position = BABYLON.Vector3.Zero();
+  fb.position = new BABYLON.Vector3(0, 0.4, 0);
   var fbMat = new BABYLON.PBRMaterial('pfbmat', this.scene);
   fbMat.albedoColor = new BABYLON.Color3(col.r, col.g, col.b);
   fbMat.metallic    = 0.35;
@@ -1917,7 +1917,7 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
       }
       if (!model) return;
 
-      model.position = BABYLON.Vector3.Zero();
+      model.position = new BABYLON.Vector3(0, 0.05, 0);
       model.scaling  = new BABYLON.Vector3(
         CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
       );
