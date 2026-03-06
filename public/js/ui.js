@@ -738,24 +738,6 @@ GameUI.prototype.showPartyReviewScreen = function () {
     duration: 420, easing: 'easeOutQuart', delay: anime.stagger(100) });
 };
 
-/**
- * Show a confirmation dialog before starting the battle.
- * @param {number} stage - The stage number to display.
- * @param {object} story - The active story object, if any.
- */
-GameUI.prototype.showBattleConfirmScreen = function (stage, story) {
-  var detailsEl = document.getElementById('battle-confirm-details');
-  if (detailsEl) {
-    detailsEl.textContent = story
-      ? 'Your party is assembled. Are you ready to begin the story?'
-      : 'Your party is assembled. Are you ready to begin Stage ' + stage + '?';
-  }
-
-  this.showScreen('screen-battle-confirm');
-  anime({ targets: '#screen-battle-confirm .overlay-box', scale: [0.9, 1], opacity: [0, 1],
-    duration: 400, easing: 'easeOutBack' });
-};
-
 // ─── Battle screen ────────────────────────────────────────────────────────────
 
 GameUI.prototype.showBattleScreen = function () {

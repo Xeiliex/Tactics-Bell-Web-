@@ -702,14 +702,12 @@ var game = (function () {
     if (!queue || queue.length === 0) { onDone(); return; }
     var entry = queue.shift();
     g.ui.showPromotionScreen(entry.unit, entry.choices, function (chosenClassId) {
-      if (chosenClassId) {
-        entry.unit.reclass(chosenClassId);
-        // Keep partyConfig in sync
-        var units = [g.player].concat(g.allies);
-        var idx = units.indexOf(entry.unit);
-        if (idx >= 0 && g.partyConfig && g.partyConfig[idx]) {
-          g.partyConfig[idx].classId = chosenClassId;
-        }
+      entry.unit.reclass(chosenClassId);
+      // Keep partyConfig in sync
+      var units = [g.player].concat(g.allies);
+      var idx = units.indexOf(entry.unit);
+      if (idx >= 0 && g.partyConfig && g.partyConfig[idx]) {
+        g.partyConfig[idx].classId = chosenClassId;
       }
       _processPromotionQueue(queue, onDone);
     });
