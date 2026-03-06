@@ -1288,13 +1288,18 @@ GameUI.prototype.showBattleEventDialog = function (lines, onComplete) {
 
 // ─── Loading overlay ─────────────────────────────────────────────────────────
 
-GameUI.prototype.showLoadingScreen = function (text) {
+GameUI.prototype.showLoadingScreen = function (text, onShown) {
   var el = document.getElementById('screen-loading');
   if (!el) return;
   var msg = el.querySelector('.loading-message');
   if (msg && text) msg.textContent = text;
   el.classList.remove('hidden');
-  el.style.opacity = 1;
+  anime({
+    targets: el,
+    opacity: [0, 1],
+    duration: 150,
+    complete: function () { if (onShown) onShown(); }
+  });
 };
 
 GameUI.prototype.hideLoadingScreen = function (callback) {

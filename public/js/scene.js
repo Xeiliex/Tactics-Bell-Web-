@@ -308,9 +308,9 @@ GameScene.prototype.renderGrid = function (grid) {
       var tileH  = isHigh ? 0.5 : 0.14;
 
       var box = BABYLON.MeshBuilder.CreateBox('tile_' + r + '_' + c, {
-        width: TILE_STEP * 0.93, height: tileH, depth: TILE_STEP * 0.93
+        width: TILE_STEP, height: tileH, depth: TILE_STEP
       }, this.scene);
-      box.position = new BABYLON.Vector3(pos.x, isHigh ? tileH / 2 : -tileH / 2, pos.z);
+      box.position = new BABYLON.Vector3(pos.x, (isHigh ? tileH / 2 : -tileH / 2) - 0.01, pos.z);
 
       // Reuse PBR material per terrain type
       var matKey = terrain.name;
@@ -380,9 +380,9 @@ GameScene.prototype.changeTileTerrain = function (tiles) {
     var isHigh = (newTerrain === TERRAIN.MOUNTAIN);
     var tileH  = isHigh ? 0.5 : 0.14;
     var newBox = BABYLON.MeshBuilder.CreateBox('tile_' + tile.row + '_' + tile.col, {
-      width: TILE_STEP * 0.93, height: tileH, depth: TILE_STEP * 0.93
+      width: TILE_STEP, height: tileH, depth: TILE_STEP
     }, self.scene);
-    newBox.position = new BABYLON.Vector3(pos.x, isHigh ? tileH / 2 : -tileH / 2, pos.z);
+    newBox.position = new BABYLON.Vector3(pos.x, (isHigh ? tileH / 2 : -tileH / 2) - 0.01, pos.z);
 
     // Apply the correct PBR material for the new terrain type.
     var matKey = newTerrain.name;
@@ -1610,7 +1610,7 @@ GameScene.prototype.highlightTiles = function (tiles, type) {
   tiles.forEach(function (tile) {
     if (!tile || !tile.mesh) return;
     var ov = BABYLON.MeshBuilder.CreateBox('hl_' + tile.row + '_' + tile.col, {
-      width: TILE_STEP * 0.88, height: 0.06, depth: TILE_STEP * 0.88
+      width: TILE_STEP * 0.95, height: 0.06, depth: TILE_STEP * 0.95
     }, self.scene);
     ov.position = new BABYLON.Vector3(
       tile.mesh.position.x,

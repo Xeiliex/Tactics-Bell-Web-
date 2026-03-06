@@ -334,17 +334,6 @@ var game = (function () {
       startBattle(true);
     });
 
-    // Battle Confirm → Begin (Dialog removed, listeners commented out)
-    /*
-    document.getElementById('btn-confirm-battle').addEventListener('click', function () {
-      if (g.story) {
-        g.story.startStory(0);
-      } else {
-        startBattle(true);
-      }
-    });
-    */
-
     document.getElementById('btn-attack').addEventListener('click', function () {
       if (g.combat) g.combat.beginTargeting(null);
     });
@@ -377,12 +366,6 @@ var game = (function () {
   // ─── Start / restart battle ──────────────────────────────────────────────────
 
   function startBattle(isNewGame) {
-    // Guard: Babylon.js must be available (CDN may be blocked in some environments)
-    if (typeof BABYLON === 'undefined') {
-      alert('Babylon.js could not be loaded.\nPlease check your internet connection and reload.');
-      return;
-    }
-
     // Start (or keep running) the memory monitor while a battle is active.
     // The warning fires if used JS heap exceeds 75 % of the heap size limit.
     if (typeof AssetCache !== 'undefined') {
@@ -391,32 +374,14 @@ var game = (function () {
       });
     }
 
-    // The battle canvas lives inside #screen-battle which starts with
-    // display:none.  showScreen() only removes that class after its 200 ms
-    // fade-out, so a naive 80 ms setTimeout would let Babylon.js initialise
-    // on a 0×0 canvas — producing an invisible viewport.
-    // Solution: forcibly reveal the canvas element *now* (before the animated
-    // transition) so it has real dimensions when the Engine constructor runs.
-    // The loading overlay is drawn on top, hiding the brief visual jump.
-    var battleScreenEl = document.getElementById('screen-battle');
-    if (battleScreenEl) {
-      battleScreenEl.classList.remove('hidden');
-      battleScreenEl.classList.add('active');
-      battleScreenEl.style.opacity = '0';
-    }
-
-    // Now kick off the normal screen transition (fades current screen out,
-    // then fades the battle screen in — loading overlay covers the seam).
-    g.ui.showBattleScreen();
-
-    // Show loading overlay while the scene initialises
-    g.ui.showLoadingScreen('Preparing battle…');
-
-    // Small delay to let the browser flush layout so the canvas reports its
-    // real clientWidth/clientHeight before Babylon reads it.
-    setTimeout(function () {
+    // Show the loading screen first, then show the battle screen (which contains
+    // the canvas). The loading screen will cover the transition.
+    // The actual Babylon.js scene setup happens in the callback, ensuring the
+    // canvas element is visible and has its final dimensions.
+    g.ui.showLoadingScreen('Preparing battle…', function () {
+      g.ui.showBattleScreen();
       _setupBattle(isNewGame);
-    }, 80);
+    });
   }
 
   function _setupBattle(isNewGame) {
