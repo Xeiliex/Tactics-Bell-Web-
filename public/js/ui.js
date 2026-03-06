@@ -122,6 +122,7 @@ var WIZARD_STEP_META = [
   { title: 'Choose Your Race',      sub: 'Your heritage shapes your innate abilities.' },
   { title: 'Choose Your Class',     sub: 'Your training defines your role in battle.' },
   { title: 'Choose a Background',   sub: 'Your past grants unique advantages.' },
+  { title: 'Hair & Style',          sub: 'Customise your adventurer\'s hairstyle.' },
   { title: 'Name & Appearance',     sub: 'Give your adventurer an identity.' }
 ];
 
@@ -139,7 +140,8 @@ GameUI.prototype.showCreateScreen = function () {
   // Initialise partyConfig if this is a fresh visit
   if (!game.partyConfig) {
     game.partyConfig = [{
-      name: 'Hero', race: null, classId: null, backgroundId: null, colorId: 'default', gender: 'male'
+      name: 'Hero', race: null, classId: null, backgroundId: null, colorId: 'default', gender: 'male',
+      hairStyle: 'none', hairColor: 'dark'
     }];
     for (var pi = 0; pi < 2 && pi < ALLY_PRESETS.length; pi++) {
       var p = ALLY_PRESETS[pi];
@@ -148,7 +150,8 @@ GameUI.prototype.showCreateScreen = function () {
       // permanently disabled — the user can still change it.
       game.partyConfig.push({
         name: p.name, race: p.race, classId: p.classId,
-        backgroundId: 'soldier', colorId: 'default', gender: 'male'
+        backgroundId: 'soldier', colorId: 'default', gender: 'male',
+        hairStyle: 'none', hairColor: 'dark'
       });
     }
   }
@@ -213,17 +216,18 @@ GameUI.prototype._renderWizardStep = function () {
     if (w.stepIdx === 0)      this._buildWizardRaceStep(content, member);
     else if (w.stepIdx === 1) this._buildWizardClassStep(content, member);
     else if (w.stepIdx === 2) this._buildWizardBackgroundStep(content, member);
+    else if (w.stepIdx === 3) this._buildWizardHairStep(content, member, w.memberIdx);
     else                      this._buildWizardIdentityStep(content, member, w.memberIdx, mmeta);
   }
 
-  // Show the 3-D preview canvas on class (1) and identity (3) steps;
+  // Show the 3-D preview canvas on class (1), hair (3), and identity (4) steps;
   // hide it on race (0) and background (2) steps, and always hide it when
   // GRAPHICS_QUALITY is 'low' (CharacterPreviewScene is not initialised in
   // that mode, which would leave a blank dark box visible to the user).
   var previewWrap = document.getElementById('wizard-preview-wrap');
   if (previewWrap) {
     var previewEnabled = (typeof GRAPHICS_QUALITY === 'undefined' || GRAPHICS_QUALITY !== 'low');
-    if (previewEnabled && (w.stepIdx === 1 || w.stepIdx === 3)) {
+    if (previewEnabled && (w.stepIdx === 1 || w.stepIdx === 3 || w.stepIdx === 4)) {
       previewWrap.classList.remove('hidden');
     } else {
       previewWrap.classList.add('hidden');
@@ -239,7 +243,7 @@ GameUI.prototype._wizardStepComplete = function (memberIdx, stepIdx) {
   if (stepIdx === 0) return !!m.race;
   if (stepIdx === 1) return !!m.classId;
   if (stepIdx === 2) return !!m.backgroundId;
-  return true; // identity always completable
+  return true; // hair (3) and identity (4) always completable
 };
 
 // ─── Wizard navigation ────────────────────────────────────────────────────────
@@ -308,7 +312,7 @@ GameUI.prototype._disposePreview = function () {
  * Initialise (or reuse) the CharacterPreviewScene and load the given model.
  * Uses a short setTimeout so Babylon initialises after the canvas is painted.
  */
-GameUI.prototype._ensurePreview = function (classId, colorId, raceId, gender) {
+GameUI.prototype._ensurePreview = function (classId, colorId, raceId, gender, hairStyle, hairColor) {
   if (typeof GRAPHICS_QUALITY !== 'undefined' && GRAPHICS_QUALITY === 'low') return;
   if (typeof CharacterPreviewScene === 'undefined') return;
   var self = this;
@@ -318,11 +322,13 @@ GameUI.prototype._ensurePreview = function (classId, colorId, raceId, gender) {
     setTimeout(function () {
       if (preview !== self._charPreview) return; // disposed while waiting
       if (preview.init('char-preview-canvas') && classId) {
-        preview.loadModel(classId, colorId || 'default', raceId || 'human', gender || 'male');
+        preview.loadModel(classId, colorId || 'default', raceId || 'human', gender || 'male',
+          hairStyle || 'none', hairColor || 'dark');
       }
     }, 80);
   } else if (classId) {
-    this._charPreview.loadModel(classId, colorId || 'default', raceId || 'human', gender || 'male');
+    this._charPreview.loadModel(classId, colorId || 'default', raceId || 'human', gender || 'male',
+      hairStyle || 'none', hairColor || 'dark');
   }
 };
 
@@ -397,7 +403,8 @@ GameUI.prototype._buildWizardClassStep = function (container, member) {
       if (nb) nb.disabled = false;
       anime({ targets: card, scale: [0.95, 1.0], duration: 200, easing: 'easeOutBack' });
       // Update the 3-D preview to show this class
-      self._ensurePreview(cls.id, member.colorId, member.race, member.gender);
+      self._ensurePreview(cls.id, member.colorId, member.race, member.gender,
+        member.hairStyle, member.hairColor);
     });
 
     grid.appendChild(card);
@@ -407,7 +414,8 @@ GameUI.prototype._buildWizardClassStep = function (container, member) {
 
   // If a class was already selected (e.g. navigating back), show it in the preview
   if (member.classId) {
-    self._ensurePreview(member.classId, member.colorId, member.race, member.gender);
+    self._ensurePreview(member.classId, member.colorId, member.race, member.gender,
+      member.hairStyle, member.hairColor);
   }
 
   anime({ targets: grid.querySelectorAll('.card'), translateY: [16, 0], opacity: [0, 1],
@@ -463,6 +471,86 @@ GameUI.prototype._buildWizardBackgroundStep = function (container, member) {
     duration: 340, easing: 'easeOutQuart', delay: anime.stagger(50) });
 };
 
+GameUI.prototype._buildWizardHairStep = function (container, member, memberIdx) {
+  var self = this;
+  var wrap = document.createElement('div');
+  wrap.className = 'wizard-identity';
+
+  // ── Hair style ────────────────────────────────────────────────────────────
+  var styleLabel = document.createElement('div');
+  styleLabel.className = 'wizard-color-label';
+  styleLabel.textContent = 'Hair Style';
+  wrap.appendChild(styleLabel);
+
+  var styleRow = document.createElement('div');
+  styleRow.className = 'hair-style-row';
+
+  var currentStyle = member.hairStyle || 'none';
+
+  HAIR_STYLES.forEach(function (style) {
+    var btn = document.createElement('button');
+    btn.className = 'hair-style-btn' + (style.id === currentStyle ? ' selected' : '');
+    btn.title = style.name;
+    btn.innerHTML = '<span class="hair-icon">' + style.icon + '</span>' +
+                    '<span class="hair-label">' + style.name + '</span>';
+    btn.addEventListener('click', function () {
+      styleRow.querySelectorAll('.hair-style-btn').forEach(function (b) { b.classList.remove('selected'); });
+      btn.classList.add('selected');
+      member.hairStyle = style.id;
+      anime({ targets: btn, scale: [0.90, 1.0], duration: 180, easing: 'easeOutBack' });
+      // Reload preview with updated hair
+      if (self._charPreview && member.classId) {
+        self._charPreview.loadModel(member.classId, member.colorId || 'default',
+          member.race || 'human', member.gender || 'male',
+          style.id, member.hairColor || 'dark');
+      }
+    });
+    styleRow.appendChild(btn);
+  });
+  wrap.appendChild(styleRow);
+
+  // ── Hair colour ───────────────────────────────────────────────────────────
+  var colorLabel = document.createElement('div');
+  colorLabel.className = 'wizard-color-label';
+  colorLabel.textContent = 'Hair Colour';
+  wrap.appendChild(colorLabel);
+
+  var colorRow = document.createElement('div');
+  colorRow.className = 'color-swatches';
+  var currentColor = member.hairColor || 'dark';
+
+  HAIR_COLORS.forEach(function (color) {
+    var swatch = document.createElement('div');
+    swatch.className = 'color-swatch' + (color.id === currentColor ? ' selected' : '');
+    swatch.dataset.color = color.id;
+    swatch.title = color.name;
+    swatch.style.backgroundColor = color.hex;
+
+    swatch.addEventListener('click', function () {
+      colorRow.querySelectorAll('.color-swatch').forEach(function (s) { s.classList.remove('selected'); });
+      swatch.classList.add('selected');
+      member.hairColor = color.id;
+      anime({ targets: swatch, scale: [0.85, 1.0], duration: 200, easing: 'easeOutBack' });
+      // Reload preview with updated hair colour
+      if (self._charPreview && member.classId) {
+        self._charPreview.loadModel(member.classId, member.colorId || 'default',
+          member.race || 'human', member.gender || 'male',
+          member.hairStyle || 'none', color.id);
+      }
+    });
+    colorRow.appendChild(swatch);
+  });
+  wrap.appendChild(colorRow);
+
+  container.appendChild(wrap);
+
+  // Show the 3-D preview with current hair settings
+  if (member.classId) {
+    self._ensurePreview(member.classId, member.colorId, member.race, member.gender,
+      member.hairStyle, member.hairColor);
+  }
+};
+
 GameUI.prototype._buildWizardIdentityStep = function (container, member, memberIdx, mmeta) {
   var self = this;
   var wrap = document.createElement('div');
@@ -505,7 +593,8 @@ GameUI.prototype._buildWizardIdentityStep = function (container, member, memberI
       anime({ targets: btn, scale: [0.90, 1.0], duration: 180, easing: 'easeOutBack' });
       // Reload the 3-D preview with updated gender
       if (self._charPreview && member.classId) {
-        self._charPreview.loadModel(member.classId, member.colorId || 'default', member.race || 'human', opt.id);
+        self._charPreview.loadModel(member.classId, member.colorId || 'default', member.race || 'human', opt.id,
+          member.hairStyle || 'none', member.hairColor || 'dark');
       }
     });
     genderRow.appendChild(btn);
@@ -573,7 +662,8 @@ GameUI.prototype._buildWizardIdentityStep = function (container, member, memberI
 
   // Ensure the 3-D preview shows the current class with the current colour
   if (member.classId) {
-    self._ensurePreview(member.classId, member.colorId, member.race, member.gender);
+    self._ensurePreview(member.classId, member.colorId, member.race, member.gender,
+      member.hairStyle, member.hairColor);
   }
 
   // Auto-focus the name input after render
