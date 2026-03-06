@@ -840,6 +840,7 @@ var game = (function () {
           race:         m.race         || 'human',
           classId:      m.classId      || 'warrior',
           backgroundId: m.backgroundId || null,
+          portrait:     m.portrait     || null,
           colorId:      m.colorId      || 'default',
           level: 1, exp: 0,
           hp: 0   // placeholder — Character constructor sets hp = maxHp on creation
