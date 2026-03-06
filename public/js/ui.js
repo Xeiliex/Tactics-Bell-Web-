@@ -119,6 +119,12 @@ GameUI.prototype.showTitleScreen = function () {
 GameUI.prototype.showPartyChoiceScreen = function () {
   this._disposePreview();
   this.showScreen('screen-party-select');
+
+  // Wire up buttons now that this screen is active.
+  document.getElementById('btn-custom-party').addEventListener('click', () => {
+    if (this.game && this.game.ui) this.game.ui.showCreateScreen();
+  });
+
   anime({ targets: '#screen-party-select .card', translateY: [20, 0], opacity: [0, 1], duration: 400, delay: anime.stagger(100) });
 };
 
