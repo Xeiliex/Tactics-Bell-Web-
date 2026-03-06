@@ -91,7 +91,9 @@ var TERRAIN_MODEL_FILES = {
   Forest:   'terrain-forest.obj',
   Water:    'terrain-water.obj',
   Mountain: 'terrain-mountain.obj',
-  Road:     'terrain-road.obj'
+  Road:     'terrain-road.obj',
+  'Cobblestone Road': 'terrain-cobblestone.obj',
+  'Dirt Path':        'terrain-dirt.obj'
 };
 
 // Uniform scale applied to every loaded terrain model.
@@ -106,13 +108,15 @@ var TERRAIN_PBR_PROPS = {
   Forest:   { metallic: 0.0,  roughness: 0.95 },
   Water:    { metallic: 0.0,  roughness: 0.06, alpha: 0.85 },
   Mountain: { metallic: 0.08, roughness: 0.92 },
-  Road:     { metallic: 0.0,  roughness: 0.65 },
+  Road:     { metallic: 0.0,  roughness: 0.85 },
   Lava:         { metallic: 0.0,  roughness: 0.88,
                   emissiveR: 0.8,  emissiveG: 0.12, emissiveB: 0.0, emissiveIntensity: 2.0 },
   Crystal:      { metallic: 0.25, roughness: 0.05, alpha: 0.85,
                   emissiveR: 0.18, emissiveG: 0.06, emissiveB: 0.28, emissiveIntensity: 0.5 },
   'Broken Road': { metallic: 0.05, roughness: 0.92 },
-  Ruins:         { metallic: 0.10, roughness: 0.96 }
+  Ruins:         { metallic: 0.10, roughness: 0.96 },
+  'Cobblestone Road': { metallic: 0.02, roughness: 0.75 },
+  'Dirt Path':        { metallic: 0.0,  roughness: 0.90 }
 };
 
 // ─── Map prop configuration ───────────────────────────────────────────────────
@@ -173,6 +177,7 @@ function GameScene() {
   this._frameEl       = null; // #debug-fps-frame DOM element
   this._shadowGenerator = null; // ShadowGenerator for directional light
   this._fxaaPostProcess = null; // FXAA anti-aliasing post-process
+  this._glowLayer       = null; // GlowLayer for bloom effects
   // Weather
   this._weatherPs     = null;  // active weather BABYLON.ParticleSystem
   this._weatherTickFn = null;  // gameLoop callback for animated weather effects
@@ -224,10 +229,19 @@ GameScene.prototype.init = function (canvasId) {
 
   // Shadow generator — quality scaled by hardware tier
   var shadowMapSize = (typeof HARDWARE_TIER !== 'undefined' && HARDWARE_TIER === 'low') ? 512 : 1024;
-  var shadowGen = new BABYLON.ShadowGenerator(shadowMapSize, dirLight);
-  shadowGen.useBlurExponentialShadowMap = (typeof HARDWARE_TIER === 'undefined' || HARDWARE_TIER !== 'low');
-  shadowGen.blurKernel = 8;
-  this._shadowGenerator = shadowGen;
+  this._shadowGenerator = new BABYLON.ShadowGenerator(shadowMapSize, dirLight);
+
+  // Use high-quality Contact Hardening Shadows (PCSS) on high-end hardware for
+  // softer, more realistic shadows.  Falls back to PCF on lower-end.
+  if (typeof HARDWARE_TIER === 'undefined' || HARDWARE_TIER !== 'low') {
+    this._shadowGenerator.useContactHardeningShadow = true;
+    this._shadowGenerator.contactHardeningLightSizeUVRatio = 0.07; // Softness
+    this._shadowGenerator.setDarkness(0.4); // Less intense shadows
+  } else {
+    this._shadowGenerator.usePercentageCloserFiltering = true;
+  }
+
+  this._shadowGenerator.bias = 0.005;
 
   // FXAA anti-aliasing post-process — smooths jagged edges on high-end hardware.
   // Skipped on low-end / software renderers where the GPU overhead is unwanted.
@@ -235,8 +249,17 @@ GameScene.prototype.init = function (canvasId) {
     this._fxaaPostProcess = new BABYLON.FxaaPostProcess('fxaa', 1.0, this.camera);
   }
 
-  // PBR environment intensity for image-based lighting
-  this.scene.environmentIntensity = 0.4;
+  // Glow layer for bloom effects on emissive materials (lava, crystals, magic)
+  this._glowLayer = new BABYLON.GlowLayer('glow', this.scene, {
+    mainTextureFixedSize: 512,
+    blurKernelSize: 64
+  });
+  this._glowLayer.intensity = 0.6;
+
+  // PBR environment texture for image-based lighting (IBL)
+  // This adds realistic reflections and ambient light to all PBR materials.
+  var envTex = BABYLON.CubeTexture.CreateFromPrefilteredData('textures/environment.env', this.scene);
+  this.scene.environmentTexture = envTex;
 
   // Render loop
   var self = this;
@@ -336,6 +359,60 @@ GameScene.prototype.renderGrid = function (grid) {
   // Asynchronously place environmental prop decorations from the medieval-village
   // megakit glTF models (high-quality only — no-op on low-end hardware).
   this._addMapProps(grid);
+};
+
+/**
+ * Update the visual appearance of one or more tiles after their terrain type
+ * has been changed by a game event (e.g. weather).
+ * @param {Tile[]} tiles
+ */
+GameScene.prototype.changeTileTerrain = function (tiles) {
+  if (!this.scene || !tiles || !tiles.length) return;
+  var self = this;
+
+  tiles.forEach(function (tile) {
+    var oldMesh = tile.mesh;
+    var newTerrain = tile.terrain;
+    var pos = self.gridToWorld(tile.row, tile.col);
+
+    // Create a new procedural box as a base. This will be upgraded to a model
+    // if one is available for the new terrain type.
+    var isHigh = (newTerrain === TERRAIN.MOUNTAIN);
+    var tileH  = isHigh ? 0.5 : 0.14;
+    var newBox = BABYLON.MeshBuilder.CreateBox('tile_' + tile.row + '_' + tile.col, {
+      width: TILE_STEP * 0.93, height: tileH, depth: TILE_STEP * 0.93
+    }, self.scene);
+    newBox.position = new BABYLON.Vector3(pos.x, isHigh ? tileH / 2 : -tileH / 2, pos.z);
+
+    // Apply the correct PBR material for the new terrain type.
+    var matKey = newTerrain.name;
+    if (!self._tileMat[matKey]) {
+      // Material not yet created for this scene, so build it now.
+      var mat = new BABYLON.PBRMaterial('mat_' + matKey, self.scene);
+      var pbr = TERRAIN_PBR_PROPS[matKey] || { metallic: 0.0, roughness: 0.82 };
+      mat.albedoColor = new BABYLON.Color3(newTerrain.r, newTerrain.g, newTerrain.b);
+      mat.metallic    = pbr.metallic;
+      mat.roughness   = pbr.roughness;
+      if (pbr.alpha !== undefined) mat.alpha = pbr.alpha;
+      self._tileMat[matKey] = mat;
+    }
+    newBox.material = self._tileMat[matKey];
+    newBox.metadata = { row: tile.row, col: tile.col };
+    newBox.isPickable = true;
+    newBox.receiveShadows = true;
+
+    // Dispose the old mesh and update tracking arrays.
+    if (oldMesh) {
+      var idx = self._tileMeshes.indexOf(oldMesh);
+      if (idx !== -1) self._tileMeshes.splice(idx, 1);
+      oldMesh.dispose();
+    }
+    tile.mesh = newBox;
+    self._tileMeshes.push(newBox);
+  });
+
+  // Asynchronously upgrade the new procedural boxes to full 3D models.
+  this._upgradeToModels({ tiles: tiles.map(function (t) { return [t]; }), size: this._gridSize });
 };
 
 // ─── Terrain model loading ────────────────────────────────────────────────────
@@ -667,32 +744,8 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
             node.body.setEnabled(false);
             node.head.setEnabled(false);
 
-            // If the glTF model has no head mesh (e.g. Peasant bodies),
-            // create a procedural sphere parented to the unit root so
-            // the character doesn't appear headless in battle.
-            var hasHeadMesh = geoMeshes.some(function (m) {
-              return m.name && m.name.toLowerCase().indexOf('head') !== -1;
-            });
-            if (!hasHeadMesh) {
-              var headSphere = BABYLON.MeshBuilder.CreateSphere(
-                'charhead_' + unit.id,
-                { diameter: 0.28, segments: 10 },
-                self.scene
-              );
-              var skinColor = unit.meshColor();
-              var headMat = new BABYLON.PBRMaterial('charheadmat_' + unit.id, self.scene);
-              headMat.albedoColor = new BABYLON.Color3(skinColor.r, skinColor.g, skinColor.b);
-              headMat.metallic    = 0.0;
-              headMat.roughness   = 0.9;
-              headSphere.material = headMat;
-              // Position at neck level in model-local space (before scale is applied
-              // by the parent TransformNode, so use unscaled coords: head ≈ Y 1.65).
-              headSphere.position = new BABYLON.Vector3(0, 1.65, 0);
-              headSphere.parent   = unitRoot;
-              headSphere.isPickable = false;
-              headSphere.receiveShadows = true;
-              if (self._shadowGenerator) { self._shadowGenerator.addShadowCaster(headSphere, true); }
-            }
+            // Attach a procedural head if the model is missing one.
+            self._attachHeadMesh(unit, unitRoot, geoMeshes, true);
 
             // Attach procedural hair above the head.
             self._attachHairMesh(unit, unitRoot);
@@ -730,6 +783,9 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
             var clone = template.clone('charmodel_' + unit.id);
             clone.setEnabled(true);
             clone.position   = new BABYLON.Vector3(pos.x, 0, pos.z);
+
+            // Attach procedural hair above the head.
+            self._attachHairMesh(unit, clone);
             clone.isPickable = false;
             clone.receiveShadows = true;
 
@@ -750,7 +806,6 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
             node.model      = clone;
             node.modelParts = [clone];
 
-            self._attachHairMesh(unit, clone);
             self._startIdleAnim(unit.id, clone, null);
           });
 
@@ -850,6 +905,46 @@ GameScene.prototype._startIdleAnim = function (unitId, mesh, skeleton) {
   });
 };
 
+/**
+ * Attaches a procedural head sphere to a character model if it doesn't have one.
+ * This is a fallback for models like the Peasant body that are headless by design.
+ */
+GameScene.prototype._attachHeadMesh = function (unit, rootNode, meshes, isGltf) {
+  if (!this.scene || !rootNode) return;
+
+  // Check if a head mesh already exists in the provided geometry.
+  var hasHeadMesh = meshes.some(function (m) {
+    return m.name && m.name.toLowerCase().indexOf('head') !== -1;
+  });
+  if (hasHeadMesh) return;
+
+  // Create a procedural sphere for the head.
+  var headSphere = BABYLON.MeshBuilder.CreateSphere(
+    'charhead_' + unit.id,
+    { diameter: 0.28, segments: 10 },
+    this.scene
+  );
+
+  // Apply the unit's skin color to the head.
+  var skinColor = unit.meshColor();
+  var headMat = new BABYLON.PBRMaterial('charheadmat_' + unit.id, this.scene);
+  headMat.albedoColor = new BABYLON.Color3(skinColor.r, skinColor.g, skinColor.b);
+  headMat.metallic    = 0.0;
+  headMat.roughness   = 0.9;
+  headSphere.material = headMat;
+
+  // Position at neck level in model-local space. The Y position differs
+  // between the glTF models and the older OBJ fallbacks.
+  var headY = isGltf ? 1.65 : 0.73;
+  headSphere.position = new BABYLON.Vector3(0, headY, 0);
+
+  headSphere.parent   = rootNode;
+  headSphere.isPickable = false;
+  headSphere.receiveShadows = true;
+  if (this._shadowGenerator) {
+    this._shadowGenerator.addShadowCaster(headSphere, true);
+  }
+};
 
 // ─── Procedural hair mesh ─────────────────────────────────────────────────────
 // Attaches a simple procedural hair mesh to the character's head position.

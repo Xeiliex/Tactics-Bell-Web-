@@ -188,12 +188,38 @@ Combat.prototype.nextUnit = function () {
 Combat.prototype.endRound = function () {
   this.turnNumber++;
   this.ui.setTurnNumber(this.turnNumber);
+
+  // Apply weather effects on terrain at the start of a new round.
+  this._applyWeatherTerrainChanges();
   // Notify listeners (e.g. story battle events) that a new round has started
   if (this.onNewRound) { this.onNewRound(this.turnNumber); }
   // Rebuild turn order (units may have died)
   this.buildTurnOrder();
   this.ui.updateTurnOrder(this.turnOrder, this.currentUnit());
   this.advanceToCurrentUnit();
+};
+
+/**
+ * At the start of a new round, iterate through all tiles and apply any
+ * terrain transformations defined by the current weather type.
+ */
+Combat.prototype._applyWeatherTerrainChanges = function () {
+  if (!this.weather || !this.weather.terrainChanges) return;
+
+  var changes = this.weather.terrainChanges;
+  var changedTiles = [];
+
+  for (var r = 0; r < this.grid.size; r++) {
+    for (var c = 0; c < this.grid.size; c++) {
+      var tile = this.grid.tiles[r][c];
+      var effect = changes[tile.terrain.name];
+      if (effect && Math.random() < effect.prob) {
+        tile.terrain = effect.to;
+        changedTiles.push(tile);
+      }
+    }
+  }
+  if (changedTiles.length > 0) this.scene.changeTileTerrain(changedTiles);
 };
 
 // ─── Victory / defeat checks ─────────────────────────────────────────────────

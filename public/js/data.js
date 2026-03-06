@@ -11,9 +11,11 @@ var TERRAIN = {
   MOUNTAIN: { name: 'Mountain', passable: false, defBonus: 0, resBonus: 0, hexColor: '#78909C', r: 0.47, g: 0.56, b: 0.61 },
   ROAD:        { name: 'Road',        passable: true,  defBonus: 0, resBonus: 0, hexColor: '#FFF176', r: 0.88, g: 0.84, b: 0.46 },
   LAVA:        { name: 'Lava',        passable: false, defBonus: 0, resBonus: 0, hexColor: '#FF5722', r: 1.00, g: 0.34, b: 0.13 },
-  CRYSTAL:     { name: 'Crystal',     passable: true,  defBonus: 0, resBonus: 2, hexColor: '#CE93D8', r: 0.81, g: 0.58, b: 0.85 },
-  BROKEN_ROAD: { name: 'Broken Road', passable: true,  defBonus: 0, resBonus: 0, hexColor: '#8D6E63', r: 0.55, g: 0.43, b: 0.39 },
-  RUINS:       { name: 'Ruins',       passable: false, defBonus: 0, resBonus: 0, hexColor: '#6D4C41', r: 0.43, g: 0.30, b: 0.26 }
+  CRYSTAL:          { name: 'Crystal',          passable: true,  defBonus: 0, resBonus: 2, hexColor: '#CE93D8', r: 0.81, g: 0.58, b: 0.85 },
+  BROKEN_ROAD:      { name: 'Broken Road',      passable: true,  defBonus: 0, resBonus: 0, hexColor: '#8D6E63', r: 0.55, g: 0.43, b: 0.39 },
+  RUINS:            { name: 'Ruins',            passable: false, defBonus: 0, resBonus: 0, hexColor: '#6D4C41', r: 0.43, g: 0.30, b: 0.26 },
+  COBBLESTONE_ROAD: { name: 'Cobblestone Road', passable: true,  defBonus: 0, resBonus: 0, hexColor: '#B0BEC5', r: 0.69, g: 0.75, b: 0.77 },
+  DIRT_PATH:        { name: 'Dirt Path',        passable: true,  defBonus: 0, resBonus: 0, hexColor: '#A1887F', r: 0.63, g: 0.53, b: 0.50 }
 };
 
 // ═══════════════════════════════════════
@@ -26,12 +28,33 @@ var TERRAIN = {
 //          Negative values make attacks harder to land.
 //          Fog (−3) severely obscures targeting; Wind (−2) deflects shots.
 //
+// terrainChanges — (optional) map of terrain transformations this weather can cause.
+//                  Keyed by the original terrain name (from TERRAIN).
+//                  `to` is the new TERRAIN type.
+//                  `prob` is the per-tile chance (0–1) of this change occurring each round.
+//
 var WEATHER_TYPES = {
-  clear: { id: 'clear', name: 'Clear', emoji: '\u2600\uFE0F',  description: 'Clear skies.',                                    spdMod:  0, hitMod:  0 },
-  rain:  { id: 'rain',  name: 'Rain',  emoji: '\uD83C\uDF27\uFE0F', description: 'Rain slows movement and soaks gear.',             spdMod: -1, hitMod: -1 },
-  snow:  { id: 'snow',  name: 'Snow',  emoji: '\u2744\uFE0F',  description: 'Snow buries the field and chills everyone.',      spdMod: -2, hitMod:  0 },
-  wind:  { id: 'wind',  name: 'Wind',  emoji: '\uD83D\uDCA8',  description: 'Howling winds throw off every shot.',             spdMod:  0, hitMod: -2 },
-  fog:   { id: 'fog',   name: 'Fog',   emoji: '\uD83C\uDF2B\uFE0F', description: 'Thick fog makes targeting nearly impossible.', spdMod:  0, hitMod: -3 }
+  clear: { id: 'clear', name: 'Clear', emoji: '☀️',  description: 'Clear skies.',
+    spdMod:  0, hitMod:  0
+  },
+  rain:  { id: 'rain',  name: 'Rain',  emoji: '🌧️', description: 'Rain slows movement and soaks gear. Can cool lava.',
+    spdMod: -1, hitMod: -1,
+    terrainChanges: {
+      Lava: { to: TERRAIN.BROKEN_ROAD, prob: 0.35 }
+    }
+  },
+  snow:  { id: 'snow',  name: 'Snow',  emoji: '❄️',  description: 'Snow buries the field and chills everyone. Can freeze water.',
+    spdMod: -2, hitMod:  0,
+    terrainChanges: {
+      Water: { to: TERRAIN.GRASS, prob: 0.25 }
+    }
+  },
+  wind:  { id: 'wind',  name: 'Wind',  emoji: '💨',  description: 'Howling winds throw off every shot.',
+    spdMod:  0, hitMod: -2
+  },
+  fog:   { id: 'fog',   name: 'Fog',   emoji: '🌫️', description: 'Thick fog makes targeting nearly impossible.',
+    spdMod:  0, hitMod: -3
+  }
 };
 
 // ═══════════════════════════════════════

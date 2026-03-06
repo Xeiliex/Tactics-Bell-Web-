@@ -116,6 +116,12 @@ GameUI.prototype.showTitleScreen = function () {
   });
 };
 
+GameUI.prototype.showPartyChoiceScreen = function () {
+  this._disposePreview();
+  this.showScreen('screen-party-select');
+  anime({ targets: '#screen-party-select .card', translateY: [20, 0], opacity: [0, 1], duration: 400, delay: anime.stagger(100) });
+};
+
 // ─── Character creation wizard ────────────────────────────────────────────────
 
 var WIZARD_STEP_META = [
@@ -701,6 +707,12 @@ GameUI.prototype.showPartyReviewScreen = function () {
       : '<div class="review-member-emoji">' + CLASSES[member.classId].emoji + '</div>';
 
     var card = document.createElement('div');
+    // For story mode, the back button should go to the wizard, not party choice.
+    var backBtn = document.getElementById('btn-review-back');
+    if (backBtn) {
+      backBtn.textContent = game.story ? '← Recreate' : '← Back';
+    }
+
     card.className = 'review-member-card' + (i === 0 ? ' hero-card' : '');
     card.innerHTML =
       '<div class="review-member-role">' + memberTitles[i] + '</div>' +

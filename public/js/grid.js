@@ -7,6 +7,73 @@
 
 var GRID_SIZE = 10;
 
+// ─── Perlin noise generator ───────────────────────────────────────────────────
+// Classic 2D Perlin noise implementation for procedural terrain generation.
+// Adapted from the public-domain Java implementation by Ken Perlin.
+
+var PerlinNoise = (function () {
+  var p = new Uint8Array(512);
+
+  function _init() {
+    var permutation = [];
+    for (var i = 0; i < 256; i++) { permutation[i] = i; }
+    // Shuffle permutation array
+    for (var i = 255; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = permutation[i]; permutation[i] = permutation[j]; permutation[j] = tmp;
+    }
+    for (var i = 0; i < 256; i++) { p[i] = p[i + 256] = permutation[i]; }
+  }
+
+  function _fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  function _lerp(t, a, b) { return a + t * (b - a); }
+  function _grad(hash, x, y) {
+    var h = hash & 15;
+    var u = h < 8 ? x : y;
+    var v = h < 4 ? y : (h === 12 || h === 14 ? x : 0);
+    return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+  }
+
+  /** Generate a 2D Perlin noise value for coordinates (x, y). Returns [-1, 1]. */
+  function noise(x, y) {
+    var xi = Math.floor(x) & 255;
+    var yi = Math.floor(y) & 255;
+    var xf = x - Math.floor(x);
+    var yf = y - Math.floor(y);
+
+    var u = _fade(xf);
+    var v = _fade(yf);
+
+    var aa = p[p[xi] + yi];
+    var ab = p[p[xi] + yi + 1];
+    var ba = p[p[xi + 1] + yi];
+    var bb = p[p[xi + 1] + yi + 1];
+
+    var n1 = _grad(aa, xf, yf);
+    var n2 = _grad(ba, xf - 1, yf);
+    var n3 = _grad(ab, xf, yf - 1);
+    var n4 = _grad(bb, xf - 1, yf - 1);
+
+    var n_x1 = _lerp(u, n1, n2);
+    var n_x2 = _lerp(u, n3, n4);
+    return _lerp(v, n_x1, n_x2);
+  }
+
+  /** Octave-summed ("fractal") noise for more detail. Returns [-1, 1]. */
+  function fractal(x, y, octaves, persistence) {
+    var total = 0, frequency = 1, amplitude = 1, maxValue = 0;
+    for (var i = 0; i < octaves; i++) {
+      total += noise(x * frequency, y * frequency) * amplitude;
+      maxValue += amplitude;
+      amplitude *= persistence; frequency *= 2;
+    }
+    return total / maxValue;
+  }
+
+  _init();
+  return { noise: noise, fractal: fractal, reseed: _init };
+}());
+
 /**
  * Represents a single tile on the battle grid.
  */
@@ -150,37 +217,99 @@ function generateStage(stage) {
   var size = gridSizeForStage(stage);
   var grid = new Grid(size);
 
-  // 1. Fill with grass
+  // 1. Pick a map config appropriate for this stage and grid size
+  var config = selectMapConfig(stage, size);
+
+  // 2. Generate terrain using Perlin noise
+  PerlinNoise.reseed();
+  var elevNoiseScale   = 6.5 / size;
+  var featureNoiseScale = 9.0 / size;
+
   grid.tiles = [];
   for (var r = 0; r < size; r++) {
     grid.tiles[r] = [];
     for (var c = 0; c < size; c++) {
-      grid.tiles[r][c] = new Tile(r, c, TERRAIN.GRASS);
-    }
-  }
+      var elev    = PerlinNoise.fractal(c * elevNoiseScale,    r * elevNoiseScale,    4, 0.5);
+      var feature = PerlinNoise.fractal(c * featureNoiseScale, r * featureNoiseScale, 5, 0.6);
 
-  // 2. Pick a map config appropriate for this stage and grid size
-  var config = selectMapConfig(stage, size);
+      var terrain = TERRAIN.GRASS;
+      if (elev < -0.45) {
+        terrain = TERRAIN.WATER;
+      } else if (elev > 0.6) {
+        terrain = TERRAIN.MOUNTAIN;
+      } else if (elev > 0.5) {
+        terrain = TERRAIN.BROKEN_ROAD;
+      } else {
+        // Grasslands: add features based on the second noise map
+        if (feature > 0.55) {
+          terrain = TERRAIN.FOREST;
+        } else if (feature < -0.6) {
+          // Place ruins in "drier" areas
+          var isWall = PerlinNoise.noise(c * 2, r * 2) > 0.3;
+          terrain = isWall ? TERRAIN.RUINS : TERRAIN.BROKEN_ROAD;
+        } else if (Math.abs(feature) > 0.5 && elev > 0.3) {
+          terrain = TERRAIN.CRYSTAL;
+        }
+      }
 
-  // 3. Paint terrain clusters from the config's palette
-  config.palette.forEach(function (entry) {
-    for (var s = 0; s < entry.seeds; s++) {
-      var sr = randInt(1, size - 2);
-      var sc = randInt(1, size - 2);
-      paintCluster(grid, sr, sc, entry.type, entry.spread);
+      grid.tiles[r][c] = new Tile(r, c, terrain);
     }
   });
 
-  // 4. Add road tiles connecting the spawn zones
+
+/** Cellular-automata-style blob painter */
+function paintCluster(grid, seedRow, seedCol, terrain, spreadChance) {
+  var stack = [{ row: seedRow, col: seedCol, chance: spreadChance }];
+  var visited = {};
+  visited[seedRow + ',' + seedCol] = true;
+
+  while (stack.length) {
+    var cur = stack.pop();
+    var tile = grid.tiles[cur.row][cur.col];
+
+    // For mountains, leave some BROKEN_ROAD at the edges for a more rugged feel.
+    if (terrain === TERRAIN.MOUNTAIN && Math.random() > 0.75) {
+      tile.terrain = TERRAIN.BROKEN_ROAD;
+    } else {
+      tile.terrain = terrain;
+    }
+
+    var nbrs = grid.neighbours(cur.row, cur.col);
+    for (var i = 0; i < nbrs.length; i++) {
+      var key = nbrs[i].row + ',' + nbrs[i].col;
+      // For forests, make them denser in the middle by reducing spread chance.
+      var nextChance = (terrain === TERRAIN.FOREST) ? cur.chance * 0.85 : cur.chance;
+      if (!visited[key] && Math.random() < nextChance) {
+        visited[key] = true;
+        stack.push({ row: nbrs[i].row, col: nbrs[i].col, chance: nextChance });
+      }
+    }
+  }
+}
+
+/** Paints a rectangular building ruin with walls and a floor. */
+function paintBuilding(grid, r, c, width, height) {
+  for (var i = 0; i < width; i++) {
+    for (var j = 0; j < height; j++) {
+      var tile = grid.getTile(r + j, c + i);
+      if (tile) {
+        var isWall = (i === 0 || j === 0 || i === width - 1 || j === height - 1);
+        tile.terrain = isWall ? TERRAIN.RUINS : TERRAIN.BROKEN_ROAD;
+      }
+    }
+  }
+}
+
+  // 3. Add road tiles connecting the spawn zones
   var p0 = config.playerSpawns[0];
   var e0 = config.enemySpawns[0];
   addRoad(grid, p0.row, p0.col, e0.row, e0.col);
 
-  // 5. Clear spawn zones so they are always accessible (must run after addRoad)
+  // 4. Clear spawn zones so they are always accessible (must run after addRoad)
   clearSpawnArea(grid, config.playerSpawns);
   clearSpawnArea(grid, config.enemySpawns);
 
-  // 6. Assign spawn positions from the config
+  // 5. Assign spawn positions from the config
   grid.playerSpawns = config.playerSpawns;
   grid.enemySpawns  = config.enemySpawns;
 
@@ -218,35 +347,17 @@ function clearSpawnArea(grid, spawns) {
   });
 }
 
-/** Cellular-automata-style blob painter */
-function paintCluster(grid, seedRow, seedCol, terrain, spreadChance) {
-  var stack = [{ row: seedRow, col: seedCol }];
-  var visited = {};
-  visited[seedRow + ',' + seedCol] = true;
-
-  while (stack.length) {
-    var cur = stack.pop();
-    grid.tiles[cur.row][cur.col].terrain = terrain;
-    var nbrs = grid.neighbours(cur.row, cur.col);
-    for (var i = 0; i < nbrs.length; i++) {
-      var key = nbrs[i].row + ',' + nbrs[i].col;
-      if (!visited[key] && Math.random() < spreadChance) {
-        visited[key] = true;
-        stack.push({ row: nbrs[i].row, col: nbrs[i].col });
-      }
-    }
-  }
-}
-
 /** Adds a loose road path connecting two points, with ~25% of tiles as broken road */
 function addRoad(grid, r1, c1, r2, c2) {
   var r = r1, c = c1;
   var size = grid.size;
+  var roadType = (Math.random() < 0.5) ? TERRAIN.COBBLESTONE_ROAD : TERRAIN.DIRT_PATH;
+
   while (r !== r2 || c !== c2) {
     if (grid.getTile(r, c)) {
       var t = grid.tiles[r][c];
       if (t.terrain === TERRAIN.GRASS || t.terrain === TERRAIN.CRYSTAL) {
-        t.terrain = (Math.random() < 0.25) ? TERRAIN.BROKEN_ROAD : TERRAIN.ROAD;
+        t.terrain = (Math.random() < 0.25) ? TERRAIN.BROKEN_ROAD : roadType;
       }
     }
     // Randomly step toward target

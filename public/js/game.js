@@ -215,7 +215,7 @@ var game = (function () {
       g.player      = null;
       g.partyConfig = null;
       g.story       = null;
-      g.ui.showCreateScreen();
+      g.ui.showPartyChoiceScreen();
     });
 
     // Title → Story Mode
@@ -294,6 +294,21 @@ var game = (function () {
       }
     });
 
+    // Party Choice → Custom Party
+    document.getElementById('btn-custom-party').addEventListener('click', function () {
+      if (g.ui) g.ui.showCreateScreen();
+    });
+
+    // Party Choice → Quick Start
+    document.getElementById('btn-prefill-party').addEventListener('click', function () {
+      _startQuickMatch(true); // true = show review screen instead of starting battle
+    });
+
+    // Party Choice → Back to Title
+    document.getElementById('btn-party-choice-back').addEventListener('click', function () {
+      if (g.ui) g.ui.showTitleScreen();
+    });
+
     document.getElementById('btn-wizard-next').addEventListener('click', function () {
       if (g.ui) g.ui.wizardNext();
     });
@@ -301,7 +316,12 @@ var game = (function () {
     // Party Review → Recreate
     document.getElementById('btn-review-back').addEventListener('click', function () {
       // Restart wizard at step 0, member 0, preserving existing choices
-      g.ui.showCreateScreen();
+      if (g.story) {
+        g.ui.showCreateScreen();
+      } else {
+        // For non-story mode, go back to the party choice screen
+        g.ui.showPartyChoiceScreen();
+      }
     });
 
     // Party Review → Battle
@@ -804,9 +824,10 @@ var game = (function () {
 
   /**
    * Assign a random predefined hero party from QUICK_MATCH_HERO_PARTIES and
-   * immediately start a stage-1 battle — bypassing the character-creation wizard.
+   * either start a battle or show the review screen.
+   * @param {boolean} [showReview] If true, show the party review screen instead of starting a battle.
    */
-  function _startQuickMatch() {
+  function _startQuickMatch(showReview) {
     var pool  = QUICK_MATCH_HERO_PARTIES;
     var party = pool.length
       ? pool[Math.floor(Math.random() * pool.length)]
@@ -836,7 +857,11 @@ var game = (function () {
       g.partyConfig[0].isPlayer = true;
     }
 
-    startBattle(true);
+    if (showReview) {
+      g.ui.showPartyReviewScreen();
+    } else {
+      startBattle(true);
+    }
   }
 
   // ─── Multiplayer ─────────────────────────────────────────────────────────────
