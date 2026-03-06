@@ -294,11 +294,6 @@ var game = (function () {
       }
     });
 
-    // Party Choice → Quick Start
-    document.getElementById('btn-prefill-party').addEventListener('click', function () {
-      _startQuickMatch(true); // true = show review screen instead of starting battle
-    });
-
     // Party Choice → Back to Title
     document.getElementById('btn-party-choice-back').addEventListener('click', function () {
       if (g.ui) g.ui.showTitleScreen();

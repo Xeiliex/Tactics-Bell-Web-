@@ -119,13 +119,22 @@ GameUI.prototype.showTitleScreen = function () {
 GameUI.prototype.showPartyChoiceScreen = function () {
   this._disposePreview();
   this.showScreen('screen-party-select');
-
-  // Wire up buttons now that this screen is active.
-  document.getElementById('btn-custom-party').addEventListener('click', () => {
-    if (this.game && this.game.ui) this.game.ui.showCreateScreen();
+  anime({
+    targets: '#screen-party-select .card',
+    translateY: [20, 0],
+    opacity: [0, 1],
+    duration: 400,
+    delay: anime.stagger(100),
+    complete: () => {
+      // Wire up buttons now that this screen is active and rendered.
+      document.getElementById('btn-custom-party').addEventListener('click', () => {
+        if (this.game && this.game.ui) this.game.ui.showCreateScreen();
+      });
+      document.getElementById('btn-prefill-party').addEventListener('click', () => {
+        if (this.game) this.game._startQuickMatch(true);
+      });
+    }
   });
-
-  anime({ targets: '#screen-party-select .card', translateY: [20, 0], opacity: [0, 1], duration: 400, delay: anime.stagger(100) });
 };
 
 // ─── Character creation wizard ────────────────────────────────────────────────
