@@ -113,7 +113,12 @@ var game = (function () {
         data.exp     = g.player.exp;
         data.hp      = g.player.hp;
       }
-      localStorage.setItem(SAVE_KEY, _encodeSave(data));
+      var encoded = _encodeSave(data);
+      localStorage.setItem(SAVE_KEY, encoded);
+      // Also persist to the cloud when the player is signed in (fire-and-forget).
+      if (typeof auth !== 'undefined' && auth.getUser()) {
+        auth.saveToCloud(encoded);
+      }
     } catch (e) {
       // localStorage not available in this environment
     }
@@ -1218,11 +1223,12 @@ var game = (function () {
     init();
   }
 
-  // Expose functions needed by StoryManager
-  g.startBattle   = startBattle;
-  g.onBackToTitle = onBackToTitle;
-  g.saveProgress  = saveProgress;
-  g.distributeExp = distributeExp;
+  // Expose functions needed by StoryManager and auth module
+  g.startBattle          = startBattle;
+  g.onBackToTitle        = onBackToTitle;
+  g.saveProgress         = saveProgress;
+  g.distributeExp        = distributeExp;
+  g.updateContinueButton = _updateContinueButton;
 
   return g; // expose for debugging
 
