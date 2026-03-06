@@ -224,6 +224,7 @@ GameUI.prototype._renderWizardStep = function () {
   // hide it on race (0) and background (2) steps, and always hide it when
   // GRAPHICS_QUALITY is 'low' (CharacterPreviewScene is not initialised in
   // that mode, which would leave a blank dark box visible to the user).
+  // Step indices: 0=Race, 1=Class, 2=Background, 3=Hair, 4=Identity
   var previewWrap = document.getElementById('wizard-preview-wrap');
   if (previewWrap) {
     var previewEnabled = (typeof GRAPHICS_QUALITY === 'undefined' || GRAPHICS_QUALITY !== 'low');

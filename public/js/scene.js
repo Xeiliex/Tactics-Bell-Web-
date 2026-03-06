@@ -814,6 +814,8 @@ GameScene.prototype._startIdleAnim = function (unitId, mesh, skeleton) {
   // clavicle/spine: subtle breathing movement with no base offset needed.
   var boneAnims = [
     { name: 'spine_02',   prop: 'rotation.x', base:  0.05, amp:  0.04,  speedMul: 1.0 },
+    // Clavicle amplitude increased to 0.10 (from 0.06) so shoulder movement
+    // remains perceptible alongside the larger arm drop offsets.
     { name: 'clavicle_l', prop: 'rotation.z', base:  0.0,  amp: -0.10,  speedMul: 1.0 },
     { name: 'clavicle_r', prop: 'rotation.z', base:  0.0,  amp:  0.10,  speedMul: 1.0 },
     // Arms drop down from T-pose: base offsets around ±1.2 rad move arms ~70° downward.
@@ -1924,6 +1926,8 @@ function _applyPreviewIdleAnim(skeleton, scene) {
 
   var boneAnims = [
     { name: 'spine_02',   prop: 'rotation.x', base:  0.05, amp:  0.04,  speed: 0.45 },
+    // Clavicle amplitude 0.10 (increased from 0.06) so shoulder movement
+    // remains perceptible alongside the larger arm drop offsets.
     { name: 'clavicle_l', prop: 'rotation.z', base:  0.0,  amp: -0.10,  speed: 0.45 },
     { name: 'clavicle_r', prop: 'rotation.z', base:  0.0,  amp:  0.10,  speed: 0.45 },
     { name: 'upperarm_l', prop: 'rotation.z', base: -1.2,  amp: -0.08,  speed: 0.32 },
