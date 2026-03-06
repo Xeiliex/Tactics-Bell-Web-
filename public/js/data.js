@@ -467,6 +467,28 @@ var BODY_COLORS = [
 ];
 
 // ═══════════════════════════════════════
+//  HAIR STYLE + COLOUR PRESETS  (character customisation)
+// ═══════════════════════════════════════
+var HAIR_STYLES = [
+  { id: 'none',   name: 'None',      icon: '○' },
+  { id: 'short',  name: 'Short',     icon: '◔' },
+  { id: 'medium', name: 'Medium',    icon: '◑' },
+  { id: 'long',   name: 'Long',      icon: '◕' },
+  { id: 'tied',   name: 'Tied Back', icon: '●' }
+];
+
+var HAIR_COLORS = [
+  { id: 'dark',   name: 'Dark',    hex: '#1a0a00', r: 0.10, g: 0.06, b: 0.02 },
+  { id: 'brown',  name: 'Brown',   hex: '#6B3E26', r: 0.42, g: 0.24, b: 0.15 },
+  { id: 'auburn', name: 'Auburn',  hex: '#A0522D', r: 0.63, g: 0.32, b: 0.18 },
+  { id: 'blonde', name: 'Blonde',  hex: '#E8C68A', r: 0.91, g: 0.78, b: 0.54 },
+  { id: 'silver', name: 'Silver',  hex: '#C8CDD4', r: 0.78, g: 0.80, b: 0.83 },
+  { id: 'white',  name: 'White',   hex: '#F0F0F0', r: 0.94, g: 0.94, b: 0.94 },
+  { id: 'red',    name: 'Red',     hex: '#8B1A1A', r: 0.55, g: 0.10, b: 0.10 },
+  { id: 'indigo', name: 'Indigo',  hex: '#2B3BA7', r: 0.17, g: 0.23, b: 0.65 }
+];
+
+// ═══════════════════════════════════════
 //  STAGE ENEMY CONFIGURATIONS
 //  Themed enemy parties that scale with story progression.
 //  Party names reflect the narrative encounter type.

@@ -667,6 +667,36 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
             node.body.setEnabled(false);
             node.head.setEnabled(false);
 
+            // If the glTF model has no head mesh (e.g. Peasant bodies),
+            // create a procedural sphere parented to the unit root so
+            // the character doesn't appear headless in battle.
+            var hasHeadMesh = geoMeshes.some(function (m) {
+              return m.name && m.name.toLowerCase().indexOf('head') !== -1;
+            });
+            if (!hasHeadMesh) {
+              var headSphere = BABYLON.MeshBuilder.CreateSphere(
+                'charhead_' + unit.id,
+                { diameter: 0.28, segments: 10 },
+                self.scene
+              );
+              var skinColor = unit.meshColor();
+              var headMat = new BABYLON.PBRMaterial('charheadmat_' + unit.id, self.scene);
+              headMat.albedoColor = new BABYLON.Color3(skinColor.r, skinColor.g, skinColor.b);
+              headMat.metallic    = 0.0;
+              headMat.roughness   = 0.9;
+              headSphere.material = headMat;
+              // Position at neck level in model-local space (before scale is applied
+              // by the parent TransformNode, so use unscaled coords: head ≈ Y 1.65).
+              headSphere.position = new BABYLON.Vector3(0, 1.65, 0);
+              headSphere.parent   = unitRoot;
+              headSphere.isPickable = false;
+              headSphere.receiveShadows = true;
+              if (self._shadowGenerator) { self._shadowGenerator.addShadowCaster(headSphere, true); }
+            }
+
+            // Attach procedural hair above the head.
+            self._attachHairMesh(unit, unitRoot);
+
             // Store the root node for movement/animation; also keep a direct
             // reference to the first child mesh for hit-flash and physics.
             node.model       = unitRoot;
@@ -720,6 +750,7 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
             node.model      = clone;
             node.modelParts = [clone];
 
+            self._attachHairMesh(unit, clone);
             self._startIdleAnim(unit.id, clone, null);
           });
 
@@ -739,6 +770,10 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
 // gets a gentle Y-position breathing bob.  When a Babylon skeleton is supplied
 // the spine and upper-arm bones also receive subtle idle oscillations, giving the
 // model life without a pre-authored animation clip.
+//
+// The upper-arm bones are offset from the T-pose bind pose to a natural
+// resting position (arms angled ~70° down from horizontal) so the character
+// does not appear stuck in a T-pose during idle.
 //
 // All animations are staggered by a hash of unitId so units don't bob in sync.
 
@@ -773,16 +808,22 @@ GameScene.prototype._startIdleAnim = function (unitId, mesh, skeleton) {
   if (!skeleton) { return; }
   var scene = this.scene;
 
+  // Upper arms: base offset moves them from T-pose (~horizontal) to a
+  // natural resting position (~70° down from horizontal).  The animation
+  // then oscillates gently around that rest position.
+  // clavicle/spine: subtle breathing movement with no base offset needed.
   var boneAnims = [
-    // Chest breathing: spine_02 pitches slightly forward and back.
-    { name: 'spine_02',   prop: 'rotation.x', amp:  0.04,  speedMul: 1.0  },
-    // Shoulder sway: clavicle bones rise and fall in sync with breathing.
-    { name: 'clavicle_l', prop: 'rotation.z', amp: -0.06,  speedMul: 1.0  },
-    { name: 'clavicle_r', prop: 'rotation.z', amp:  0.06,  speedMul: 1.0  },
-    // Arm idle sway: upper arms drift very slightly forward and back,
-    // breaking the static T-pose silhouette.
-    { name: 'upperarm_l', prop: 'rotation.x', amp:  0.10,  speedMul: 0.7  },
-    { name: 'upperarm_r', prop: 'rotation.x', amp:  0.10,  speedMul: 0.7  }
+    { name: 'spine_02',   prop: 'rotation.x', base:  0.05, amp:  0.04,  speedMul: 1.0 },
+    // Clavicle amplitude increased to 0.10 (from 0.06) so shoulder movement
+    // remains perceptible alongside the larger arm drop offsets.
+    { name: 'clavicle_l', prop: 'rotation.z', base:  0.0,  amp: -0.10,  speedMul: 1.0 },
+    { name: 'clavicle_r', prop: 'rotation.z', base:  0.0,  amp:  0.10,  speedMul: 1.0 },
+    // Arms drop down from T-pose: base offsets around ±1.2 rad move arms ~70° downward.
+    { name: 'upperarm_l', prop: 'rotation.z', base: -1.2,  amp: -0.08,  speedMul: 0.7 },
+    { name: 'upperarm_r', prop: 'rotation.z', base:  1.2,  amp:  0.08,  speedMul: 0.7 },
+    // Slight elbow bend to reinforce the resting-arm silhouette.
+    { name: 'lowerarm_l', prop: 'rotation.y', base:  0.30, amp:  0.05,  speedMul: 0.7 },
+    { name: 'lowerarm_r', prop: 'rotation.y', base: -0.30, amp: -0.05,  speedMul: 0.7 }
   ];
 
   boneAnims.forEach(function (cfg) {
@@ -800,13 +841,95 @@ GameScene.prototype._startIdleAnim = function (unitId, mesh, skeleton) {
     bEase.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
     bAnim.setEasingFunction(bEase);
     bAnim.setKeys([
-      { frame: 0,  value: 0         },
-      { frame: 30, value: cfg.amp   },
-      { frame: 60, value: 0         }
+      { frame: 0,  value: cfg.base           },
+      { frame: 30, value: cfg.base + cfg.amp },
+      { frame: 60, value: cfg.base           }
     ]);
     bone.animations = (bone.animations || []).concat([bAnim]);
     scene.beginAnimation(bone, 0, 60, true, speed * cfg.speedMul);
   });
+};
+
+
+// ─── Procedural hair mesh ─────────────────────────────────────────────────────
+// Attaches a simple procedural hair mesh to the character's head position.
+// The hair is parented to the character root so it moves with the unit.
+// Hair style controls the shape; hair color controls the material.
+// Called for both glTF-loaded models and OBJ fallbacks.
+
+GameScene.prototype._attachHairMesh = function (unit, rootMesh) {
+  if (!this.scene || !rootMesh) return;
+  var styleId = (unit && unit.hairStyle) ? unit.hairStyle : 'none';
+  if (styleId === 'none') return;
+
+  var colorId = (unit && unit.hairColor) ? unit.hairColor : 'dark';
+  var col = { r: 0.10, g: 0.06, b: 0.02 }; // default dark
+  if (typeof HAIR_COLORS !== 'undefined') {
+    for (var ci = 0; ci < HAIR_COLORS.length; ci++) {
+      if (HAIR_COLORS[ci].id === colorId) {
+        col = { r: HAIR_COLORS[ci].r, g: HAIR_COLORS[ci].g, b: HAIR_COLORS[ci].b };
+        break;
+      }
+    }
+  }
+
+  var mat = new BABYLON.PBRMaterial('hairmat_' + unit.id, this.scene);
+  mat.albedoColor = new BABYLON.Color3(col.r, col.g, col.b);
+  mat.metallic    = 0.0;
+  mat.roughness   = 0.95;
+
+  // Hair is positioned at the top of the head in model-local space.
+  // For glTF models the head centre is at ≈ Y 1.70; for OBJ the cylinder
+  // head is at Y 0.73 (absolute), but since we parent to the model root
+  // with scale 1 we use 1.80 (top of head sphere) for glTF models.
+  var isGltf = rootMesh.getClassName && rootMesh.getClassName() === 'TransformNode';
+  var headY   = isGltf ? 1.82 : 0.87;
+
+  var mesh;
+  if (styleId === 'short') {
+    // Short hair: flat hemisphere cap.
+    mesh = BABYLON.MeshBuilder.CreateSphere('hair_' + unit.id, {
+      diameter: 0.30, segments: 8, slice: 0.55
+    }, this.scene);
+    mesh.position = new BABYLON.Vector3(0, headY, 0);
+  } else if (styleId === 'medium') {
+    // Medium hair: slightly taller hemisphere.
+    mesh = BABYLON.MeshBuilder.CreateSphere('hair_' + unit.id, {
+      diameter: 0.33, segments: 8, slice: 0.65
+    }, this.scene);
+    mesh.position = new BABYLON.Vector3(0, headY - 0.02, 0);
+  } else if (styleId === 'long') {
+    // Long hair: tall cap + narrow trailing cylinder.
+    var cap = BABYLON.MeshBuilder.CreateSphere('hairCap_' + unit.id, {
+      diameter: 0.32, segments: 8, slice: 0.70
+    }, this.scene);
+    cap.position = new BABYLON.Vector3(0, headY - 0.01, 0);
+    cap.parent   = rootMesh;
+    cap.material = mat;
+    cap.isPickable = false;
+
+    var trail = BABYLON.MeshBuilder.CreateCylinder('hairTrail_' + unit.id, {
+      height: isGltf ? 0.55 : 0.30, diameter: 0.14, tessellation: 8
+    }, this.scene);
+    trail.position = new BABYLON.Vector3(0, headY - (isGltf ? 0.40 : 0.22), (isGltf ? -0.12 : -0.07));
+    trail.parent   = rootMesh;
+    trail.material = mat;
+    trail.isPickable = false;
+    return; // early return — multiple meshes already parented
+  } else if (styleId === 'tied') {
+    // Tied back: small bun at top-back.
+    mesh = BABYLON.MeshBuilder.CreateSphere('hair_' + unit.id, {
+      diameter: 0.20, segments: 7
+    }, this.scene);
+    mesh.position = new BABYLON.Vector3(0, headY + 0.02, (isGltf ? -0.10 : -0.06));
+  } else {
+    return;
+  }
+
+  if (!mesh) return;
+  mesh.parent    = rootMesh;
+  mesh.material  = mat;
+  mesh.isPickable = false;
 };
 
 
@@ -1593,7 +1716,9 @@ function CharacterPreviewScene() {
   this._model          = null;
   this._fallback       = null;
   this._rotObs         = null;
-  this._pendingClassId = null;
+  this._pendingClassId  = null;
+  this._pendingHairStyle = null;
+  this._pendingHairColor = null;
 }
 
 /** Initialise Babylon on the given canvas.  Returns true on success. */
@@ -1608,7 +1733,7 @@ CharacterPreviewScene.prototype.init = function (canvasId) {
 
     this._camera = new BABYLON.ArcRotateCamera(
       'prevCam', -Math.PI / 2, Math.PI / 3.2, 2.8,
-      new BABYLON.Vector3(0, 0.4, 0), this.scene
+      new BABYLON.Vector3(0, 0.85, 0), this.scene
     );
     this._camera.attachControl(canvas, true);
 
@@ -1634,10 +1759,12 @@ CharacterPreviewScene.prototype.init = function (canvasId) {
 };
 
 /** Load (or reload) the glTF/OBJ model for classId with the given colour and gender. */
-CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, gender) {
+CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, gender, hairStyle, hairColor) {
   if (!this.scene) return;
   var self = this;
   this._pendingClassId = classId;
+  this._pendingHairStyle = hairStyle || 'none';
+  this._pendingHairColor = hairColor || 'dark';
 
   if (this._model)    { this._model.dispose();    this._model    = null; }
   if (this._fallback) { this._fallback.dispose(); this._fallback = null; }
@@ -1709,6 +1836,28 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
         model.material  = mat;
       }
 
+      // Add a procedural head sphere when the model has no head mesh.
+      if (isGltf) {
+        var hasHead = meshes.some(function (m) {
+          return m.name && m.name.toLowerCase().indexOf('head') !== -1;
+        });
+        if (!hasHead) {
+          var headSphere = BABYLON.MeshBuilder.CreateSphere('prevHead', {
+            diameter: 0.28, segments: 10
+          }, self.scene);
+          var headMat = new BABYLON.PBRMaterial('prevHeadMat', self.scene);
+          headMat.albedoColor = new BABYLON.Color3(col.r, col.g, col.b);
+          headMat.metallic    = 0.0;
+          headMat.roughness   = 0.9;
+          headSphere.material = headMat;
+          headSphere.position = new BABYLON.Vector3(0, 1.65, 0);
+          headSphere.parent   = model;
+        }
+      }
+
+      // Attach procedural hair above the head.
+      _applyPreviewHair(model, self._pendingHairStyle, self._pendingHairColor, isGltf, self.scene);
+
       // Apply idle bone animations to the preview skeleton so it doesn't
       // display as a static T-pose.
       if (isGltf && model.skeleton) {
@@ -1760,12 +1909,15 @@ CharacterPreviewScene.prototype.dispose = function () {
   }
   this._model          = null;
   this._fallback       = null;
-  this._pendingClassId = null;
+  this._pendingClassId  = null;
+  this._pendingHairStyle = null;
+  this._pendingHairColor = null;
 };
 
 /**
  * Apply looping idle bone animations to a skeleton in the preview scene.
- * This breaks the static T-pose by adding gentle spine breathing and arm sway.
+ * Upper arms are offset from T-pose to a natural resting position (arms
+ * ~70° down from horizontal), then oscillate gently around that rest pose.
  */
 function _applyPreviewIdleAnim(skeleton, scene) {
   if (!skeleton || !scene) { return; }
@@ -1773,11 +1925,15 @@ function _applyPreviewIdleAnim(skeleton, scene) {
   ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
 
   var boneAnims = [
-    { name: 'spine_02',   prop: 'rotation.x', amp:  0.04, speed: 0.45 },
-    { name: 'clavicle_l', prop: 'rotation.z', amp: -0.06, speed: 0.45 },
-    { name: 'clavicle_r', prop: 'rotation.z', amp:  0.06, speed: 0.45 },
-    { name: 'upperarm_l', prop: 'rotation.x', amp:  0.10, speed: 0.32 },
-    { name: 'upperarm_r', prop: 'rotation.x', amp:  0.10, speed: 0.32 }
+    { name: 'spine_02',   prop: 'rotation.x', base:  0.05, amp:  0.04,  speed: 0.45 },
+    // Clavicle amplitude 0.10 (increased from 0.06) so shoulder movement
+    // remains perceptible alongside the larger arm drop offsets.
+    { name: 'clavicle_l', prop: 'rotation.z', base:  0.0,  amp: -0.10,  speed: 0.45 },
+    { name: 'clavicle_r', prop: 'rotation.z', base:  0.0,  amp:  0.10,  speed: 0.45 },
+    { name: 'upperarm_l', prop: 'rotation.z', base: -1.2,  amp: -0.08,  speed: 0.32 },
+    { name: 'upperarm_r', prop: 'rotation.z', base:  1.2,  amp:  0.08,  speed: 0.32 },
+    { name: 'lowerarm_l', prop: 'rotation.y', base:  0.30, amp:  0.05,  speed: 0.32 },
+    { name: 'lowerarm_r', prop: 'rotation.y', base: -0.30, amp: -0.05,  speed: 0.32 }
   ];
 
   boneAnims.forEach(function (cfg) {
@@ -1791,13 +1947,69 @@ function _applyPreviewIdleAnim(skeleton, scene) {
     );
     anim.setEasingFunction(ease);
     anim.setKeys([
-      { frame: 0,  value: 0        },
-      { frame: 30, value: cfg.amp  },
-      { frame: 60, value: 0        }
+      { frame: 0,  value: cfg.base           },
+      { frame: 30, value: cfg.base + cfg.amp },
+      { frame: 60, value: cfg.base           }
     ]);
     bone.animations = (bone.animations || []).concat([anim]);
     scene.beginAnimation(bone, 0, 60, true, cfg.speed);
   });
+}
+
+/**
+ * Attach a procedural hair mesh to the preview model root.
+ * isGltf controls whether to use glTF-scale head positions or OBJ-scale.
+ */
+function _applyPreviewHair(modelRoot, hairStyle, hairColor, isGltf, scene) {
+  if (!modelRoot || !scene || !hairStyle || hairStyle === 'none') { return; }
+
+  var col = { r: 0.10, g: 0.06, b: 0.02 };
+  if (typeof HAIR_COLORS !== 'undefined') {
+    for (var ci = 0; ci < HAIR_COLORS.length; ci++) {
+      if (HAIR_COLORS[ci].id === hairColor) {
+        col = { r: HAIR_COLORS[ci].r, g: HAIR_COLORS[ci].g, b: HAIR_COLORS[ci].b };
+        break;
+      }
+    }
+  }
+
+  var mat = new BABYLON.PBRMaterial('prevHairMat', scene);
+  mat.albedoColor = new BABYLON.Color3(col.r, col.g, col.b);
+  mat.metallic    = 0.0;
+  mat.roughness   = 0.95;
+
+  var headY = isGltf ? 1.82 : 0.87;
+  var mesh;
+
+  if (hairStyle === 'short') {
+    mesh = BABYLON.MeshBuilder.CreateSphere('prevHair', { diameter: 0.30, segments: 8, slice: 0.55 }, scene);
+    mesh.position = new BABYLON.Vector3(0, headY, 0);
+  } else if (hairStyle === 'medium') {
+    mesh = BABYLON.MeshBuilder.CreateSphere('prevHair', { diameter: 0.33, segments: 8, slice: 0.65 }, scene);
+    mesh.position = new BABYLON.Vector3(0, headY - 0.02, 0);
+  } else if (hairStyle === 'long') {
+    var cap = BABYLON.MeshBuilder.CreateSphere('prevHairCap', { diameter: 0.32, segments: 8, slice: 0.70 }, scene);
+    cap.position = new BABYLON.Vector3(0, headY - 0.01, 0);
+    cap.parent   = modelRoot;
+    cap.material = mat;
+    cap.isPickable = false;
+    var trail = BABYLON.MeshBuilder.CreateCylinder('prevHairTrail', {
+      height: isGltf ? 0.55 : 0.30, diameter: 0.14, tessellation: 8
+    }, scene);
+    trail.position = new BABYLON.Vector3(0, headY - (isGltf ? 0.40 : 0.22), (isGltf ? -0.12 : -0.07));
+    trail.parent   = modelRoot;
+    trail.material = mat;
+    trail.isPickable = false;
+    return;
+  } else if (hairStyle === 'tied') {
+    mesh = BABYLON.MeshBuilder.CreateSphere('prevHair', { diameter: 0.20, segments: 7 }, scene);
+    mesh.position = new BABYLON.Vector3(0, headY + 0.02, (isGltf ? -0.10 : -0.06));
+  }
+
+  if (!mesh) return;
+  mesh.parent    = modelRoot;
+  mesh.material  = mat;
+  mesh.isPickable = false;
 }
 
 /** Resolve a display colour from colorId (BODY_COLORS) then raceId (RACES). */
