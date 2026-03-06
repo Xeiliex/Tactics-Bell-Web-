@@ -1090,6 +1090,13 @@ GameUI.prototype.showPromotionScreen = function (unit, choices, onChoose) {
     });
     anime({ targets: choicesEl.querySelectorAll('.card'), translateY: [20, 0], opacity: [0, 1],
       duration: 380, easing: 'easeOutBack', delay: anime.stagger(80) });
+
+    // Add a "Decide Later" button
+    var laterBtn = document.createElement('button');
+    laterBtn.className = 'btn btn-secondary btn-cancel-promote';
+    laterBtn.textContent = 'Decide Later';
+    laterBtn.onclick = function () { if (onChoose) onChoose(null); };
+    choicesEl.appendChild(laterBtn);
   }
   this.showScreen('screen-promote');
   anime({ targets: '.promote-title', scale: [0.8, 1], opacity: [0, 1], duration: 600, easing: 'easeOutElastic(1, 0.6)' });
