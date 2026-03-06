@@ -329,15 +329,22 @@ var game = (function () {
       if (!g.partyConfig || !g.partyConfig[0] || !g.partyConfig[0].race || !g.partyConfig[0].classId) {
         return;
       }
+      // The confirmation dialog was removed; proceed directly to battle.
+      // g.ui.showBattleConfirmScreen(g.stage, g.story);
+      startBattle(true);
+    });
+
+    // Battle Confirm → Begin (Dialog removed, listeners commented out)
+    /*
+    document.getElementById('btn-confirm-battle').addEventListener('click', function () {
       if (g.story) {
-        // Story mode: play opening cutscene for chapter 1 then start battle
         g.story.startStory(0);
       } else {
         startBattle(true);
       }
     });
+    */
 
-    // Action menu
     document.getElementById('btn-attack').addEventListener('click', function () {
       if (g.combat) g.combat.beginTargeting(null);
     });

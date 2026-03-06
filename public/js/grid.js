@@ -254,8 +254,7 @@ function generateStage(stage) {
 
       grid.tiles[r][c] = new Tile(r, c, terrain);
     }
-  });
-
+  }
 
 /** Cellular-automata-style blob painter */
 function paintCluster(grid, seedRow, seedCol, terrain, spreadChance) {
