@@ -868,7 +868,10 @@ GameUI.prototype.showSkillMenu = function (unit, onSkillSelect) {
     var btn = document.createElement('button');
     btn.className   = 'action-btn skill-btn' + (skill.encounter ? ' encounter-skill' : '') + (used ? ' encounter-used' : '');
     btn.textContent = skill.emoji + ' ' + skill.name + (skill.encounter ? ' ✦' : '');
-    btn.title       = skill.desc + (skill.encounter ? ' (Encounter — once per battle)' : '') + (used ? ' [USED]' : '');
+    var titleParts = [skill.desc];
+    if (skill.encounter) titleParts.push('Encounter — once per battle');
+    if (used) titleParts.push('USED');
+    btn.title = titleParts.join(' | ');
     if (used) {
       btn.disabled = true;
     } else {

@@ -5,6 +5,9 @@
 //  COMBAT SYSTEM
 // ═══════════════════════════════════════
 
+/** Cardinal direction offsets reused by _isAdjacentToMountain. */
+var _CARDINAL_DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
 var COMBAT_STATE = {
   IDLE:          'IDLE',
   PLAYER_SELECT: 'PLAYER_SELECT',
@@ -600,8 +603,7 @@ Combat.prototype.calcDamage = function (attacker, target, skill) {
 
   var raw = offensive * skillPower - defensive * 0.5;
   raw = Math.max(1, Math.round(raw + (Math.random() * 3 - 1)));
-  raw = Math.round(raw * triMult);
-  raw = Math.max(1, raw);
+  raw = Math.max(1, Math.round(raw * triMult));
 
   if (crit) { raw = Math.ceil(raw * 1.5); }
 
@@ -823,9 +825,8 @@ Combat.prototype.unitAt = function (row, col) {
  * adjacent to them, not on them).
  */
 Combat.prototype._isAdjacentToMountain = function (unit) {
-  var dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-  for (var i = 0; i < dirs.length; i++) {
-    var t = this.grid.getTile(unit.gridRow + dirs[i][0], unit.gridCol + dirs[i][1]);
+  for (var i = 0; i < _CARDINAL_DIRS.length; i++) {
+    var t = this.grid.getTile(unit.gridRow + _CARDINAL_DIRS[i][0], unit.gridCol + _CARDINAL_DIRS[i][1]);
     if (t && t.terrain.name === 'Mountain') return true;
   }
   return false;
