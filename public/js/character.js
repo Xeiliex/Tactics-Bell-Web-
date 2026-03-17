@@ -55,6 +55,9 @@ function Character(opts) {
   // Status effects — always initialised so startTurn never hits undefined
   this.statusEffects = { burn: 0, stun: 0 };
 
+  // Encounter skill usage (once per battle).  Keyed by skill id; true = already used.
+  this.usedEncounterSkills = {};
+
   // Babylon mesh reference
   this.meshes = null;
 }

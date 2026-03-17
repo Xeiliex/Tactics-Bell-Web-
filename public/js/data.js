@@ -96,11 +96,24 @@ var RACES = {
 };
 
 // ═══════════════════════════════════════
+//  WEAPON TRIANGLE
+//  Physical → Arcane → Holy → Physical
+//  Advantage: ×1.25 damage.  Disadvantage: ×0.75 damage.
+//  Attacker's skill.category is checked against defender's class.weaponCategory.
+// ═══════════════════════════════════════
+var WEAPON_TRIANGLE = {
+  physical: { arcane: 1.25, holy: 0.75, physical: 1.0 },
+  arcane:   { holy:   1.25, physical: 0.75, arcane: 1.0 },
+  holy:     { physical: 1.25, arcane: 0.75, holy:   1.0 }
+};
+
+// ═══════════════════════════════════════
 //  CLASSES
 //  tier 0 = base (any level)
 //  tier 1 = advanced (requires level 10)
 //  tier 2 = elite   (requires level 25)
-//  advancesFrom = array of classIds that can promote into this class
+//  advancesFrom  = array of classIds that can promote into this class
+//  weaponCategory = 'physical'/'arcane'/'holy' — used by the weapon triangle
 // ═══════════════════════════════════════
 
 /** Gold required to voluntarily reclass a character. */
@@ -116,12 +129,13 @@ var CLASSES = {
     description: 'Powerful melee fighter with high HP and DEF.',
     color: '#EF5350',
     tier: 0, requiresLevel: 1, advancesFrom: null,
+    weaponCategory: 'physical',
     baseStats: { hp: 55, atk: 14, def: 12, mag: 2, spd: 8, res: 5 },
     statGrowth: { hp: 8, atk: 3, def: 3, mag: 0, spd: 1, res: 1 },
     moveRange: 3, attackRange: 1,
     skills: [
-      { id: 'slash',  name: 'Power Slash', emoji: '⚔️', type: 'physical', power: 1.3, range: 1, desc: 'A powerful melee slash.' },
-      { id: 'bash',   name: 'Shield Bash', emoji: '🛡️', type: 'physical', power: 0.7, range: 1, desc: 'Knock the enemy back.' }
+      { id: 'slash', name: 'Power Slash', emoji: '⚔️', type: 'physical', category: 'physical', power: 1.3, range: 1, desc: 'A powerful melee slash.', encounter: true },
+      { id: 'bash',  name: 'Shield Bash', emoji: '🛡️', type: 'physical', category: 'physical', power: 0.7, range: 1, desc: 'Knock the enemy back.' }
     ]
   },
   mage: {
@@ -129,12 +143,13 @@ var CLASSES = {
     description: 'Long-range magical attacker. High MAG.',
     color: '#AB47BC',
     tier: 0, requiresLevel: 1, advancesFrom: null,
+    weaponCategory: 'arcane',
     baseStats: { hp: 30, atk: 4, def: 3, mag: 16, spd: 7, res: 8 },
     statGrowth: { hp: 4, atk: 0, def: 1, mag: 4, spd: 1, res: 2 },
     moveRange: 2, attackRange: 3,
     skills: [
-      { id: 'fireball', name: 'Fireball',  emoji: '🔥', type: 'magic', power: 1.5, range: 3, desc: 'Hurl a blazing fireball.' },
-      { id: 'icelance', name: 'Ice Lance',  emoji: '❄️', type: 'magic', power: 1.2, range: 3, desc: 'A piercing lance of ice.' }
+      { id: 'fireball', name: 'Fireball', emoji: '🔥', type: 'magic', category: 'arcane', power: 1.5, range: 3, desc: 'Hurl a blazing fireball.', encounter: true },
+      { id: 'icelance', name: 'Ice Lance', emoji: '❄️', type: 'magic', category: 'arcane', power: 1.2, range: 3, desc: 'A piercing lance of ice.' }
     ]
   },
   archer: {
@@ -142,12 +157,13 @@ var CLASSES = {
     description: 'Precise long-range attacker. Highest SPD.',
     color: '#66BB6A',
     tier: 0, requiresLevel: 1, advancesFrom: null,
+    weaponCategory: 'physical',
     baseStats: { hp: 38, atk: 13, def: 6, mag: 4, spd: 11, res: 4 },
     statGrowth: { hp: 5, atk: 3, def: 1, mag: 1, spd: 2, res: 1 },
     moveRange: 3, attackRange: 4,
     skills: [
-      { id: 'trueshot', name: 'True Shot',    emoji: '🏹', type: 'physical', power: 1.1, range: 4, desc: 'A pin-point accurate shot.' },
-      { id: 'volley',   name: 'Arrow Volley', emoji: '🌧️', type: 'physical', power: 0.7, range: 4, desc: 'Shower of arrows.' }
+      { id: 'trueshot', name: 'True Shot',    emoji: '🏹', type: 'physical', category: 'physical', power: 1.1, range: 4, desc: 'A pin-point accurate shot.', encounter: true },
+      { id: 'volley',   name: 'Arrow Volley', emoji: '🌧️', type: 'physical', category: 'physical', power: 0.7, range: 4, desc: 'Shower of arrows.' }
     ]
   },
   healer: {
@@ -155,12 +171,13 @@ var CLASSES = {
     description: 'Restores HP to allies. High RES.',
     color: '#26C6DA',
     tier: 0, requiresLevel: 1, advancesFrom: null,
+    weaponCategory: 'holy',
     baseStats: { hp: 38, atk: 5, def: 6, mag: 12, spd: 9, res: 11 },
     statGrowth: { hp: 5, atk: 1, def: 1, mag: 3, spd: 1, res: 3 },
     moveRange: 3, attackRange: 2,
     skills: [
-      { id: 'holylight', name: 'Holy Light',   emoji: '✨', type: 'heal',    power: 1.5, range: 2, desc: 'Restore HP to an ally.', targetsAllies: true },
-      { id: 'strike',    name: 'Light Strike',  emoji: '💫', type: 'magic',   power: 1.0, range: 2, desc: 'A holy magic attack.' }
+      { id: 'holylight', name: 'Holy Light',  emoji: '✨', type: 'heal',  category: 'holy', power: 1.5, range: 2, desc: 'Restore HP to an ally.', targetsAllies: true, encounter: true },
+      { id: 'strike',    name: 'Light Strike', emoji: '💫', type: 'magic', category: 'holy', power: 1.0, range: 2, desc: 'A holy magic attack.' }
     ]
   },
 
@@ -171,12 +188,13 @@ var CLASSES = {
     description: 'Armoured guardian with exceptional DEF and HP. Hard to kill.',
     color: '#90CAF9',
     tier: 1, requiresLevel: 10, advancesFrom: ['warrior'],
+    weaponCategory: 'physical',
     baseStats: { hp: 68, atk: 13, def: 20, mag: 4, spd: 7, res: 9 },
     statGrowth: { hp: 10, atk: 2, def: 5, mag: 0, spd: 1, res: 2 },
     moveRange: 3, attackRange: 1,
     skills: [
-      { id: 'ironwall',  name: 'Iron Wall',  emoji: '🛡️', type: 'physical', power: 0.8, range: 1, desc: 'A guarding blow that absorbs recoil.' },
-      { id: 'holyblade', name: 'Holy Blade', emoji: '✝️',  type: 'physical', power: 1.4, range: 1, desc: 'A sacred sword strike.' }
+      { id: 'ironwall',  name: 'Iron Wall',  emoji: '🛡️', type: 'physical', category: 'physical', power: 0.8, range: 1, desc: 'A guarding blow that absorbs recoil.' },
+      { id: 'holyblade', name: 'Holy Blade', emoji: '✝️',  type: 'physical', category: 'holy',     power: 1.4, range: 1, desc: 'A sacred sword strike.', encounter: true }
     ]
   },
   berserker: {
@@ -184,12 +202,13 @@ var CLASSES = {
     description: 'Reckless warrior with devastating ATK. High risk, high reward.',
     color: '#EF9A9A',
     tier: 1, requiresLevel: 10, advancesFrom: ['warrior'],
+    weaponCategory: 'physical',
     baseStats: { hp: 58, atk: 22, def: 9, mag: 1, spd: 13, res: 3 },
     statGrowth: { hp: 9, atk: 5, def: 2, mag: 0, spd: 2, res: 1 },
     moveRange: 4, attackRange: 1,
     skills: [
-      { id: 'frenzy',  name: 'Frenzy',   emoji: '😤', type: 'physical', power: 1.8, range: 1, desc: 'Unleash a furious flurry of blows.' },
-      { id: 'warcry',  name: 'War Cry',  emoji: '📣', type: 'physical', power: 0.6, range: 1, desc: 'Intimidate the enemy before striking.' }
+      { id: 'frenzy', name: 'Frenzy',  emoji: '😤', type: 'physical', category: 'physical', power: 1.8, range: 1, desc: 'Unleash a furious flurry of blows.', encounter: true },
+      { id: 'warcry', name: 'War Cry', emoji: '📣', type: 'physical', category: 'physical', power: 0.6, range: 1, desc: 'Intimidate the enemy before striking.' }
     ]
   },
   sorcerer: {
@@ -197,12 +216,13 @@ var CLASSES = {
     description: 'Master of destructive magic. Enormous spell power at a cost to survivability.',
     color: '#CE93D8',
     tier: 1, requiresLevel: 10, advancesFrom: ['mage'],
+    weaponCategory: 'arcane',
     baseStats: { hp: 28, atk: 3, def: 2, mag: 24, spd: 9, res: 9 },
     statGrowth: { hp: 3, atk: 0, def: 0, mag: 7, spd: 1, res: 2 },
     moveRange: 2, attackRange: 4,
     skills: [
-      { id: 'thunder', name: 'Thunder', emoji: '⚡',  type: 'magic', power: 1.8, range: 4, desc: 'Call down a bolt of lightning.' },
-      { id: 'meteor',  name: 'Meteor',  emoji: '☄️', type: 'magic', power: 2.2, range: 4, desc: 'Summon a meteor from the sky.' }
+      { id: 'thunder', name: 'Thunder', emoji: '⚡',  type: 'magic', category: 'arcane', power: 1.8, range: 4, desc: 'Call down a bolt of lightning.' },
+      { id: 'meteor',  name: 'Meteor',  emoji: '☄️', type: 'magic', category: 'arcane', power: 2.2, range: 4, desc: 'Summon a meteor from the sky.', encounter: true }
     ]
   },
   sage: {
@@ -210,12 +230,13 @@ var CLASSES = {
     description: 'Wise scholar who balances offensive and support magic.',
     color: '#80CBC4',
     tier: 1, requiresLevel: 10, advancesFrom: ['mage'],
+    weaponCategory: 'arcane',
     baseStats: { hp: 35, atk: 5, def: 6, mag: 20, spd: 10, res: 14 },
     statGrowth: { hp: 5, atk: 0, def: 2, mag: 5, spd: 1, res: 3 },
     moveRange: 3, attackRange: 3,
     skills: [
-      { id: 'arcaneblast', name: 'Arcane Blast', emoji: '💥', type: 'magic', power: 1.4, range: 3, desc: 'A focused burst of pure arcane energy.' },
-      { id: 'mindshock',   name: 'Mind Shock',   emoji: '🌀', type: 'magic', power: 1.0, range: 3, desc: 'Disorient and damage the target.' }
+      { id: 'arcaneblast', name: 'Arcane Blast', emoji: '💥', type: 'magic', category: 'arcane', power: 1.4, range: 3, desc: 'A focused burst of pure arcane energy.', encounter: true },
+      { id: 'mindshock',   name: 'Mind Shock',   emoji: '🌀', type: 'magic', category: 'arcane', power: 1.0, range: 3, desc: 'Disorient and damage the target.' }
     ]
   },
   ranger: {
@@ -223,12 +244,13 @@ var CLASSES = {
     description: 'Swift wilderness scout with superior mobility and precision.',
     color: '#A5D6A7',
     tier: 1, requiresLevel: 10, advancesFrom: ['archer'],
+    weaponCategory: 'physical',
     baseStats: { hp: 46, atk: 17, def: 10, mag: 5, spd: 15, res: 7 },
     statGrowth: { hp: 6, atk: 4, def: 2, mag: 1, spd: 3, res: 1 },
     moveRange: 4, attackRange: 4,
     skills: [
-      { id: 'eagleeye',  name: 'Eagle Eye',  emoji: '🦅', type: 'physical', power: 1.4, range: 4, desc: 'A pin-point shot that never misses.' },
-      { id: 'multishot', name: 'Multi-Shot', emoji: '🏹', type: 'physical', power: 0.8, range: 4, desc: 'Fire multiple arrows in rapid succession.' }
+      { id: 'eagleeye',  name: 'Eagle Eye',  emoji: '🦅', type: 'physical', category: 'physical', power: 1.4, range: 4, desc: 'A pin-point shot that never misses.', encounter: true },
+      { id: 'multishot', name: 'Multi-Shot', emoji: '🏹', type: 'physical', category: 'physical', power: 0.8, range: 4, desc: 'Fire multiple arrows in rapid succession.' }
     ]
   },
   assassin: {
@@ -236,12 +258,13 @@ var CLASSES = {
     description: 'Lethal predator who strikes from the shadows with blinding speed.',
     color: '#546E7A',
     tier: 1, requiresLevel: 10, advancesFrom: ['archer'],
+    weaponCategory: 'physical',
     baseStats: { hp: 36, atk: 20, def: 6, mag: 3, spd: 19, res: 5 },
     statGrowth: { hp: 4, atk: 5, def: 1, mag: 0, spd: 4, res: 1 },
     moveRange: 5, attackRange: 2,
     skills: [
-      { id: 'shadowstrike', name: 'Shadow Strike', emoji: '🌑', type: 'physical', power: 2.0, range: 2, desc: 'A devastating sneak attack.' },
-      { id: 'doublecut',    name: 'Double Cut',    emoji: '✂️', type: 'physical', power: 0.9, range: 2, desc: 'Two swift blade attacks in quick succession.' }
+      { id: 'shadowstrike', name: 'Shadow Strike', emoji: '🌑', type: 'physical', category: 'physical', power: 2.0, range: 2, desc: 'A devastating sneak attack.', encounter: true },
+      { id: 'doublecut',    name: 'Double Cut',    emoji: '✂️', type: 'physical', category: 'physical', power: 0.9, range: 2, desc: 'Two swift blade attacks in quick succession.' }
     ]
   },
   cleric: {
@@ -249,12 +272,13 @@ var CLASSES = {
     description: 'Devoted healer with powerful restoration magic and holy attacks.',
     color: '#FFF59D',
     tier: 1, requiresLevel: 10, advancesFrom: ['healer'],
+    weaponCategory: 'holy',
     baseStats: { hp: 46, atk: 7, def: 10, mag: 18, spd: 11, res: 17 },
     statGrowth: { hp: 6, atk: 1, def: 2, mag: 5, spd: 1, res: 4 },
     moveRange: 3, attackRange: 2,
     skills: [
-      { id: 'greatheal', name: 'Greater Heal', emoji: '💖', type: 'heal',  power: 2.0, range: 2, desc: 'Restore a large amount of HP to an ally.', targetsAllies: true },
-      { id: 'smite',     name: 'Smite',        emoji: '⚡', type: 'magic', power: 1.5, range: 2, desc: 'Call down divine wrath upon a foe.' }
+      { id: 'greatheal', name: 'Greater Heal', emoji: '💖', type: 'heal',  category: 'holy', power: 2.0, range: 2, desc: 'Restore a large amount of HP to an ally.', targetsAllies: true, encounter: true },
+      { id: 'smite',     name: 'Smite',        emoji: '⚡', type: 'magic', category: 'holy', power: 1.5, range: 2, desc: 'Call down divine wrath upon a foe.' }
     ]
   },
   exorcist: {
@@ -262,12 +286,13 @@ var CLASSES = {
     description: 'Holy warrior who purges evil. Offensive magic with light support.',
     color: '#FFCC80',
     tier: 1, requiresLevel: 10, advancesFrom: ['healer'],
+    weaponCategory: 'holy',
     baseStats: { hp: 42, atk: 11, def: 8, mag: 20, spd: 12, res: 11 },
     statGrowth: { hp: 5, atk: 2, def: 1, mag: 5, spd: 1, res: 3 },
     moveRange: 3, attackRange: 3,
     skills: [
-      { id: 'holywrath', name: 'Holy Wrath', emoji: '🌟', type: 'magic', power: 1.8, range: 3, desc: 'Unleash burning holy energy upon the foe.' },
-      { id: 'purify',    name: 'Purify',     emoji: '✨', type: 'heal',  power: 1.2, range: 2, desc: 'Cleanse an ally and restore HP.', targetsAllies: true }
+      { id: 'holywrath', name: 'Holy Wrath', emoji: '🌟', type: 'magic', category: 'holy', power: 1.8, range: 3, desc: 'Unleash burning holy energy upon the foe.', encounter: true },
+      { id: 'purify',    name: 'Purify',     emoji: '✨', type: 'heal',  category: 'holy', power: 1.2, range: 2, desc: 'Cleanse an ally and restore HP.', targetsAllies: true }
     ]
   },
 
@@ -278,12 +303,13 @@ var CLASSES = {
     description: 'Supreme holy warrior. Unbreakable defence with righteous power.',
     color: '#FFD54F',
     tier: 2, requiresLevel: 25, advancesFrom: ['knight'],
+    weaponCategory: 'holy',
     baseStats: { hp: 88, atk: 20, def: 28, mag: 10, spd: 9, res: 16 },
     statGrowth: { hp: 12, atk: 3, def: 6, mag: 1, spd: 1, res: 3 },
     moveRange: 3, attackRange: 1,
     skills: [
-      { id: 'divinestrike', name: 'Divine Strike', emoji: '✝️',  type: 'physical', power: 1.6, range: 1, desc: 'A blessed attack that shakes the heavens.' },
-      { id: 'sacredshield', name: 'Sacred Shield', emoji: '🔰', type: 'physical', power: 0.5, range: 1, desc: 'Shield an ally while striking the foe.' }
+      { id: 'divinestrike', name: 'Divine Strike', emoji: '✝️',  type: 'physical', category: 'holy', power: 1.6, range: 1, desc: 'A blessed attack that shakes the heavens.', encounter: true },
+      { id: 'sacredshield', name: 'Sacred Shield', emoji: '🔰', type: 'physical', category: 'holy', power: 0.5, range: 1, desc: 'Shield an ally while striking the foe.' }
     ]
   },
   warlord: {
@@ -291,12 +317,13 @@ var CLASSES = {
     description: 'Unstoppable force of destruction. The mightiest melee warrior.',
     color: '#E57373',
     tier: 2, requiresLevel: 25, advancesFrom: ['berserker'],
+    weaponCategory: 'physical',
     baseStats: { hp: 78, atk: 32, def: 14, mag: 2, spd: 17, res: 6 },
     statGrowth: { hp: 11, atk: 8, def: 3, mag: 0, spd: 2, res: 1 },
     moveRange: 4, attackRange: 1,
     skills: [
-      { id: 'titanslash', name: 'Titan Slash',  emoji: '💥', type: 'physical', power: 2.5, range: 1, desc: 'A devastating cleave that shakes the earth.' },
-      { id: 'battleroar', name: 'Battle Roar',  emoji: '🦁', type: 'physical', power: 1.0, range: 1, desc: 'A terrifying attack that stuns the enemy.' }
+      { id: 'titanslash', name: 'Titan Slash', emoji: '💥', type: 'physical', category: 'physical', power: 2.5, range: 1, desc: 'A devastating cleave that shakes the earth.', encounter: true },
+      { id: 'battleroar', name: 'Battle Roar', emoji: '🦁', type: 'physical', category: 'physical', power: 1.0, range: 1, desc: 'A terrifying attack that stuns the enemy.' }
     ]
   },
   archmage: {
@@ -304,12 +331,13 @@ var CLASSES = {
     description: 'The pinnacle of magical mastery. Reality bends to their will.',
     color: '#7986CB',
     tier: 2, requiresLevel: 25, advancesFrom: ['sorcerer'],
+    weaponCategory: 'arcane',
     baseStats: { hp: 36, atk: 5, def: 4, mag: 35, spd: 11, res: 15 },
     statGrowth: { hp: 4, atk: 0, def: 1, mag: 10, spd: 1, res: 3 },
     moveRange: 2, attackRange: 5,
     skills: [
-      { id: 'arcaneburst', name: 'Arcane Burst', emoji: '💫', type: 'magic', power: 2.8, range: 5, desc: 'An overwhelming surge of arcane power.' },
-      { id: 'timewarp',    name: 'Time Warp',    emoji: '⏳', type: 'magic', power: 1.5, range: 5, desc: 'Distort time to confuse and damage the foe.' }
+      { id: 'arcaneburst', name: 'Arcane Burst', emoji: '💫', type: 'magic', category: 'arcane', power: 2.8, range: 5, desc: 'An overwhelming surge of arcane power.', encounter: true },
+      { id: 'timewarp',    name: 'Time Warp',    emoji: '⏳', type: 'magic', category: 'arcane', power: 1.5, range: 5, desc: 'Distort time to confuse and damage the foe.' }
     ]
   },
   oracle: {
@@ -317,12 +345,13 @@ var CLASSES = {
     description: 'Mystic seer who shapes fate. Supreme support mage.',
     color: '#4DB6AC',
     tier: 2, requiresLevel: 25, advancesFrom: ['sage'],
+    weaponCategory: 'arcane',
     baseStats: { hp: 42, atk: 6, def: 8, mag: 28, spd: 14, res: 20 },
     statGrowth: { hp: 6, atk: 0, def: 2, mag: 7, spd: 1, res: 5 },
     moveRange: 3, attackRange: 4,
     skills: [
-      { id: 'fatecast',  name: 'Fate Cast',  emoji: '🌠', type: 'magic', power: 2.0, range: 4, desc: 'A cosmic beam that never misses.' },
-      { id: 'prophecy',  name: 'Prophecy',   emoji: '📿', type: 'heal',  power: 1.8, range: 3, desc: 'A foreseen blessing that restores HP.', targetsAllies: true }
+      { id: 'fatecast', name: 'Fate Cast', emoji: '🌠', type: 'magic', category: 'arcane', power: 2.0, range: 4, desc: 'A cosmic beam that never misses.', encounter: true },
+      { id: 'prophecy', name: 'Prophecy',  emoji: '📿', type: 'heal',  category: 'holy',   power: 1.8, range: 3, desc: 'A foreseen blessing that restores HP.', targetsAllies: true }
     ]
   },
   beastmaster: {
@@ -330,12 +359,13 @@ var CLASSES = {
     description: 'Commander of wild beasts. Unmatched mobility and raw power.',
     color: '#8BC34A',
     tier: 2, requiresLevel: 25, advancesFrom: ['ranger'],
+    weaponCategory: 'physical',
     baseStats: { hp: 58, atk: 24, def: 14, mag: 9, spd: 19, res: 10 },
     statGrowth: { hp: 7, atk: 6, def: 2, mag: 1, spd: 3, res: 2 },
     moveRange: 5, attackRange: 4,
     skills: [
-      { id: 'wildhunt',  name: 'Wild Hunt',  emoji: '🦌', type: 'physical', power: 1.8, range: 4, desc: 'A relentless charge across the battlefield.' },
-      { id: 'beastcall', name: 'Beast Call', emoji: '🐯', type: 'physical', power: 1.2, range: 4, desc: 'Summon a wild beast to savage the foe.' }
+      { id: 'wildhunt',  name: 'Wild Hunt',  emoji: '🦌', type: 'physical', category: 'physical', power: 1.8, range: 4, desc: 'A relentless charge across the battlefield.', encounter: true },
+      { id: 'beastcall', name: 'Beast Call', emoji: '🐯', type: 'physical', category: 'physical', power: 1.2, range: 4, desc: 'Summon a wild beast to savage the foe.' }
     ]
   },
   shadow: {
@@ -343,12 +373,13 @@ var CLASSES = {
     description: 'Phantom killer who strikes unseen. Unmatched speed and lethality.',
     color: '#455A64',
     tier: 2, requiresLevel: 25, advancesFrom: ['assassin'],
+    weaponCategory: 'physical',
     baseStats: { hp: 44, atk: 30, def: 8, mag: 6, spd: 26, res: 7 },
     statGrowth: { hp: 5, atk: 7, def: 1, mag: 0, spd: 5, res: 1 },
     moveRange: 6, attackRange: 2,
     skills: [
-      { id: 'deathmark',    name: 'Death Mark',    emoji: '💀', type: 'physical', power: 2.8, range: 2, desc: 'Mark a target — a guaranteed critical blow.' },
-      { id: 'phantomstep',  name: 'Phantom Step',  emoji: '👻', type: 'physical', power: 1.5, range: 2, desc: 'Teleport behind the target and strike.' }
+      { id: 'deathmark',   name: 'Death Mark',   emoji: '💀', type: 'physical', category: 'physical', power: 2.8, range: 2, desc: 'Mark a target — a guaranteed critical blow.', encounter: true },
+      { id: 'phantomstep', name: 'Phantom Step', emoji: '👻', type: 'physical', category: 'physical', power: 1.5, range: 2, desc: 'Teleport behind the target and strike.' }
     ]
   },
   archbishop: {
@@ -356,12 +387,13 @@ var CLASSES = {
     description: 'Supreme divine healer. The last hope on any battlefield.',
     color: '#F8BBD0',
     tier: 2, requiresLevel: 25, advancesFrom: ['cleric'],
+    weaponCategory: 'holy',
     baseStats: { hp: 58, atk: 9, def: 14, mag: 26, spd: 14, res: 24 },
     statGrowth: { hp: 8, atk: 1, def: 3, mag: 6, spd: 1, res: 6 },
     moveRange: 3, attackRange: 3,
     skills: [
-      { id: 'divinegrace', name: 'Divine Grace', emoji: '💝', type: 'heal',  power: 2.5, range: 3, desc: 'Shower an ally in powerful healing radiance.', targetsAllies: true },
-      { id: 'holyguard',   name: 'Holy Guard',   emoji: '🔰', type: 'magic', power: 1.5, range: 3, desc: 'A shining holy blast to smite the wicked.' }
+      { id: 'divinegrace', name: 'Divine Grace', emoji: '💝', type: 'heal',  category: 'holy', power: 2.5, range: 3, desc: 'Shower an ally in powerful healing radiance.', targetsAllies: true, encounter: true },
+      { id: 'holyguard',   name: 'Holy Guard',   emoji: '🔰', type: 'magic', category: 'holy', power: 1.5, range: 3, desc: 'A shining holy blast to smite the wicked.' }
     ]
   },
   inquisitor: {
@@ -369,12 +401,13 @@ var CLASSES = {
     description: 'Righteous holy warrior who purges evil with overwhelming divine power.',
     color: '#FF8F00',
     tier: 2, requiresLevel: 25, advancesFrom: ['exorcist'],
+    weaponCategory: 'holy',
     baseStats: { hp: 54, atk: 18, def: 12, mag: 28, spd: 15, res: 16 },
     statGrowth: { hp: 7, atk: 3, def: 2, mag: 6, spd: 1, res: 4 },
     moveRange: 3, attackRange: 3,
     skills: [
-      { id: 'holyjudgment', name: 'Holy Judgment', emoji: '⚡', type: 'magic', power: 2.4, range: 3, desc: 'Divine lightning strikes down the unworthy.' },
-      { id: 'purge',        name: 'Purge',          emoji: '🌟', type: 'magic', power: 1.8, range: 3, desc: 'Obliterate all impurity with holy fire.' }
+      { id: 'holyjudgment', name: 'Holy Judgment', emoji: '⚡', type: 'magic', category: 'holy', power: 2.4, range: 3, desc: 'Divine lightning strikes down the unworthy.', encounter: true },
+      { id: 'purge',        name: 'Purge',          emoji: '🌟', type: 'magic', category: 'holy', power: 1.8, range: 3, desc: 'Obliterate all impurity with holy fire.' }
     ]
   }
 };
