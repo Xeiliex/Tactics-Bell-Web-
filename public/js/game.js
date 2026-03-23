@@ -168,7 +168,7 @@ var game = (function () {
       if (!btn) return;
       function updateBtn() {
         var isHigh = (typeof GRAPHICS_QUALITY === 'undefined' || GRAPHICS_QUALITY !== 'low');
-        btn.textContent  = isHigh ? '🖥 High Graphics' : '⚙ Low Graphics';
+        btn.textContent  = isHigh ? 'GFX: HIGH' : 'GFX: LOW';
         btn.className    = 'btn-gfx-toggle ' + (isHigh ? 'gfx-high' : 'gfx-low');
         btn.title        = isHigh
           ? 'Using high-quality 3-D models — click to switch to low graphics'

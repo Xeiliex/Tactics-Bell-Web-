@@ -17,37 +17,81 @@
 
   <!-- ══════════════ TITLE SCREEN ══════════════ -->
   <div id="screen-title" class="screen active">
-    <div class="title-bg"></div>
-    <div class="title-content">
-      <div class="title-bell">🔔</div>
-      <h1 class="game-title">TACTICS BELL</h1>
-      <p class="tagline">Battle · Level Up · Conquer</p>
-      <div class="title-menu-grid">
-        <button class="btn-primary btn-large" id="btn-new-game">⚔ NEW GAME</button>
-        <button class="btn-story btn-large" id="btn-story-mode">📖 STORY MODE</button>
-        <button class="btn-accent btn-large" id="btn-quick-match">⚡ QUICK MATCH</button>
-        <button class="btn-mp btn-large" id="btn-multiplayer">🌐 MULTIPLAYER</button>
-      </div>
-      <button class="btn-secondary btn-large hidden" id="btn-continue-game">▶ CONTINUE</button>
-      <button class="btn-gfx-toggle" id="btn-gfx-toggle" title="Toggle graphics quality"></button>
-
-      <!-- SSO auth area — visible once GOOGLE_CLIENT_ID is configured on the server -->
-      <div id="sso-auth-area">
-        <!-- Shown when signed in -->
-        <div id="sso-user-widget" class="hidden">
-          <div class="sso-avatar"></div>
-          <span class="sso-name"></span>
-          <button id="btn-sso-logout" class="sso-logout-btn">Sign Out</button>
+    <div class="console-bg">
+      <div class="console-scanlines"></div>
+      <div class="console-content">
+        <div class="console-header">
+          <div class="console-title">TACTICS BELL v1.0.0</div>
+          <div class="console-subtitle">Strategic Turn-Based Combat System</div>
+          <div class="console-status">System Ready - Select Command:</div>
         </div>
-        <!-- Rendered as a Google Sign-In button by GSI when signed out -->
-        <div id="sso-signin-btn"></div>
+        
+        <div class="console-ascii">
+          <pre>
+ ████████╗ █████╗  ██████╗████████╗██╗ ██████╗███████╗
+ ╚══██╔══╝██╔══██╗██╔════╝╚══██╔══╝██║██╔════╝██╔════╝
+    ██║   ███████║██║  ███╗  ██║   ██║██║     ███████╗
+    ██║   ██╔══██║██║   ██║  ██║   ██║██║     ╚════██║
+    ██║   ██║  ██║╚██████╔╝  ██║   ██║╚██████╗███████║
+    ╚═╝   ╚═╝  ╚═╝ ╚═════╝   ╚═╝   ╚═╝ ╚═════╝╚══════╝
+          </pre>
+        </div>
+        
+        <div class="console-menu">
+          <div class="console-command">
+            <span class="console-prompt">&gt;</span>
+            <button class="console-btn" id="btn-new-game">NEW_GAME</button>
+            <span class="console-desc">Create custom party</span>
+          </div>
+          <div class="console-command">
+            <span class="console-prompt">&gt;</span>
+            <button class="console-btn" id="btn-story-mode">STORY_MODE</button>
+            <span class="console-desc">Campaign mode</span>
+          </div>
+          <div class="console-command">
+            <span class="console-prompt">&gt;</span>
+            <button class="console-btn" id="btn-quick-match">QUICK_MATCH</button>
+            <span class="console-desc">Instant battle</span>
+          </div>
+          <div class="console-command">
+            <span class="console-prompt">&gt;</span>
+            <button class="console-btn" id="btn-multiplayer">MULTIPLAYER</button>
+            <span class="console-desc">Online PvP</span>
+          </div>
+        </div>
+        
+        <div class="console-footer">
+          <div class="console-continue">
+            <button class="console-btn-secondary hidden" id="btn-continue-game">CONTINUE_GAME</button>
+          </div>
+          <div class="console-info">
+            <div class="console-version">Build: 2026.03.23 | Engine: Babylon.js 7.0</div>
+            <button class="btn-gfx-toggle" id="btn-gfx-toggle" title="Toggle graphics quality">GFX: HIGH</button>
+          </div>
+        </div>
+
+        <!-- SSO auth area — visible once GOOGLE_CLIENT_ID is configured on the server -->
+        <div id="sso-auth-area" class="console-auth">
+          <!-- Shown when signed in -->
+          <div id="sso-user-widget" class="hidden">
+            <div class="console-user">
+              <div class="sso-avatar"></div>
+              <span class="sso-name"></span>
+              <button id="btn-sso-logout" class="console-logout-btn">LOGOUT</button>
+            </div>
+          </div>
+          <!-- Rendered as a Google Sign-In button by GSI when signed out -->
+          <div id="sso-signin-btn"></div>
+        </div>
       </div>
-      <!-- AdSense — title screen banner -->
-      <div class="ad-banner ad-banner--title">
-        <ins class="adsbygoogle"
-          style="display:block"
-          data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
-          data-ad-slot="XXXXXXXXXX"
+    </div>
+    
+    <!-- AdSense — title screen banner -->
+    <div class="ad-banner ad-banner--title">
+      <ins class="adsbygoogle"
+        style="display:block"
+        data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+        data-ad-slot="XXXXXXXXXX"
           data-ad-format="auto"
           data-full-width-responsive="true"></ins>
         <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
@@ -70,10 +114,10 @@
         </div>
         
         <div class="card party-option-card" id="card-quick-party">
-          <div class="card-icon">⚡</div>
-          <h3 class="card-title">Quick Match</h3>
-          <p class="card-desc">Jump straight into battle with pre-made adventurers.</p>
-          <button class="btn-accent btn-large" id="btn-prefill-party">Quick Start</button>
+          <div class="card-icon">🏠</div>
+          <h3 class="card-title">Back to Title</h3>
+          <p class="card-desc">Return to the main menu.</p>
+          <button class="btn-secondary btn-large" id="btn-prefill-party">Main Menu</button>
         </div>
       </div>
       

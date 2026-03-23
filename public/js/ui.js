@@ -131,7 +131,7 @@ GameUI.prototype.showPartyChoiceScreen = function () {
         if (this.game && this.game.ui) this.game.ui.showCreateScreen();
       });
       document.getElementById('btn-prefill-party').addEventListener('click', () => {
-        if (this.game) this.game._startQuickMatch(true);
+        if (this.game && this.game.ui) this.game.ui.showScreen('screen-title');
       });
       document.getElementById('btn-party-back').addEventListener('click', () => {
         if (this.game && this.game.ui) this.game.ui.showScreen('screen-title');
