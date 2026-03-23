@@ -143,9 +143,9 @@ GameUI.prototype.showPartyChoiceScreen = function () {
 // ─── Character creation wizard ────────────────────────────────────────────────
 
 var WIZARD_STEP_META = [
+  { title: 'Choose Your Class',     sub: 'Your training defines your role and appearance.' },
+  { title: 'Choose Your Gender',    sub: 'Select your character\'s gender.' },
   { title: 'Choose Your Race',      sub: 'Your heritage shapes your innate abilities.' },
-  { title: 'Choose Your Class',     sub: 'Your training defines your role in battle.' },
-  { title: 'Choose a Background',   sub: 'Your past grants unique advantages.' },
   { title: 'Hair & Style',          sub: 'Customise your adventurer\'s hairstyle.' },
   { title: 'Name & Appearance',     sub: 'Give your adventurer an identity.' }
 ];
@@ -237,22 +237,21 @@ GameUI.prototype._renderWizardStep = function () {
   var content = document.getElementById('wizard-content');
   if (content) {
     content.innerHTML = '';
-    if (w.stepIdx === 0)      this._buildWizardRaceStep(content, member);
-    else if (w.stepIdx === 1) this._buildWizardClassStep(content, member);
-    else if (w.stepIdx === 2) this._buildWizardBackgroundStep(content, member);
+    if (w.stepIdx === 0)      this._buildWizardClassStep(content, member);
+    else if (w.stepIdx === 1) this._buildWizardGenderStep(content, member);
+    else if (w.stepIdx === 2) this._buildWizardRaceStep(content, member);
     else if (w.stepIdx === 3) this._buildWizardHairStep(content, member, w.memberIdx);
     else                      this._buildWizardIdentityStep(content, member, w.memberIdx, mmeta);
   }
 
-  // Show the 3-D preview canvas on class (1), hair (3), and identity (4) steps;
-  // hide it on race (0) and background (2) steps, and always hide it when
-  // GRAPHICS_QUALITY is 'low' (CharacterPreviewScene is not initialised in
-  // that mode, which would leave a blank dark box visible to the user).
-  // Step indices: 0=Race, 1=Class, 2=Background, 3=Hair, 4=Identity
+  // Show the 3-D preview canvas on class (0), gender (1), hair (3), and identity (4) steps;
+  // hide it on race (2) step, and always hide it when GRAPHICS_QUALITY is 'low'
+  // (CharacterPreviewScene is not initialised in that mode).
+  // Step indices: 0=Class, 1=Gender, 2=Race, 3=Hair, 4=Identity
   var previewWrap = document.getElementById('wizard-preview-wrap');
   if (previewWrap) {
     var previewEnabled = (typeof GRAPHICS_QUALITY === 'undefined' || GRAPHICS_QUALITY !== 'low');
-    if (previewEnabled && (w.stepIdx === 1 || w.stepIdx === 3 || w.stepIdx === 4)) {
+    if (previewEnabled && (w.stepIdx === 0 || w.stepIdx === 1 || w.stepIdx === 3 || w.stepIdx === 4)) {
       previewWrap.classList.remove('hidden');
     } else {
       previewWrap.classList.add('hidden');
@@ -265,9 +264,9 @@ GameUI.prototype._renderWizardStep = function () {
 
 GameUI.prototype._wizardStepComplete = function (memberIdx, stepIdx) {
   var m = this.game.partyConfig[memberIdx];
-  if (stepIdx === 0) return !!m.race;
-  if (stepIdx === 1) return !!m.classId;
-  if (stepIdx === 2) return !!m.backgroundId;
+  if (stepIdx === 0) return !!m.classId;
+  if (stepIdx === 1) return !!m.gender; // gender must be selected
+  if (stepIdx === 2) return !!m.race;
   return true; // hair (3) and identity (4) always completable
 };
 
@@ -380,6 +379,41 @@ GameUI.prototype._buildWizardRaceStep = function (container, member) {
       container.querySelectorAll('.card').forEach(function (c) { c.classList.remove('selected'); });
       card.classList.add('selected');
       member.race = race.id;
+      var nb = document.getElementById('btn-wizard-next');
+      if (nb) nb.disabled = false;
+      anime({ targets: card, scale: [0.95, 1.0], duration: 200, easing: 'easeOutBack' });
+    });
+
+    grid.appendChild(card);
+  });
+
+  container.appendChild(grid);
+  anime({ targets: grid.querySelectorAll('.card'), translateY: [16, 0], opacity: [0, 1],
+    duration: 340, easing: 'easeOutQuart', delay: anime.stagger(50) });
+};
+
+GameUI.prototype._buildWizardGenderStep = function (container, member) {
+  var grid = document.createElement('div');
+  grid.className = 'cards-grid';
+
+  var genders = [
+    { id: 'male', name: 'Male', emoji: '♂️', description: 'Male character model' },
+    { id: 'female', name: 'Female', emoji: '♀️', description: 'Female character model' }
+  ];
+
+  genders.forEach(function (gender) {
+    var card = document.createElement('div');
+    card.className = 'card' + (member.gender === gender.id ? ' selected' : '');
+
+    card.innerHTML =
+      '<div class="card-emoji">' + gender.emoji + '</div>' +
+      '<div class="card-name">' + gender.name + '</div>' +
+      '<div class="card-desc">' + gender.description + '</div>';
+
+    card.addEventListener('click', function () {
+      container.querySelectorAll('.card').forEach(function (c) { c.classList.remove('selected'); });
+      card.classList.add('selected');
+      member.gender = gender.id;
       var nb = document.getElementById('btn-wizard-next');
       if (nb) nb.disabled = false;
       anime({ targets: card, scale: [0.95, 1.0], duration: 200, easing: 'easeOutBack' });
