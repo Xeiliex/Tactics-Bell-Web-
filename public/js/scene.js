@@ -189,6 +189,19 @@ function GameScene() {
 
 GameScene.prototype.init = function (canvasId) {
   var canvas = document.getElementById(canvasId);
+  
+  // Check for WebGL support
+  var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if (!gl) {
+    console.error('WebGL not supported on this device');
+    // Show error message to user
+    var errorMsg = document.createElement('div');
+    errorMsg.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#e8dcc8;font-family:sans-serif;text-align:center;background:#0e0c08;padding:20px;border-radius:5px;';
+    errorMsg.innerHTML = '<h2>WebGL Required</h2><p>This game requires WebGL support, which is not available on your device or browser.</p><p>Please try a different browser or device.</p>';
+    canvas.parentNode.appendChild(errorMsg);
+    return; // Don't initialize Babylon.js
+  }
+  
   this.engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true }, true);
   this.scene  = new BABYLON.Scene(this.engine);
   this.scene.clearColor = new BABYLON.Color4(0.05, 0.07, 0.14, 1);
@@ -258,8 +271,14 @@ GameScene.prototype.init = function (canvasId) {
 
   // PBR environment texture for image-based lighting (IBL)
   // This adds realistic reflections and ambient light to all PBR materials.
-  var envTex = BABYLON.CubeTexture.CreateFromPrefilteredData('textures/environment.env', this.scene);
-  this.scene.environmentTexture = envTex;
+  // Falls back gracefully if the texture file is missing.
+  try {
+    var envTex = BABYLON.CubeTexture.CreateFromPrefilteredData('textures/environment.env', this.scene);
+    this.scene.environmentTexture = envTex;
+  } catch (e) {
+    console.warn('Environment texture not available, using default lighting:', e.message);
+    // Game continues without IBL - materials will still look good with direct lighting
+  }
 
   // Render loop
   var self = this;
@@ -515,7 +534,9 @@ GameScene.prototype._upgradeToModels = function (grid) {
         template.dispose();
       },
       null,           // progress callback — not needed
-      function () {   // error callback — model file absent, keep fallback boxes
+      function (scene, message, exception) {   // error callback — model file absent, keep fallback boxes
+        console.warn('Failed to load terrain model ' + fileName + ':', message);
+        // Fallback to procedural meshes already handled by not replacing them
       },
       pluginExt       // force OBJ plugin when loading from a blob: URL
     );
@@ -618,7 +639,9 @@ GameScene.prototype._addMapProps = function (grid) {
         template.dispose();
       },
       null,
-      function () {} // error: file absent — skip silently, game remains playable
+      function (scene, message, exception) { // error: file absent — skip silently, game remains playable
+        console.warn('Failed to load prop model ' + fileName + ':', message);
+      }
     );
   });
 };
@@ -1962,7 +1985,9 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
       self._model = model;
     },
     null,
-    function () { /* model absent — keep procedural fallback */ },
+    function (scene, message, exception) { /* model absent — keep procedural fallback */
+      console.warn('Failed to load character model ' + fileName + ':', message);
+    },
     pluginExt
   );
 };

@@ -177,6 +177,69 @@ html, body {
 }
 
 /* ────────────────────────────────────────
+   PARTY SELECTION SCREEN
+──────────────────────────────────────── */
+#screen-party-select {
+  background: linear-gradient(135deg, #1a1408 0%, #0e0c08 100%);
+  padding: 40px 20px;
+}
+
+.party-select-container {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.party-select-subtitle {
+  color: #c9a227;
+  font-size: 1.1em;
+  margin: 10px 0 40px 0;
+}
+
+.party-select-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 30px;
+  margin-bottom: 40px;
+}
+
+.party-option-card {
+  background: rgba(14, 12, 8, 0.9);
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  border-radius: 8px;
+  padding: 30px 20px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.party-option-card:hover {
+  border-color: #c9a227;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(201, 162, 39, 0.2);
+}
+
+.card-icon {
+  font-size: 3em;
+  margin-bottom: 15px;
+}
+
+.card-title {
+  color: #e8dcc8;
+  font-size: 1.4em;
+  margin-bottom: 10px;
+}
+
+.card-desc {
+  color: #b0a080;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.party-select-actions {
+  margin-top: 20px;
+}
+
+/* ────────────────────────────────────────
    CHARACTER WIZARD (create screen)
 ──────────────────────────────────────── */
 #screen-create {

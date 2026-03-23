@@ -101,35 +101,44 @@ var Multiplayer = (function () {
    */
   function connect(cb) {
     if (_ws) disconnect();
-    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    var url   = proto + '//' + location.host + '/ws';
-    _ws = new WebSocket(url);
+    
+    try {
+      var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      var url   = proto + '//' + location.host + '/ws';
+      _ws = new WebSocket(url);
 
-    _ws.onopen = function () {
-      _connected = true;
-      if (cb) cb(null);
-    };
+      _ws.onopen = function () {
+        _connected = true;
+        if (cb) cb(null);
+      };
 
-    _ws.onerror = function () {
-      _connected = false;
-      if (cb) cb(new Error('WebSocket connection failed'));
-    };
+      _ws.onerror = function (error) {
+        console.error('WebSocket error:', error);
+        _connected = false;
+        if (_pub.onError) _pub.onError('Failed to connect to server');
+        if (cb) cb(new Error('WebSocket connection failed'));
+      };
 
-    _ws.onclose = function () {
-      _connected = false;
-      if (_playerIdx !== -1) {
-        // Only fire if we were in a match
-        _dispatch('onOpponentLeft');
-      }
-      _playerIdx = -1;
-      _roomCode  = null;
-    };
+      _ws.onclose = function (event) {
+        _connected = false;
+        console.log('WebSocket closed:', event.code, event.reason);
+        if (_playerIdx !== -1) {
+          // Only fire if we were in a match
+          _dispatch('onOpponentLeft');
+        }
+        _playerIdx = -1;
+        _roomCode  = null;
+      };
 
-    _ws.onmessage = function (evt) {
-      var msg;
-      try { msg = JSON.parse(evt.data); } catch (_) { return; }
-      _handleMessage(msg);
-    };
+      _ws.onmessage = function (evt) {
+        var msg;
+        try { msg = JSON.parse(evt.data); } catch (_) { return; }
+        _handleMessage(msg);
+      };
+    } catch (e) {
+      console.error('WebSocket creation failed:', e);
+      if (cb) cb(e);
+    }
   }
 
   /** Close the WebSocket connection. */
