@@ -37,7 +37,6 @@
         <div class="loading-hint" id="loading-hint">💡 Pro tip: Position your units strategically to control the battlefield</div>
       </div>
 
-      <div class="loading-spinner"></div>
     </div>
   </div>
 
@@ -45,7 +44,33 @@
   <div id="screen-title" class="screen active">
     <div class="fantasy-bg">
       <div class="fantasy-particles"></div>
-      <div class="fantasy-content">
+      <!-- Bell Tower with Camera Effects -->
+      <div class="bell-tower-container">
+        <div class="bell-tower">
+          <div class="tower-base"></div>
+          <div class="tower-body">
+            <div class="tower-window">
+              <div class="bell-hanger">
+                <div class="bell-rope bell-rope-1"></div>
+                <div class="bell bell-1">🔔</div>
+              </div>
+              <div class="bell-hanger">
+                <div class="bell-rope bell-rope-2"></div>
+                <div class="bell bell-2">🔔</div>
+              </div>
+              <div class="bell-hanger">
+                <div class="bell-rope bell-rope-3"></div>
+                <div class="bell bell-3">🔔</div>
+              </div>
+            </div>
+            <div class="tower-roof">
+              <div class="roof-peak"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="fantasy-content">
         <div class="fantasy-header">
           <div class="fantasy-title">
             <span class="fantasy-bell-symbol">🔔</span>
@@ -477,18 +502,15 @@
         }
       });
 
-      ipcRenderer.on('loading-complete', () => {
-        const loadingScreen = document.getElementById('screen-loading');
-        const titleScreen = document.getElementById('screen-title');
-
-        if (loadingScreen && titleScreen) {
-          // Hide loading screen
-          loadingScreen.classList.remove('active');
-          loadingScreen.classList.add('hidden');
-
-          // Show title screen
-          titleScreen.classList.remove('hidden');
-          titleScreen.classList.add('active');
+      ipcRenderer.on('start-model-cache', () => {
+        // Trigger model caching if AssetCache is available
+        if (typeof AssetCache !== 'undefined') {
+          AssetCache.preloadTerrainModels(() => {
+            AssetCache.preloadCharacterModels(() => {
+              // Model caching complete
+              console.log('Model caching completed');
+            });
+          });
         }
       });
     }

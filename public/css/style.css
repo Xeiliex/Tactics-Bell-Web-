@@ -92,6 +92,14 @@ html, body {
     radial-gradient(circle at 50% 50%, var(--bell-gold) 0%, transparent 60%);
   opacity: 0.4;  /* Reduced opacity for better readability */
   pointer-events: none;  /* Don't interfere with clicks */
+  animation: camera-pan 20s ease-in-out infinite;
+}
+
+@keyframes camera-pan {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.05) rotate(0.5deg); }
+  50% { transform: scale(1.1) rotate(1deg); }
+  75% { transform: scale(1.05) rotate(0.5deg); }
 }
 
 .fantasy-particles {
@@ -105,6 +113,280 @@ html, body {
   background-size: 200px 200px, 150px 150px, 180px 180px, 220px 220px;
   animation: magical-float 20s ease-in-out infinite;
   pointer-events: none;  /* Don't interfere with clicks */
+}
+
+/* Bell Tower Styles */
+.bell-tower-container::before {
+  content: '';
+  position: absolute;
+  top: -50px;
+  left: -50px;
+  right: -50px;
+  bottom: -50px;
+  background: radial-gradient(circle at center, rgba(212, 175, 55, 0.1) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: tower-ambient-light 4s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes tower-ambient-light {
+  0% { opacity: 0.3; transform: scale(0.9); }
+  100% { opacity: 0.6; transform: scale(1.1); }
+}
+
+@keyframes tower-camera {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(0.8) rotateY(0deg);
+    filter: brightness(1);
+  }
+  25% {
+    transform: translate(-50%, -50%) scale(0.9) rotateY(5deg);
+    filter: brightness(1.1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1) rotateY(10deg);
+    filter: brightness(1.2);
+  }
+  75% {
+    transform: translate(-50%, -50%) scale(0.9) rotateY(5deg);
+    filter: brightness(1.1);
+  }
+}
+
+.bell-tower {
+  position: relative;
+  width: 200px;
+  height: 300px;
+  transform-style: preserve-3d;
+}
+
+.tower-base {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 180px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--earth-brown), var(--ink-medium));
+  border-radius: 10px 10px 0 0;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+.tower-body {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 140px;
+  height: 200px;
+  background: linear-gradient(135deg, var(--ink-medium), var(--shadow-dark));
+  border-radius: 5px 5px 0 0;
+  box-shadow: 0 0 15px rgba(0,0,0,0.3);
+  overflow: hidden;
+}
+
+.tower-window {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 140px;
+  background: rgba(212, 175, 55, 0.1);
+  border: 2px solid var(--bell-gold);
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  padding: 10px 0;
+  box-shadow: inset 0 0 20px rgba(212, 175, 55, 0.2);
+}
+
+.tower-window::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, var(--bell-gold), var(--magic-blue), var(--bell-gold));
+  border-radius: 7px;
+  z-index: -1;
+  opacity: 0.3;
+  animation: window-glow 3s ease-in-out infinite alternate;
+}
+
+@keyframes window-glow {
+  0% { opacity: 0.2; }
+  100% { opacity: 0.5; }
+}
+
+.bell-hanger {
+  position: relative;
+  width: 100%;
+  height: 30px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.bell-rope {
+  width: 2px;
+  height: 20px;
+  background: var(--ink-medium);
+  position: relative;
+  transform-origin: top center;
+}
+
+.bell-rope-1 {
+  animation: bell-swing-1 4s ease-in-out infinite;
+}
+
+.bell-rope-2 {
+  animation: bell-swing-2 3.5s ease-in-out infinite 0.5s;
+}
+
+.bell-rope-3 {
+  animation: bell-swing-3 5s ease-in-out infinite 1s;
+}
+
+@keyframes bell-swing-1 {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(15deg); }
+  75% { transform: rotate(-15deg); }
+}
+
+@keyframes bell-swing-2 {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-20deg); }
+  75% { transform: rotate(20deg); }
+}
+
+@keyframes bell-swing-3 {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(25deg); }
+  75% { transform: rotate(-25deg); }
+}
+
+.bell {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 24px;
+  color: var(--bell-gold);
+  text-shadow: 0 0 10px var(--glow-gold);
+  transform-origin: top center;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.bell::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  border: 2px solid var(--bell-gold);
+  border-radius: 50%;
+  opacity: 0;
+  animation: bell-wave 4s ease-out infinite;
+}
+
+.bell-1::before {
+  animation: bell-wave-1 4s ease-out infinite;
+}
+
+.bell-2::before {
+  animation: bell-wave-2 3.5s ease-out infinite 0.5s;
+}
+
+.bell-3::before {
+  animation: bell-wave-3 5s ease-out infinite 1s;
+}
+
+@keyframes bell-wave-1 {
+  0%, 90%, 100% { opacity: 0; transform: scale(0.8); }
+  10%, 20% { opacity: 0.6; transform: scale(1.2); }
+  30%, 40% { opacity: 0.3; transform: scale(1.1); }
+  50% { opacity: 0; transform: scale(0.9); }
+}
+
+@keyframes bell-wave-2 {
+  0%, 90%, 100% { opacity: 0; transform: scale(0.8); }
+  10%, 20% { opacity: 0.7; transform: scale(1.3); }
+  30%, 40% { opacity: 0.4; transform: scale(1.15); }
+  50% { opacity: 0; transform: scale(0.95); }
+}
+
+@keyframes bell-wave-3 {
+  0%, 90%, 100% { opacity: 0; transform: scale(0.8); }
+  10%, 20% { opacity: 0.8; transform: scale(1.4); }
+  30%, 40% { opacity: 0.5; transform: scale(1.2); }
+  50% { opacity: 0; transform: scale(1); }
+}
+
+.bell-1 {
+  animation: bell-ring-1 4s ease-in-out infinite;
+}
+
+.bell-2 {
+  animation: bell-ring-2 3.5s ease-in-out infinite 0.5s;
+}
+
+.bell-3 {
+  animation: bell-ring-3 5s ease-in-out infinite 1s;
+}
+
+@keyframes bell-ring-1 {
+  0%, 100% { transform: translateX(-50%) rotate(0deg) scale(1); }
+  10% { transform: translateX(-50%) rotate(5deg) scale(1.1); }
+  20% { transform: translateX(-50%) rotate(-5deg) scale(1.05); }
+  30% { transform: translateX(-50%) rotate(3deg) scale(1.08); }
+  40% { transform: translateX(-50%) rotate(-3deg) scale(1.03); }
+  50% { transform: translateX(-50%) rotate(0deg) scale(1); }
+}
+
+@keyframes bell-ring-2 {
+  0%, 100% { transform: translateX(-50%) rotate(0deg) scale(1); }
+  10% { transform: translateX(-50%) rotate(-8deg) scale(1.15); }
+  20% { transform: translateX(-50%) rotate(8deg) scale(1.08); }
+  30% { transform: translateX(-50%) rotate(-5deg) scale(1.12); }
+  40% { transform: translateX(-50%) rotate(5deg) scale(1.05); }
+  50% { transform: translateX(-50%) rotate(0deg) scale(1); }
+}
+
+@keyframes bell-ring-3 {
+  0%, 100% { transform: translateX(-50%) rotate(0deg) scale(1); }
+  10% { transform: translateX(-50%) rotate(10deg) scale(1.2); }
+  20% { transform: translateX(-50%) rotate(-10deg) scale(1.1); }
+  30% { transform: translateX(-50%) rotate(7deg) scale(1.15); }
+  40% { transform: translateX(-50%) rotate(-7deg) scale(1.08); }
+  50% { transform: translateX(-50%) rotate(0deg) scale(1); }
+}
+
+.tower-roof {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 160px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--earth-brown), var(--ink-medium));
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+
+.roof-peak {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 20px;
+  background: var(--bell-gold);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  box-shadow: 0 0 10px var(--glow-gold);
 }
 
 @keyframes magical-float {
@@ -126,6 +408,7 @@ html, body {
   display: flex;
   flex-direction: column;
   justify-content: center;  /* Center content vertically */
+  transform: translateY(50px); /* Move content down to avoid bell tower */
 }
 
 .fantasy-header {
@@ -2620,9 +2903,10 @@ html, body {
 .loading-subtitle {
   font-family: var(--font-script);
   font-size: 1.2em;
-  color: var(--ink-light);
+  color: var(--parchment);
   font-style: italic;
   margin-bottom: 20px;
+  opacity: 0.9;
 }
 
 .loading-progress-section {
@@ -2729,9 +3013,9 @@ html, body {
 .loading-current-file {
   font-family: var(--font-script);
   font-size: 0.9em;
-  color: var(--ink-light);
+  color: var(--parchment);
   font-style: italic;
-  opacity: 0.8;
+  opacity: 0.7;
   max-width: 400px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2750,8 +3034,8 @@ html, body {
 .loading-message {
   font-family: var(--font-script);
   font-size: 1em;
-  color: var(--magic-purple);
-  text-shadow: 0 0 10px var(--glow-purple);
+  color: var(--parchment);
+  text-shadow: 0 0 8px var(--glow-gold);
   font-style: italic;
   text-align: center;
   line-height: 1.4;
@@ -2767,11 +3051,11 @@ html, body {
 .loading-hint {
   font-family: var(--font-script);
   font-size: 0.85em;
-  color: var(--ink-medium);
+  color: var(--parchment);
   font-style: italic;
   text-align: center;
   line-height: 1.4;
-  opacity: 0.9;
+  opacity: 0.8;
   padding: 10px 20px;
   background: rgba(244, 241, 232, 0.05);
   border-radius: 15px;

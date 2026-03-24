@@ -16,6 +16,61 @@ const ASSETS_TO_PRELOAD = [
   'Assets/medieval-village-megakit/Textures/'
 ];
 
+function checkForUpdates(callback) {
+  // Simple update check - in a real app, this would check a remote server
+  // For now, we'll just simulate a quick check
+  const https = require('https');
+
+  // Check GitHub for latest release (example - replace with your repo)
+  const options = {
+    hostname: 'api.github.com',
+    path: '/repos/wintercoker/Tactics-bell-web/releases/latest',
+    method: 'GET',
+    headers: {
+      'User-Agent': 'Tactics-Bell-App'
+    }
+  };
+
+  const req = https.request(options, (res) => {
+    let data = '';
+
+    res.on('data', (chunk) => {
+      data += chunk;
+    });
+
+    res.on('end', () => {
+      try {
+        const release = JSON.parse(data);
+        const latestVersion = release.tag_name || '1.0.0';
+        const currentVersion = require('./package.json').version;
+
+        if (latestVersion !== currentVersion) {
+          console.log(`Update available: ${latestVersion} (current: ${currentVersion})`);
+          // In a real app, you might show a dialog here
+        } else {
+          console.log('App is up to date');
+        }
+      } catch (e) {
+        console.log('Could not check for updates');
+      }
+      callback();
+    });
+  });
+
+  req.on('error', (e) => {
+    console.log('Update check failed:', e.message);
+    callback();
+  });
+
+  req.setTimeout(3000, () => {
+    req.destroy();
+    console.log('Update check timed out');
+    callback();
+  });
+
+  req.end();
+}
+
 function preloadAssets(callback) {
   const appPath = __dirname; // electron-main.js is in the root directory
   let totalAssets = 0;
@@ -34,9 +89,11 @@ function preloadAssets(callback) {
 
   // Simulate initial loading phases
   const initialPhases = [
+    { phase: 'Checking for updates...', delay: 300 },
     { phase: 'Initializing game engine...', delay: 500 },
     { phase: 'Loading core systems...', delay: 300 },
     { phase: 'Preparing battlefield...', delay: 400 },
+    { phase: 'Caching 3D models...', delay: 800 },
     { phase: 'Scanning game assets...', delay: 200 }
   ];
 
@@ -51,6 +108,28 @@ function preloadAssets(callback) {
           currentFile: currentInitialPhase.phase.toLowerCase(),
           phase: currentInitialPhase.phase
         });
+      }
+      // If this is the update check phase, actually perform the check
+      if (currentInitialPhase.phase === 'Checking for updates...') {
+        checkForUpdates(() => {
+          setTimeout(() => {
+            phaseIndex++;
+            runInitialPhases();
+          }, currentInitialPhase.delay);
+        });
+        return;
+      }
+
+      // If this is the model caching phase, trigger it in the renderer
+      if (currentInitialPhase.phase === 'Caching 3D models...') {
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('start-model-cache');
+        }
+        setTimeout(() => {
+          phaseIndex++;
+          runInitialPhases();
+        }, currentInitialPhase.delay);
+        return;
       }
       setTimeout(() => {
         phaseIndex++;
@@ -76,6 +155,12 @@ function preloadAssets(callback) {
         return;
       }
 
+      // Add timeout to prevent getting stuck
+      const timeout = setTimeout(() => {
+        console.log(`Timeout scanning directory: ${dirPath}`);
+        callback();
+      }, 5000); // 5 second timeout per directory
+
       files.forEach(file => {
         const filePath = path.join(dirPath, file.name);
         totalAssets++;
@@ -84,7 +169,10 @@ function preloadAssets(callback) {
           // Recursively scan subdirectories
           scanDirectory(filePath, () => {
             pending--;
-            if (pending === 0) callback();
+            if (pending === 0) {
+              clearTimeout(timeout);
+              callback();
+            }
           });
         } else {
           // Count file
@@ -110,8 +198,11 @@ function preloadAssets(callback) {
           // Add small artificial delay to make loading visible
           setTimeout(() => {
             pending--;
-            if (pending === 0) callback();
-          }, Math.random() * 50 + 10); // 10-60ms random delay
+            if (pending === 0) {
+              clearTimeout(timeout);
+              callback();
+            }
+          }, Math.random() * 20 + 5); // 5-25ms random delay (faster)
         }
       });
     });
@@ -120,18 +211,42 @@ function preloadAssets(callback) {
   const startAssetScanning = () => {
     // Start scanning assets
     let pendingDirs = ASSETS_TO_PRELOAD.length;
-    ASSETS_TO_PRELOAD.forEach(assetDir => {
+    let totalDirs = ASSETS_TO_PRELOAD.length;
+    let completedDirs = 0;
+
+    ASSETS_TO_PRELOAD.forEach((assetDir, index) => {
       const fullPath = path.join(appPath, assetDir);
       scanDirectory(fullPath, () => {
+        completedDirs++;
         pendingDirs--;
+
+        // Update progress for directory completion
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('loading-progress', {
+            loaded: initialPhases.length + completedDirs,
+            total: initialPhases.length + totalDirs + 1,
+            currentFile: `Completed scanning ${assetDir}`,
+            phase: `Scanning game assets... (${completedDirs}/${totalDirs})`
+          });
+        }
+
         if (pendingDirs === 0) {
           // All directories scanned
+          if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('loading-progress', {
+              loaded: initialPhases.length + totalDirs + 1,
+              total: initialPhases.length + totalDirs + 1,
+              currentFile: 'Asset scanning complete!',
+              phase: 'Loading complete!'
+            });
+          }
+
           setTimeout(() => {
             if (mainWindow && mainWindow.webContents) {
               mainWindow.webContents.send('loading-complete');
             }
             callback();
-          }, 1000); // Longer delay to show completion
+          }, 500); // Shorter delay since we already showed completion
         }
       });
     });
@@ -139,6 +254,14 @@ function preloadAssets(callback) {
 
   // Start the loading process
   runInitialPhases();
+
+  // Add a safety timeout to ensure loading always completes
+  setTimeout(() => {
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('loading-complete');
+    }
+    callback();
+  }, 15000); // 15 second absolute timeout
 }
 
 // Custom protocol for launching from links
