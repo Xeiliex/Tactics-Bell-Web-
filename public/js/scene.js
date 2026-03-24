@@ -181,6 +181,8 @@ function GameScene() {
   this._weatherTickFn = null;  // gameLoop callback for animated weather effects
   this._fogActive     = false; // whether Babylon scene fog is currently applied
   this._weatherTime   = 0;    // accumulated time (seconds) for weather animation
+  // Character composer
+  this._composer      = null;  // CharacterModelComposer instance
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────
@@ -203,6 +205,12 @@ GameScene.prototype.init = function (canvasId) {
   this.engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true }, true);
   this.scene  = new BABYLON.Scene(this.engine);
   this.scene.clearColor = new BABYLON.Color4(0.05, 0.07, 0.14, 1);
+
+  // Initialize character model composer
+  if (typeof CharacterModelComposer !== 'undefined') {
+    this._composer = new CharacterModelComposer(this.scene);
+    console.log('🎨 [SCENE] CharacterModelComposer initialized');
+  }
 
   // Physics plugin (Oimo.js) — used for death ragdolls
   try {
@@ -658,225 +666,116 @@ GameScene.prototype.renderUnits = function (units) {
 };
 
 // ─── Character model loading ──────────────────────────────────────────────────
-// Loads glTF character models (high quality) or OBJ fallbacks (low quality).
-// For glTF models the full mesh hierarchy is preserved so the skeleton remains
-// accessible for procedural idle bone animations.
+// Loads and composes character models using the CharacterModelComposer.
+// Supports outfit variations, hairstyles, and dynamic coloring.
 // On success the procedural cylinder + sphere are hidden.  On failure the
 // procedural shapes remain, so the game is always playable.
 
 GameScene.prototype._upgradeUnitsToModels = function (units) {
-  console.log('🎮 [MODEL LOAD] _upgradeUnitsToModels called with', units.length, 'units');
-  console.log('🎮 [MODEL LOAD] GRAPHICS_QUALITY:', typeof GRAPHICS_QUALITY !== 'undefined' ? GRAPHICS_QUALITY : 'UNDEFINED');
-  console.log('🎮 [MODEL LOAD] BABYLON.SceneLoader:', typeof BABYLON !== 'undefined' && BABYLON.SceneLoader ? 'EXISTS' : 'MISSING');
-  console.log('🎮 [MODEL LOAD] CHARACTER_MODEL_FILES:', typeof CHARACTER_MODEL_FILES !== 'undefined' ? 'Defined' : 'UNDEFINED', CHARACTER_MODEL_FILES);
+  console.log('🎨 [BATTLE] Composing models for', units.length, 'units');
   
-  if (typeof GRAPHICS_QUALITY !== 'undefined' && GRAPHICS_QUALITY === 'low') {
-    console.log('🎮 [MODEL LOAD] ⚠️  GRAPHICS_QUALITY is "low" — skipping model loading');
-    return;
-  }
-  if (!BABYLON.SceneLoader || typeof BABYLON.SceneLoader.ImportMesh !== 'function') {
-    console.log('🎮 [MODEL LOAD] ⚠️  BABYLON.SceneLoader not ready — skipping model loading');
+  if (!this._composer || !CharacterModelComposer) {
+    console.log('🎨 [BATTLE] Composer not available, keeping procedural fallbacks');
     return;
   }
 
   var self = this;
 
-  // Group units by (classId + '_' + gender) so each unique model file is
-  // loaded only once regardless of how many units share it.
+  // Group units by (classId + '_' + gender) to load each model only once
   var buckets = {};
   units.forEach(function (unit) {
     var gender = unit.gender || 'male';
     var key    = unit.classId + '_' + gender;
-    if (!buckets[key]) { buckets[key] = { classId: unit.classId, gender: gender, units: [] }; }
+    if (!buckets[key]) { 
+      buckets[key] = { classId: unit.classId, gender: gender, units: [] };
+    }
     buckets[key].units.push(unit);
   });
 
+  // For each unique model, compose it and clone for all units that need it
   Object.keys(buckets).forEach(function (bucketKey) {
-    var bucket  = buckets[bucketKey];
+    var bucket = buckets[bucketKey];
     var classId = bucket.classId;
-    var gender  = bucket.gender;
-    console.log('Processing bucket:', bucketKey, 'with', bucket.units.length, 'units');
-
-    // Pick the model file: glTF for high quality (always the case here),
-    // OBJ for low quality (already guarded above).
-    var genderMap = CHARACTER_MODEL_FILES[gender] || CHARACTER_MODEL_FILES.male;
-    var fileName  = genderMap[classId];
-    if (!fileName) {
-      console.log('🎮 [MODEL LOAD] ❌ No model file found for class:', classId, 'gender:', gender);
-      return;
-    }
-    console.log('🎮 [MODEL LOAD] ✓ Loading model file:', fileName, 'for class:', classId, 'gender:', gender);
-
-    var isGltf = fileName.indexOf('.gltf') !== -1 || fileName.indexOf('.glb') !== -1;
-
-    // glTF models must always load from the server because their external .bin
-    // and texture files cannot be served from a single blob: URL.
-    // OBJ models use the blob cache when available to avoid repeat network hits.
-    var useBlob   = !isGltf && typeof AssetCache !== 'undefined' && AssetCache.hasCached('models/character/' + fileName);
-    var rootUrl   = useBlob ? ''                    : 'models/character/';
-    var srcFile   = useBlob ? AssetCache.getCachedUrl('models/character/' + fileName) : fileName;
-    var pluginExt = '.obj';
-
-    console.log('🎮 [MODEL LOAD] 📤 Calling ImportMesh with:', { rootUrl, srcFile, pluginExt, fileName });
+    var gender = bucket.gender;
     
-    BABYLON.SceneLoader.ImportMesh(
-      '',          // import all meshes
-      rootUrl,
-      srcFile,
-      self.scene,
-      function (meshes) {
-        console.log('🎮 [MODEL LOAD] 📥 ImportMesh success for', fileName, 'meshes:', meshes.length);
-        if (!meshes || !meshes.length || !self.scene) return;
+    console.log('🎨 [BATTLE] Composing model for class:', classId, 'gender:', gender, 'units:', bucket.units.length);
 
-        // Filter to geometry meshes only (glTF also returns TransformNodes).
-        var geoMeshes = meshes.filter(function (m) {
-          var verts = m.getTotalVertices ? m.getTotalVertices() : 0;
-          console.log('Mesh', m.name, 'vertices:', verts);
-          return verts > 0;
-        });
-        console.log('Character model', fileName, 'loaded with', geoMeshes.length, 'geometry meshes');
-        if (!geoMeshes.length) return;
+    // Determine outfit based on class
+    var outfitId = self._classToOutfit(classId);
+    
+    // Compose the character
+    var config = {
+      gender: gender,
+      classId: classId,
+      outfitId: outfitId,
+      hairStyle: 'none',  // For battles, use simple styling
+      skinTone: SKIN_TONE_PRESETS.fair,
+      outfitColor: OUTFIT_COLOR_PRESETS.brown,
+      hairColor: HAIR_COLOR_PRESETS.dark_brown,
+      scale: CHARACTER_MODEL_SCALE
+    };
 
-        if (isGltf) {
-          // ── glTF path: keep hierarchy intact to preserve skeleton ──────────
-          // Disable all geometry meshes; we will clone them per unit.
-          geoMeshes.forEach(function (m) {
-            m.setEnabled(false);
-            m.isPickable = false;
-          });
+    self._composer.composeCharacter(config).promise.then(function(root) {
+      if (!root || !self.scene) return;
 
-          // Find the skeleton linked to the loaded geometry.
-          var loadedSkeleton = null;
-          for (var mi = 0; mi < geoMeshes.length; mi++) {
-            if (geoMeshes[mi].skeleton) {
-              loadedSkeleton = geoMeshes[mi].skeleton;
-              break;
-            }
-          }
+      console.log('🎨 [BATTLE] Model composed for:', classId);
 
-          bucket.units.forEach(function (unit) {
-            console.log('🎮 [MODEL LOAD] 👤 Cloning glTF model for unit:', unit.id);
-            var node = self._unitNodes[unit.id];
-            if (!node) {
-              console.log('🎮 [MODEL LOAD] ❌ No node found for unit:', unit.id);
-              return;
-            }
-
-            var pos = self.gridToWorld(unit.gridRow, unit.gridCol);
-            console.log('🎮 [MODEL LOAD] 📍 Unit position:', pos);
-
-            // Clone the skeleton for this unit so its bone animations are independent.
-            var unitSkeleton = loadedSkeleton
-              ? loadedSkeleton.clone('skel_' + unit.id)
-              : null;
-
-            // Parent node for all cloned geometry meshes of this unit.
-            var unitRoot = new BABYLON.TransformNode('charroot_' + unit.id, self.scene);
-            unitRoot.position = new BABYLON.Vector3(pos.x, 0, pos.z);
-            unitRoot.scaling  = new BABYLON.Vector3(
-              CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
-            );
-
-            geoMeshes.forEach(function (m, mi) {
-              var clone = m.clone('charpart_' + unit.id + '_' + mi);
-              if (!clone) return;
-              clone.setEnabled(true);
-              clone.isPickable    = false;
-              clone.receiveShadows = true;
-              clone.parent         = unitRoot;
-              if (unitSkeleton) { clone.skeleton = unitSkeleton; }
-              if (self._shadowGenerator) { self._shadowGenerator.addShadowCaster(clone, true); }
-            });
-
-            // Hide the procedural fallback meshes.
-            node.body.setEnabled(false);
-            node.head.setEnabled(false);
-
-            // Attach a procedural head if the model is missing one.
-            self._attachHeadMesh(unit, unitRoot, geoMeshes, true);
-
-            // Attach procedural hair above the head.
-            self._attachHairMesh(unit, unitRoot);
-
-            // Store the root node for movement/animation; also keep a direct
-            // reference to the first child mesh for hit-flash and physics.
-            node.model       = unitRoot;
-            node.modelParts  = unitRoot.getChildMeshes ? unitRoot.getChildMeshes(false) : [];
-
-            // Start idle animation: Y-bob on the root + bone breathing cycle.
-            self._startIdleAnim(unit.id, unitRoot, unitSkeleton);
-          });
-
-          // Dispose the loading-only template meshes.
-          geoMeshes.forEach(function (m) { try { m.dispose(); } catch (e) {} });
-
-        } else {
-          // ── OBJ path: merge into a single flat mesh (no skeleton) ──────────
-          var template = geoMeshes.length === 1
-            ? geoMeshes[0]
-            : BABYLON.Mesh.MergeMeshes(geoMeshes, true, true, undefined, false, true);
-          if (!template) return;
-
-          template.setEnabled(false);
-          template.isPickable = false;
-          template.scaling = new BABYLON.Vector3(
-            CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
-          );
-
-          bucket.units.forEach(function (unit) {
-            console.log('🎮 [MODEL LOAD] 👤 Cloning OBJ model for unit:', unit.id);
-            var node = self._unitNodes[unit.id];
-            if (!node) {
-              console.log('🎮 [MODEL LOAD] ❌ No node found for unit:', unit.id);
-              return;
-            }
-
-            var pos   = self.gridToWorld(unit.gridRow, unit.gridCol);
-            console.log('🎮 [MODEL LOAD] 📍 Unit position:', pos);
-            var clone = template.clone('charmodel_' + unit.id);
-            console.log('🎮 [MODEL LOAD] ✓ Cloned model, enabling...');
-            clone.setEnabled(true);
-            clone.position   = new BABYLON.Vector3(pos.x, 0, pos.z);
-
-            // Attach procedural hair above the head.
-            self._attachHairMesh(unit, clone);
-            clone.isPickable = false;
-            clone.receiveShadows = true;
-
-            // OBJ path: override material with unit race/custom colour.
-            var c = unit.meshColor();
-            var pbrMat = new BABYLON.PBRMaterial('charpbr_' + unit.id, self.scene);
-            pbrMat.albedoColor   = new BABYLON.Color3(c.r, c.g, c.b);
-            pbrMat.metallic      = CHARACTER_PBR_METALLIC;
-            pbrMat.roughness     = CHARACTER_PBR_ROUGHNESS;
-            pbrMat.emissiveColor = BABYLON.Color3.Black();
-            clone.material = pbrMat;
-
-            if (self._shadowGenerator) { self._shadowGenerator.addShadowCaster(clone, true); }
-
-            console.log('🎮 [MODEL LOAD] 🙈 Hiding procedural fallback for unit:', unit.id);
-            node.body.setEnabled(false);
-            node.head.setEnabled(false);
-
-            node.model      = clone;
-            node.modelParts = [clone];
-            console.log('🎮 [MODEL LOAD] ✅ Model fully set up for unit:', unit.id, '| Model enabled:', clone.isEnabled, '| Procedural hidden:', !node.body.isEnabled);
-
-            self._startIdleAnim(unit.id, clone, null);
-          });
-
-          template.dispose();
+      // Clone the model for each unit in this bucket
+      bucket.units.forEach(function (unit) {
+        var node = self._unitNodes[unit.id];
+        if (!node) {
+          console.log('🎨 [BATTLE] ❌ No node for unit:', unit.id);
+          return;
         }
-      },
-      null,           // progress callback — not needed
-      function (scene, message, exception) {   // error callback — model file absent, keep procedural fallback
-        console.error('🎮 [MODEL LOAD] ❌ ERROR loading character model:', fileName);
-        console.error('  Message:', message);
-        console.error('  Exception:', exception);
-      },
-      pluginExt
-    );
+
+        // Clone the root node
+        var clone = root.clone('battlechar_' + unit.id);
+        if (!clone) return;
+
+        var pos = self.gridToWorld(unit.gridRow, unit.gridCol);
+        clone.position = new BABYLON.Vector3(pos.x, 0, pos.z);
+        clone.isPickable = false;
+
+        // Add shadows
+        if (clone.getChildMeshes) {
+          clone.getChildMeshes().forEach(function(m) {
+            m.isPickable = false;
+            m.receiveShadows = true;
+            if (self._shadowGenerator) {
+              self._shadowGenerator.addShadowCaster(m, true);
+            }
+          });
+        }
+
+        // Hide procedural fallback
+        node.body.setEnabled(false);
+        node.head.setEnabled(false);
+
+        // Store model reference
+        node.model = clone;
+        node.modelParts = clone.getChildMeshes ? clone.getChildMeshes(false) : [clone];
+
+        // Start idle animation
+        self._startIdleAnim(unit.id, clone, null);
+
+        console.log('🎨 [BATTLE] ✅ Unit', unit.id, 'equipped with model');
+      });
+
+      // Dispose template after cloning all units
+      root.dispose();
+    }).catch(function(err) {
+      console.error('🎨 [BATTLE] Failed to compose model for class:', classId, err);
+      // Procedural fallbacks remain visible
+    });
   });
+};
+
+// ─── Helper: Map class to outfit ──────────────────────────────────────────────
+
+GameScene.prototype._classToOutfit = function(classId) {
+  // Ranger outfit for combat classes, peasant for others
+  var combatClasses = ['warrior', 'knight', 'paladin', 'berserker', 'warlord', 'archer', 'ranger', 'rogue'];
+  return combatClasses.indexOf(classId) !== -1 ? 'ranger' : 'peasant';
 };
 
 // ─── Character idle animation ─────────────────────────────────────────────────
@@ -1953,6 +1852,7 @@ function CharacterPreviewScene() {
   this._pendingClassId  = null;
   this._pendingHairStyle = null;
   this._pendingHairColor = null;
+  this._composer       = null;  // CharacterModelComposer instance
 }
 
 /** Initialise Babylon on the given canvas.  Returns true on success. */
@@ -1994,20 +1894,41 @@ CharacterPreviewScene.prototype.init = function (canvasId) {
 
 /** Load (or reload) the glTF/OBJ model for classId with the given colour and gender. */
 CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, gender, hairStyle, hairColor) {
-  console.log('CharacterPreviewScene.loadModel called for class:', classId, 'gender:', gender);
+  console.log('🎨 [PREVIEW] loadModel called for class:', classId, 'gender:', gender);
   if (!this.scene) return;
+  
   var self = this;
   this._pendingClassId = classId;
   this._pendingHairStyle = hairStyle || 'none';
-  this._pendingHairColor = hairColor || 'dark';
+  this._pendingHairColor = hairColor || 'dark_brown';
 
-  if (this._model)    { this._model.dispose();    this._model    = null; }
+  if (this._model) {
+    try {
+      // Safely dispose - handles both Meshes and TransformNodes
+      if (this._model.getChildMeshes) {
+        this._model.getChildMeshes().forEach(function(m) {
+          try { m.dispose(); } catch (e) {}
+        });
+      }
+      if (this._model.dispose && typeof this._model.dispose === 'function') {
+        this._model.dispose();
+      }
+    } catch (e) {
+      console.warn('Error disposing old model:', e.message);
+    }
+    this._model = null;
+  }
   if (this._fallback) { this._fallback.dispose(); this._fallback = null; }
+
+  // Initialize composer if needed
+  if (!this._composer) {
+    this._composer = new CharacterModelComposer(this.scene);
+  }
 
   var col = _resolvePreviewColor(colorId, raceId);
 
-  // Procedural fallback shown immediately while the model loads (or if unavailable)
-  var fb    = BABYLON.MeshBuilder.CreateCylinder('pfb', {
+  // Procedural fallback shown immediately while the model loads
+  var fb = BABYLON.MeshBuilder.CreateCylinder('pfb', {
     height: 0.8, diameter: 0.5, tessellation: 12
   }, this.scene);
   fb.position = new BABYLON.Vector3(0, 0.4, 0);
@@ -2018,115 +1939,75 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
   fb.material = fbMat;
   this._fallback = fb;
 
-  var genderKey = (gender === 'female') ? 'female' : 'male';
-  var genderMap = CHARACTER_MODEL_FILES[genderKey] || CHARACTER_MODEL_FILES.male;
-  var fileName  = genderMap[classId];
-  console.log('Preview loading model file:', fileName, 'for class:', classId, 'gender:', gender);
-  if (!fileName || !BABYLON.SceneLoader) return;
+  // Determine outfit based on class
+  var outfitId = this._classToOutfit(classId);
+  
+  // Use composer to compose character
+  var compositionConfig = {
+    gender: gender === 'female' ? 'female' : 'male',
+    classId: classId,
+    outfitId: outfitId,
+    hairStyle: this._pendingHairStyle,
+    skinTone: this._parsePreviewColor(col),
+    outfitColor: { r: 0.6, g: 0.5, b: 0.35 },  // Default outfit color
+    hairColor: this._hairColorToPreset(this._pendingHairColor),
+    scale: CHARACTER_MODEL_SCALE
+  };
 
-  var isGltf    = fileName.indexOf('.gltf') !== -1 || fileName.indexOf('.glb') !== -1;
-  // glTF must always load directly from the server (external .bin + textures)
-  var useBlob   = !isGltf && typeof AssetCache !== 'undefined' && AssetCache.hasCached('models/character/' + fileName);
-  var rootUrl   = useBlob ? ''                    : 'models/character/';
-  var srcFile   = useBlob ? AssetCache.getCachedUrl('models/character/' + fileName) : fileName;
-  var pluginExt = isGltf ? null : '.obj';
+  console.log('🎨 [PREVIEW] Composing character:', compositionConfig);
 
-  BABYLON.SceneLoader.ImportMesh('', rootUrl, srcFile, self.scene,
-    function (meshes) {
-      console.log('Preview ImportMesh success for', fileName, 'meshes:', meshes.length);
-      meshes.forEach(function (m, i) {
-        var verts = m.getTotalVertices ? m.getTotalVertices() : 0;
-        var indices = m.getTotalIndices ? m.getTotalIndices() : 0;
-        var normals = m.getVerticesData ? m.getVerticesData(BABYLON.VertexBuffer.NormalKind) : null;
-        console.log('Preview mesh', i, 'name:', m.name, 'vertices:', verts, 'indices:', indices, 'normals:', normals ? normals.length : 'none');
-      });
-      if (!meshes || !meshes.length || !self.scene) return;
-      // Discard if the class was changed while loading
-      if (self._pendingClassId !== classId) {
-        meshes.forEach(function (m) { m.dispose(); });
-        return;
-      }
-      if (self._fallback) { self._fallback.dispose(); self._fallback = null; }
+  this._composer.composeCharacter(compositionConfig).promise.then(function(root) {
+    if (!root || !self.scene) return;
+    
+    // Discard if the class was changed while loading
+    if (self._pendingClassId !== classId) {
+      root.dispose();
+      return;
+    }
+    
+    if (self._fallback) { 
+      self._fallback.dispose(); 
+      self._fallback = null; 
+    }
 
-      // For glTF, use the first root mesh with geometry; for OBJ, merge sub-meshes.
-      var model;
-      if (isGltf) {
-        // glTF imports as a hierarchy; find the first real mesh
-        model = meshes[0];
-        for (var mi = 0; mi < meshes.length; mi++) {
-          if (meshes[mi].getTotalVertices && meshes[mi].getTotalVertices() > 0) {
-            model = meshes[mi]; break;
-          }
-        }
-      } else {
-        model = meshes.length === 1
-          ? meshes[0]
-          : BABYLON.Mesh.MergeMeshes(meshes, true, true, undefined, false, true);
-      }
-      if (!model) return;
+    root.position = new BABYLON.Vector3(0, 0.05, 0);
+    root.scaling = new BABYLON.Vector3(1, 1, 1);  // Already scaled in composer
+    
+    self._model = root;
+    console.log('🎨 [PREVIEW] Model composed successfully:', root.name);
+  }).catch(function(err) {
+    console.error('🎨 [PREVIEW] Failed to compose model:', err);
+    // Keep fallback visible on error
+  });
+};
 
-      // Ensure the mesh has normals for proper PBR rendering
-      if (!model.getVerticesData(BABYLON.VertexBuffer.NormalKind)) {
-        console.log('Computing normals for preview model');
-        model.createNormals(true);
-      }
+/** Map class ID to outfit type */
+CharacterPreviewScene.prototype._classToOutfit = function(classId) {
+  // Ranger outfit for combat classes, peasant for others
+  var combatClasses = ['warrior', 'knight', 'paladin', 'berserker', 'warlord', 'archer', 'ranger', 'rogue'];
+  return combatClasses.indexOf(classId) !== -1 ? 'ranger' : 'peasant';
+};
 
-      model.position = new BABYLON.Vector3(0, 0.05, 0);
-      model.scaling  = new BABYLON.Vector3(
-        CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
-      );
+/** Convert preview color object to skin tone preset or object */
+CharacterPreviewScene.prototype._parsePreviewColor = function(col) {
+  if (!col) return SKIN_TONE_PRESETS.fair;
+  return { r: col.r, g: col.g, b: col.b };
+};
 
-      // glTF models keep their texture materials; OBJ models get solid PBR colour.
-      if (!isGltf) {
-        // Try StandardMaterial instead of PBR for testing
-        var mat = new BABYLON.StandardMaterial('prevstd_' + classId, self.scene);
-        mat.diffuseColor = new BABYLON.Color3(col.r, col.g, col.b);
-        mat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
-        model.material  = mat;
-        console.log('Applied StandardMaterial to preview model:', mat.name, 'color:', col);
-      }
-
-      // For GLTF models, assume they have proper heads and don't add procedural spheres
-      if (isGltf) {
-        // Skip procedural head for GLTF models - they should have proper heads
-      } else {
-        // Add a procedural head sphere for OBJ models when the model has no head mesh.
-        var hasHead = meshes.some(function (m) {
-          return m.name && m.name.toLowerCase().indexOf('head') !== -1;
-        });
-        if (!hasHead) {
-          var headSphere = BABYLON.MeshBuilder.CreateSphere('prevHead', {
-            diameter: 0.28, segments: 10
-          }, self.scene);
-          var headMat = new BABYLON.PBRMaterial('prevHeadMat', self.scene);
-          headMat.albedoColor = new BABYLON.Color3(col.r, col.g, col.b);
-          headMat.metallic    = 0.0;
-          headMat.roughness   = 0.9;
-          headSphere.material = headMat;
-          headSphere.position = new BABYLON.Vector3(0, 1.65, 0);
-          headSphere.parent   = model;
-        }
-      }
-
-      // Attach procedural hair above the head.
-      _applyPreviewHair(model, self._pendingHairStyle, self._pendingHairColor, isGltf, self.scene);
-
-      // Apply idle bone animations to the preview skeleton so it doesn't
-      // display as a static T-pose.
-      if (isGltf && model.skeleton) {
-        _applyPreviewIdleAnim(model.skeleton, self.scene);
-      }
-
-      self._model = model;
-      console.log('Preview model set:', model.name, 'position:', model.position, 'scaling:', model.scaling, 'visible:', model.isVisible, 'enabled:', model.isEnabled());
-      console.log('Scene children count:', self.scene.meshes.length);
-    },
-    null,
-    function (scene, message, exception) { /* model absent — keep procedural fallback */
-      console.warn('Failed to load character model ' + fileName + ':', message);
-    },
-    pluginExt
-  );
+/** Map UI hair color names to preset names */
+CharacterPreviewScene.prototype._hairColorToPreset = function(colorName) {
+  var mapping = {
+    'dark': 'dark_brown',
+    'dark_brown': 'dark_brown',
+    'brown': 'brown',
+    'light_brown': 'light_brown',
+    'blonde': 'blonde',
+    'red': 'red',
+    'white': 'white',
+    'gray': 'gray',
+    'black': 'black'
+  };
+  return mapping[colorName] || 'dark_brown';
 };
 
 /** Update the model/fallback colour without reloading the mesh. */

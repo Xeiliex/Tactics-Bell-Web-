@@ -1,0 +1,314 @@
+<!-- EDITOR UI PANEL -->
+<style id="editor-ui-styles">
+#editor-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background: #0a0e1a;
+  color: #e0e8f0;
+  font-family: 'Courier New', monospace;
+}
+
+#editor-viewport {
+  flex: 1;
+  position: relative;
+}
+
+#renderCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#editor-sidebar {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #1a2550 0%, #0f1525 100%);
+  border-left: 2px solid #4a90e2;
+  box-shadow: -4px 0 12px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+
+#editor-toolbar {
+  padding: 12px;
+  border-bottom: 2px solid #4a90e2;
+  background: #0f1828;
+}
+
+#editor-toolbar h3 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #4a90e2;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.toolbar-group {
+  margin-bottom: 12px;
+}
+
+.toolbar-label {
+  display: block;
+  font-size: 11px;
+  color: #8899cc;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
+#editor-toolbar select,
+#editor-toolbar button {
+  width: 100%;
+  padding: 6px 8px;
+  margin: 2px 0;
+  background: #1a2d4d;
+  color: #e0e8f0;
+  border: 1px solid #4a5f8f;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#editor-toolbar button:hover {
+  background: #2a3d5d;
+  border-color: #6ab7ff;
+}
+
+#editor-toolbar button.active {
+  background: #4a90e2;
+  border-color: #6ab7ff;
+  color: #0f1828;
+}
+
+#editor-canvas-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 0;
+}
+
+#editor-canvas-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+#editor-canvas-scroll::-webkit-scrollbar-track {
+  background: #0f1525;
+}
+
+#editor-canvas-scroll::-webkit-scrollbar-thumb {
+  background: #4a5f8f;
+  border-radius: 3px;
+}
+
+#editor-canvas-scroll::-webkit-scrollbar-thumb:hover {
+  background: #6a7faf;
+}
+
+.editor-panel {
+  padding: 8px 12px;
+  margin: 0 4px 8px 4px;
+  background: #1a2d4d;
+  border: 1px solid #3a4f6f;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.editor-panel h4 {
+  margin: 0 0 8px 0;
+  color: #6ab7ff;
+  font-size: 12px;
+}
+
+.editor-panel p {
+  margin: 2px 0;
+  color: #8899cc;
+  font-size: 10px;
+}
+
+.editor-panel select,
+.editor-panel button {
+  width: 100%;
+  padding: 4px 6px;
+  margin: 2px 0;
+  background: #0f1828;
+  color: #e0e8f0;
+  border: 1px solid #4a5f8f;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.editor-panel button:hover {
+  background: #2a3d5d;
+  border-color: #6ab7ff;
+}
+
+#editor-status {
+  padding: 8px 12px;
+  border-top: 2px solid #4a90e2;
+  background: #0f1828;
+  font-size: 10px;
+  color: #8899cc;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+#editor-status p {
+  margin: 2px 0;
+}
+
+/* Terrain buttons */
+.terrain-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 2px;
+  display: inline-block;
+  border: 2px solid #4a5f8f;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 10px;
+  line-height: 28px;
+}
+
+.terrain-btn:hover {
+  border-color: #6ab7ff;
+  transform: scale(1.1);
+}
+
+.terrain-btn.active {
+  border-color: #6ab7ff;
+  box-shadow: 0 0 8px #6ab7ff;
+}
+
+#terrain-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.quicksave-btn,
+.quickload-btn,
+.download-btn,
+.play-btn {
+  width: 100%;
+  padding: 8px;
+  margin: 2px 0;
+  font-size: 12px;
+  text-align: center;
+}
+
+.play-btn {
+  background: #2d9624;
+  border-color: #4dcc2a;
+  color: white;
+  font-weight: bold;
+}
+
+.play-btn:hover {
+  background: #3daa34;
+  border-color: #6dff4a;
+}
+
+.download-btn {
+  background: #1a4480;
+  border-color: #2a6ab0;
+}
+
+.download-btn:hover {
+  background: #2a5490;
+  border-color: #4a8ad0;
+}
+</style>
+
+<div id="editor-container">
+  <!-- Main 3D Viewport -->
+  <div id="editor-viewport">
+    <canvas id="renderCanvas"></canvas>
+  </div>
+  
+  <!-- Control Sidebar -->
+  <div id="editor-sidebar">
+    <!-- Toolbar Section -->
+    <div id="editor-toolbar">
+      <h3>🎮 Scenario Editor</h3>
+      
+      <!-- Paint Mode Selector -->
+      <div class="toolbar-group">
+        <span class="toolbar-label">Mode</span>
+        <button id="editor-btn-terrain" class="active">🎨 Paint Terrain</button>
+        <button id="editor-btn-units">👤 Place Units</button>
+      </div>
+      
+      <!-- Terrain Selector -->
+      <div class="toolbar-group" id="terrain-selector">
+        <span class="toolbar-label">Terrain Type</span>
+        <div id="terrain-palette">
+          <button class="terrain-btn active" data-terrain="grass" style="background: #2d9624;">🌱</button>
+          <button class="terrain-btn" data-terrain="water" style="background: #1956b3;">💧</button>
+          <button class="terrain-btn" data-terrain="mountain" style="background: #7a6652;">⛏️</button>
+          <button class="terrain-btn" data-terrain="forest" style="background: #194d0a;">🌲</button>
+          <button class="terrain-btn" data-terrain="lava" style="background: #ff4d00;">🔥</button>
+        </div>
+      </div>
+      
+      <!-- Unit Placement Settings -->
+      <div class="toolbar-group" id="unit-placement" style="display: none;">
+        <span class="toolbar-label">Unit Class</span>
+        <select id="editor-btn-class">
+          <option value="warrior">⚔️ Warrior</option>
+          <option value="archer">🏹 Archer</option>
+          <option value="mage">✨ Mage</option>
+          <option value="healer">🩹 Healer</option>
+        </select>
+        
+        <span class="toolbar-label">Team</span>
+        <select id="editor-btn-team">
+          <option value="1">🟢 Team 1 (Player)</option>
+          <option value="2">🔴 Team 2 (Enemy)</option>
+          <option value="3">🔵 Team 3 (Ally)</option>
+        </select>
+      </div>
+      
+      <!-- Action Buttons -->
+      <div class="toolbar-group">
+        <span class="toolbar-label">File</span>
+        <button class="quicksave-btn">💾 Quick Save</button>
+        <button class="quickload-btn">📂 Quick Load</button>
+        <button class="download-btn">📥 Download JSON</button>
+      </div>
+      
+      <div class="toolbar-group">
+        <button class="play-btn">▶️ Test Scenario</button>
+      </div>
+    </div>
+    
+    <!-- Info Panels -->
+    <div id="editor-canvas-scroll">
+      <!-- Unit Config Panel (shown when unit selected) -->
+      <div id="editor-unit-config" class="editor-panel"></div>
+      
+      <!-- Scenario Info Panel -->
+      <div class="editor-panel">
+        <h4>📋 Scenario Info</h4>
+        <p id="editor-scenario-name"></p>
+        <p id="editor-scenario-units"></p>
+        <p id="editor-scenario-size"></p>
+        <hr style="border: none; border-top: 1px solid #3a4f6f; margin: 4px 0;">
+        <input type="text" id="editor-scenario-filename" placeholder="Scenario name..." 
+               style="width: 100%; padding: 4px; margin: 4px 0; background: #0f1828; color: #e0e8f0; border: 1px solid #4a5f8f; border-radius: 3px;">
+      </div>
+    </div>
+    
+    <!-- Status Bar -->
+    <div id="editor-status">
+      <p><strong>Status:</strong> <span id="editor-status-text">Ready. Click on grid to paint terrain or place units.</span></p>
+    </div>
+  </div>
+</div>
