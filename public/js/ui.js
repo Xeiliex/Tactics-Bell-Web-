@@ -95,34 +95,40 @@ GameUI.prototype.showTitleScreen = function () {
   this._disposePreview();
   this.showScreen('screen-title');
   
-  // Animate bell tower entrance with gentle scale
-  anime({
-    targets: '.bell-tower-container',
-    scale: [2, 2.5],
-    opacity: [0.7, 1],
-    duration: 800,
-    easing: 'easeOutQuart',
-    delay: 0
-  });
+  // Reset bell tower to starting scale for animation entry
+  const bellContainer = document.querySelector('.bell-tower-container');
+  if (bellContainer) {
+    bellContainer.style.opacity = '0';
+    bellContainer.style.transform = 'translate(-50%, -50%) scale(1.8)';
+  }
   
-  // Animate menu title
+  // Fade in and scale up the bell tower
+  setTimeout(() => {
+    if (bellContainer) {
+      bellContainer.style.transition = 'all 900ms cubic-bezier(0.34, 1.56, 0.64, 1)';
+      bellContainer.style.opacity = '1';
+      bellContainer.style.transform = 'translate(-50%, -50%) scale(2.5)';
+    }
+  }, 10);
+  
+  // Animate menu title (with delay to start after bell grows)
   anime({
     targets: '.fantasy-title',
     opacity: [0, 1],
     translateY: [10, 0],
     duration: 600,
     easing: 'easeOutQuart',
-    delay: 200
+    delay: 400
   });
   
-  // Animate each menu item with stagger
+  // Animate each menu item with stagger (after title)
   anime({
     targets: '.fantasy-menu-item',
     opacity: [0, 1],
     translateX: [20, 0],
     duration: 500,
     easing: 'easeOutQuart',
-    delay: anime.stagger(100, { start: 500 })
+    delay: anime.stagger(100, { start: 800 })
   });
 };
 

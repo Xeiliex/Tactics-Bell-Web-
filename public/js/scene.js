@@ -25,16 +25,16 @@ var GRAPHICS_QUALITY = (function () {
 // Use OBJ models instead of GLTF for better compatibility and proper heads
 var CHARACTER_MODEL_FILES = {
   male: {
-    warrior: 'character-warrior.obj',
-    mage:    'character-mage.obj',
-    archer:  'character-archer.obj',
-    healer:  'character-healer.obj'
+    warrior: 'Male_Ranger.gltf',
+    mage:    'Male_Peasant.gltf',
+    archer:  'Male_Ranger.gltf',
+    healer:  'Male_Peasant.gltf'
   },
   female: {
-    warrior: 'character-warrior.obj',
-    mage:    'character-mage.obj',
-    archer:  'character-archer.obj',
-    healer:  'character-healer.obj'
+    warrior: 'Female_Ranger.gltf',
+    mage:    'Female_Peasant.gltf',
+    archer:  'Female_Ranger.gltf',
+    healer:  'Female_Peasant.gltf'
   }
 };
 
@@ -665,9 +665,19 @@ GameScene.prototype.renderUnits = function (units) {
 // procedural shapes remain, so the game is always playable.
 
 GameScene.prototype._upgradeUnitsToModels = function (units) {
-  console.log('_upgradeUnitsToModels called with', units.length, 'units, GRAPHICS_QUALITY:', typeof GRAPHICS_QUALITY !== 'undefined' ? GRAPHICS_QUALITY : 'undefined');
-  if (typeof GRAPHICS_QUALITY !== 'undefined' && GRAPHICS_QUALITY === 'low') return;
-  if (!BABYLON.SceneLoader || typeof BABYLON.SceneLoader.ImportMesh !== 'function') return;
+  console.log('🎮 [MODEL LOAD] _upgradeUnitsToModels called with', units.length, 'units');
+  console.log('🎮 [MODEL LOAD] GRAPHICS_QUALITY:', typeof GRAPHICS_QUALITY !== 'undefined' ? GRAPHICS_QUALITY : 'UNDEFINED');
+  console.log('🎮 [MODEL LOAD] BABYLON.SceneLoader:', typeof BABYLON !== 'undefined' && BABYLON.SceneLoader ? 'EXISTS' : 'MISSING');
+  console.log('🎮 [MODEL LOAD] CHARACTER_MODEL_FILES:', typeof CHARACTER_MODEL_FILES !== 'undefined' ? 'Defined' : 'UNDEFINED', CHARACTER_MODEL_FILES);
+  
+  if (typeof GRAPHICS_QUALITY !== 'undefined' && GRAPHICS_QUALITY === 'low') {
+    console.log('🎮 [MODEL LOAD] ⚠️  GRAPHICS_QUALITY is "low" — skipping model loading');
+    return;
+  }
+  if (!BABYLON.SceneLoader || typeof BABYLON.SceneLoader.ImportMesh !== 'function') {
+    console.log('🎮 [MODEL LOAD] ⚠️  BABYLON.SceneLoader not ready — skipping model loading');
+    return;
+  }
 
   var self = this;
 
@@ -691,8 +701,11 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
     // OBJ for low quality (already guarded above).
     var genderMap = CHARACTER_MODEL_FILES[gender] || CHARACTER_MODEL_FILES.male;
     var fileName  = genderMap[classId];
-    if (!fileName) return;
-    console.log('Loading model file:', fileName, 'for class:', classId, 'gender:', gender);
+    if (!fileName) {
+      console.log('🎮 [MODEL LOAD] ❌ No model file found for class:', classId, 'gender:', gender);
+      return;
+    }
+    console.log('🎮 [MODEL LOAD] ✓ Loading model file:', fileName, 'for class:', classId, 'gender:', gender);
 
     var isGltf = fileName.indexOf('.gltf') !== -1 || fileName.indexOf('.glb') !== -1;
 
@@ -704,13 +717,15 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
     var srcFile   = useBlob ? AssetCache.getCachedUrl('models/character/' + fileName) : fileName;
     var pluginExt = '.obj';
 
+    console.log('🎮 [MODEL LOAD] 📤 Calling ImportMesh with:', { rootUrl, srcFile, pluginExt, fileName });
+    
     BABYLON.SceneLoader.ImportMesh(
       '',          // import all meshes
       rootUrl,
       srcFile,
       self.scene,
       function (meshes) {
-        console.log('ImportMesh success for', fileName, 'meshes:', meshes.length);
+        console.log('🎮 [MODEL LOAD] 📥 ImportMesh success for', fileName, 'meshes:', meshes.length);
         if (!meshes || !meshes.length || !self.scene) return;
 
         // Filter to geometry meshes only (glTF also returns TransformNodes).
@@ -740,10 +755,15 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
           }
 
           bucket.units.forEach(function (unit) {
+            console.log('🎮 [MODEL LOAD] 👤 Cloning glTF model for unit:', unit.id);
             var node = self._unitNodes[unit.id];
-            if (!node) return;
+            if (!node) {
+              console.log('🎮 [MODEL LOAD] ❌ No node found for unit:', unit.id);
+              return;
+            }
 
             var pos = self.gridToWorld(unit.gridRow, unit.gridCol);
+            console.log('🎮 [MODEL LOAD] 📍 Unit position:', pos);
 
             // Clone the skeleton for this unit so its bone animations are independent.
             var unitSkeleton = loadedSkeleton
@@ -804,11 +824,17 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
           );
 
           bucket.units.forEach(function (unit) {
+            console.log('🎮 [MODEL LOAD] 👤 Cloning OBJ model for unit:', unit.id);
             var node = self._unitNodes[unit.id];
-            if (!node) return;
+            if (!node) {
+              console.log('🎮 [MODEL LOAD] ❌ No node found for unit:', unit.id);
+              return;
+            }
 
             var pos   = self.gridToWorld(unit.gridRow, unit.gridCol);
+            console.log('🎮 [MODEL LOAD] 📍 Unit position:', pos);
             var clone = template.clone('charmodel_' + unit.id);
+            console.log('🎮 [MODEL LOAD] ✓ Cloned model, enabling...');
             clone.setEnabled(true);
             clone.position   = new BABYLON.Vector3(pos.x, 0, pos.z);
 
@@ -828,11 +854,13 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
 
             if (self._shadowGenerator) { self._shadowGenerator.addShadowCaster(clone, true); }
 
+            console.log('🎮 [MODEL LOAD] 🙈 Hiding procedural fallback for unit:', unit.id);
             node.body.setEnabled(false);
             node.head.setEnabled(false);
 
             node.model      = clone;
             node.modelParts = [clone];
+            console.log('🎮 [MODEL LOAD] ✅ Model fully set up for unit:', unit.id, '| Model enabled:', clone.isEnabled, '| Procedural hidden:', !node.body.isEnabled);
 
             self._startIdleAnim(unit.id, clone, null);
           });
@@ -842,7 +870,9 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
       },
       null,           // progress callback — not needed
       function (scene, message, exception) {   // error callback — model file absent, keep procedural fallback
-        console.error('Failed to load character model:', fileName, message, exception);
+        console.error('🎮 [MODEL LOAD] ❌ ERROR loading character model:', fileName);
+        console.error('  Message:', message);
+        console.error('  Exception:', exception);
       },
       pluginExt
     );

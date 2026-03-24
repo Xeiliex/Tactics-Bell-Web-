@@ -6,35 +6,35 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Fantasy Color Palette - Earthy with Magical Accents */
+  /* New Natural Color Palette */
   --parchment:     #f4f1e8;   /* aged parchment */
-  --ink-dark:      #2a1810;   /* deep ink black */
-  --ink-medium:    #5d4a3a;   /* weathered brown */
-  --ink-light:     #8b7355;   /* faded sepia */
+  --ink-dark:      #443834;   /* deep brown */
+  --ink-medium:    #493f39;   /* rich brown */
+  --ink-light:     #656d5b;   /* muted green-gray */
 
   /* Magical Bell Theme Colors */
-  --bell-gold:     #d4af37;   /* enchanted gold */
-  --bell-bronze:   #cd7f32;   /* mystical bronze */
-  --bell-silver:   #c0c0c0;   /* magical silver */
+  --bell-gold:     #d9ce83;   /* warm natural gold */
+  --bell-bronze:   #656d5b;   /* muted earth */
+  --bell-silver:   #8b9a7e;   /* soft sage */
 
   /* Earthy Base Colors */
-  --forest-green:  #2d5016;   /* deep forest */
-  --earth-brown:   #4a3c28;   /* rich soil */
-  --stone-gray:    #6b6b6b;   /* weathered stone */
-  --shadow-dark:   #1a1410;   /* deep shadow */
+  --forest-green:  #656d5b;   /* muted green-gray */
+  --earth-brown:   #493f39;   /* rich soil */
+  --stone-gray:    #656d5b;   /* weathered stone */
+  --shadow-dark:   #443834;   /* deep shadow */
 
   /* Magical Accents */
-  --magic-purple:  #4b2e83;   /* arcane purple */
-  --magic-blue:    #1e3a5f;   /* mystical blue */
-  --magic-green:   #2d5a2d;   /* enchanted green */
-  --fire-orange:   #8b4513;   /* ember orange */
+  --magic-purple:  #443d4e;   /* dark purple-gray */
+  --magic-blue:    #656d5b;   /* muted blue-green */
+  --magic-green:   #656d5b;   /* enchanted green */
+  --fire-orange:   #d9ce83;   /* warm accent */
 
   /* UI Element Colors */
-  --panel-bg:      rgba(26, 20, 16, 0.99);  /* semi-transparent parchment - almost fully opaque */
-  --border-gold:   rgba(212, 175, 55, 0.6); /* golden border */
-  --border-silver: rgba(192, 192, 192, 0.4); /* silver border */
-  --glow-gold:     rgba(212, 175, 55, 0.8); /* magical glow */
-  --glow-purple:   rgba(75, 46, 131, 0.6);  /* arcane glow */
+  --panel-bg:      rgba(68, 56, 52, 0.95);  /* deep brown panel */
+  --border-gold:   rgba(217, 206, 131, 0.7); /* natural gold border */
+  --border-silver: rgba(101, 109, 91, 0.5); /* sage border */
+  --glow-gold:     rgba(217, 206, 131, 0.8); /* warm glow */
+  --glow-purple:   rgba(68, 61, 78, 0.6);  /* subtle glow */
 
   /* Typography */
   --font-medieval: 'Cinzel', serif;      /* ornate medieval font */
@@ -63,8 +63,8 @@ html, body {
   width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
 }
-.screen.hidden { display: none; }
-.screen.active { display: flex; }
+.screen.hidden { display: none !important; }
+.screen.active { display: flex !important; }
 
 /* ────────────────────────────────────────
    TITLE SCREEN
@@ -73,13 +73,10 @@ html, body {
    TITLE SCREEN (Fantasy Theme)
 ──────────────────────────────────────── */
 #screen-title {
-  background: var(--shadow-dark);
+  background: linear-gradient(180deg, #525a4a 0%, #443834 40%, #2d2a23 100%);
   font-family: var(--font-medieval);
-  overflow: hidden;
+  overflow: visible;
   position: relative;
-  background-image:
-    url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="parchment" patternUnits="userSpaceOnUse" width="100" height="100"><rect width="100" height="100" fill="%23f4f1e8" opacity="0.05"/><path d="M0,0 L100,0 L100,100 L0,100 Z" fill="none" stroke="%238b7355" stroke-width="0.5" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23parchment)"/></svg>'),
-    linear-gradient(135deg, var(--shadow-dark) 0%, var(--earth-brown) 50%, var(--shadow-dark) 100%);
   background-attachment: fixed;
 }
 
@@ -87,11 +84,11 @@ html, body {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 30% 70%, var(--magic-purple) 0%, transparent 40%),
-    radial-gradient(circle at 70% 30%, var(--magic-blue) 0%, transparent 40%),
-    radial-gradient(circle at 50% 50%, var(--bell-gold) 0%, transparent 60%);
-  opacity: 0.4;  /* Reduced opacity for better readability */
-  pointer-events: none;  /* Don't interfere with clicks */
+    radial-gradient(circle at 30% 70%, rgba(101,109,91,0.2) 0%, transparent 40%),
+    radial-gradient(circle at 70% 30%, rgba(68,61,78,0.15) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(217,206,131,0.15) 0%, transparent 60%);
+  opacity: 0.6;
+  pointer-events: none;
   animation: camera-pan 20s ease-in-out infinite;
 }
 
@@ -115,6 +112,79 @@ html, body {
   pointer-events: none;  /* Don't interfere with clicks */
 }
 
+/* ────────────────────────────────────────
+   PIXEL ART GRASS & LEAVES (2.5D Style)
+──────────────────────────────────────── */
+.fantasy-bg::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  background-image:
+    /* Grass blades - tall grass layer */
+    linear-gradient(90deg, transparent 0%, transparent 8%, #656d5b 8%, #656d5b 10%, transparent 10%, transparent 18%, #656d5b 18%, #656d5b 20%, transparent 20%, transparent 28%, #656d5b 28%, #656d5b 30%, transparent 30%, transparent 38%, #656d5b 38%, #656d5b 40%, transparent 40%, transparent 48%, #656d5b 48%, #656d5b 50%, transparent 50%, transparent 58%, #656d5b 58%, #656d5b 60%, transparent 60%, transparent 68%, #656d5b 68%, #656d5b 70%, transparent 70%, transparent 78%, #656d5b 78%, #656d5b 80%, transparent 80%, transparent 88%, #656d5b 88%, #656d5b 90%, transparent 90%),
+    /* Grass base - darker soil layer */
+    linear-gradient(180deg, rgba(101,109,91,0.8) 0%, rgba(73,63,57,0.9) 50%, #443834 100%);
+  background-size: 100% 60px, 100% 120px;
+  background-position: 0 60px, 0 0;
+  background-repeat: repeat-x, no-repeat;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Floating pixel art leaves */
+.fantasy-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    /* Leaf 1 - top left area */
+    radial-gradient(2px 3px at 12% 15%, #656d5b, #656d5b),
+    radial-gradient(1px 2px at 13% 14%, #d9ce83, #d9ce83),
+    /* Leaf 2 - top center */
+    radial-gradient(2px 3px at 45% 20%, #493f39, #493f39),
+    radial-gradient(1px 2px at 46% 19%, #d9ce83, #d9ce83),
+    /* Leaf 3 - top right */
+    radial-gradient(3px 4px at 78% 18%, #656d5b, #656d5b),
+    radial-gradient(1.5px 2px at 79% 17%, #d9ce83, #d9ce83),
+    /* Leaf 4 - mid left */
+    radial-gradient(2px 3px at 15% 40%, #443834, #443834),
+    radial-gradient(1px 2px at 16% 39%, #d9ce83, #d9ce83),
+    /* Leaf 5 - mid right */
+    radial-gradient(2.5px 3.5px at 82% 45%, #656d5b, #656d5b),
+    radial-gradient(1.5px 2px at 83% 44%, #d9ce83, #d9ce83),
+    /* Leaf 6 - bottom left area */
+    radial-gradient(2px 3px at 20% 75%, #493f39, #493f39),
+    radial-gradient(1px 2px at 21% 74%, #d9ce83, #d9ce83);
+  background-size: 4px 6px;
+  background-position: 12% 15%, 13% 14%, 45% 20%, 46% 19%, 78% 18%, 79% 17%, 15% 40%, 16% 39%, 82% 45%, 83% 44%, 20% 75%, 21% 74%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 2;
+  animation: leaves-floating 8s ease-in-out infinite;
+}
+
+@keyframes leaves-floating {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.6;
+  }
+  25% {
+    transform: translateY(-20px) rotate(15deg);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(-40px) rotate(-10deg);
+    opacity: 0.5;
+  }
+  75% {
+    transform: translateY(-20px) rotate(20deg);
+    opacity: 0.7;
+  }
+}
+
 /* Bell Tower Styles */
 .bell-tower-container {
   position: absolute;
@@ -125,6 +195,7 @@ html, body {
   animation: tower-camera 25s ease-in-out infinite;
   pointer-events: auto;
   cursor: pointer;
+  opacity: 1;  /* Will be overridden by anime.js on first load */
 }
 
 .bell-tower-container::before {
@@ -409,18 +480,18 @@ html, body {
 
 .fantasy-content {
   position: fixed;
-  right: 20px;
+  right: 30px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 15;
-  max-width: 320px;
-  padding: 30px;
+  max-width: 340px;
+  padding: 35px;
   text-align: center;
   pointer-events: auto;
-  background: rgba(26, 20, 16, 0.95);
+  background: rgba(68, 56, 52, 0.92);
   border: 2px solid var(--bell-gold);
-  border-radius: 15px;
-  box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(217, 206, 131, 0.2);
   animation: menu-fade-in 0.8s ease-out;
 }
 
@@ -430,50 +501,31 @@ html, body {
 }
 
 .fantasy-header {
-  margin-bottom: 15px;
+  margin-bottom: 25px;
   flex-shrink: 0;
 }
 
 .fantasy-title {
-  font-size: clamp(1.8rem, 4vw, 2.8em);  /* Responsive font size */
+  font-size: clamp(1.8rem, 4vw, 2.6em);
   font-weight: bold;
   color: var(--bell-gold);
-  text-shadow:
-    0 0 20px var(--glow-gold),
-    2px 2px 4px var(--shadow-dark);
-  margin-bottom: 8px;  /* Reduced margin */
+  text-shadow: 0 0 15px var(--glow-gold);
+  margin-bottom: 0;
   font-family: var(--font-medieval);
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   text-transform: uppercase;
 }
 
 .fantasy-subtitle {
-  font-size: 1.1em;  /* Slightly smaller */
-  color: var(--ink-light);
-  margin-bottom: 15px;  /* Reduced margin */
-  font-style: italic;
+  display: none;
 }
 
 .fantasy-tagline {
-  font-size: 0.95em;  /* Slightly smaller */
-  color: var(--magic-purple);
-  text-shadow: 0 0 10px var(--glow-purple);
-  animation: magical-pulse 3s ease-in-out infinite;
-  margin-bottom: 10px;  /* Reduced margin */
-}
-
-@keyframes magical-pulse {
-  0%, 100% { opacity: 0.8; }
-  50% { opacity: 1; }
+  display: none;
 }
 
 .fantasy-bell-symbol {
-  display: inline-block;
-  font-size: 2em;
-  color: var(--bell-silver);
-  margin: 0 10px;
-  text-shadow: 0 0 15px var(--bell-silver);
-  animation: bell-chime 4s ease-in-out infinite;
+  display: none;
 }
 
 @keyframes bell-chime {
@@ -491,10 +543,8 @@ html, body {
 
 .fantasy-menu-item {
   background: transparent;
-  border: 1px solid var(--border-silver);
-  border-radius: 8px;
-  padding: 10px;
-  transition: all 0.3s ease;
+  border: none;
+  padding: 15px 0;
   position: relative;
   overflow: visible;
   pointer-events: auto;
@@ -502,75 +552,84 @@ html, body {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  min-height: 70px;
   justify-content: center;
   width: 100%;
   flex-shrink: 0;
-}
-
-.fantasy-menu-item::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 70%;  /* Only cover top 70% to avoid button area */
-  background: linear-gradient(90deg, transparent, var(--glow-gold), transparent);
-  transition: left 0.5s ease;
-  pointer-events: none;  /* Don't interfere with button clicks */
-  border-radius: 12px 12px 0 0;  /* Match container border radius */
+  transition: none;
 }
 
 .fantasy-menu-item:hover {
-  border-color: var(--bell-gold);
-  transform: translateY(-3px);
-  box-shadow:
-    0 8px 25px rgba(212, 175, 55, 0.3),
-    inset 0 0 20px rgba(212, 175, 55, 0.1);
+  border-color: transparent;
+  background: transparent;
+  transform: none;
+  box-shadow: none;
+  animation: subtle-pulse 1.5s ease-in-out infinite;
 }
 
 .fantasy-menu-item:hover::before {
-  left: 100%;
+  display: none;
+}
+
+@keyframes subtle-pulse {
+  0%, 100% {
+    text-shadow: 0 0 10px rgba(217, 206, 131, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(217, 206, 131, 0.7);
+  }
 }
 
 .fantasy-menu-icon {
-  font-size: clamp(1.5rem, 4vw, 2em);  /* Responsive font size */
-  margin-bottom: clamp(4px, 1vw, 8px);  /* Responsive margin */
+  font-size: clamp(1.5rem, 4vw, 2.2em);
+  margin-bottom: 10px;
   display: block;
-  filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.3));
+  filter: drop-shadow(0 0 6px rgba(217, 206, 131, 0.2));
+  transition: filter 0.3s ease;
+}
+
+.fantasy-menu-item:hover .fantasy-menu-icon {
+  filter: drop-shadow(0 0 12px rgba(217, 206, 131, 0.6));
 }
 
 .fantasy-menu-title {
-  font-size: clamp(0.9rem, 2.5vw, 1.2em);  /* Responsive font size */
+  font-size: clamp(0.95rem, 2.8vw, 1.1em);
   color: var(--parchment);
-  margin-bottom: clamp(3px, 0.8vw, 6px);  /* Responsive margin */
+  margin-bottom: 0;
   font-weight: bold;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
+  transition: color 0.3s ease;
+}
+
+.fantasy-menu-item:hover .fantasy-menu-title {
+  color: var(--bell-gold);
 }
 
 .fantasy-menu-desc {
-  color: var(--ink-light);
-  font-size: clamp(0.7rem, 2vw, 0.85em);  /* Responsive font size */
-  font-family: var(--font-script);
-  line-height: 1.3;
-  margin-bottom: clamp(4px, 1vw, 8px);  /* Responsive margin */
+  display: none;
 }
 
 .fantasy-footer {
-  margin-top: 15px;  /* Reduced margin */
+  margin-top: 25px;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 15px;  /* Reduced gap */
-  flex-shrink: 0;  /* Don't shrink footer */
+  gap: 15px;
+  flex-shrink: 0;
 }
 
 .fantasy-version {
-  color: var(--ink-medium);
-  font-size: 0.9em;
-  font-family: var(--font-script);
+  display: none;
+}
+
+.fantasy-continue {
+  display: none;
+}
+
+.fantasy-info {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
 }
 
 /* ────────────────────────────────────────

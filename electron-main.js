@@ -180,18 +180,17 @@ function createWindow() {
 
   mainWindow.loadURL(startUrl);
 
-  // Wait for page to load before starting asset preloading
-  // This ensures IPC listeners are registered before we send events
+  // When page loads, set up dev tools and check for updates in background
   mainWindow.webContents.on('did-finish-load', () => {
-    // Start preloading assets
-    preloadAssets(() => {
-      // Assets loaded, hide loading overlay
-      if (mainWindow) {
-        // Open DevTools in development
-        if (process.env.ELECTRON_IS_DEV) {
-          mainWindow.webContents.openDevTools();
-        }
-      }
+    // Open DevTools in development mode
+    if (process.env.ELECTRON_IS_DEV) {
+      mainWindow.webContents.openDevTools();
+    }
+
+    // Check for updates in the background (non-blocking)
+    checkForUpdates(() => {
+      // Update check complete - no action needed for now
+      // Loading screen is hidden by default, only shown when updates are available
     });
   });
 

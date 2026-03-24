@@ -467,54 +467,9 @@
         "💡 Lore: Ancient bells hold the power to turn the tide of battle"
       ];
 
-      let messageIndex = 0;
-      let hintIndex = 0;
-
-      // Cycle through messages every 3 seconds
-      setInterval(() => {
-        messageIndex = (messageIndex + 1) % whimsicalMessages.length;
-        const messageEl = document.getElementById('loading-message');
-        if (messageEl) messageEl.textContent = whimsicalMessages[messageIndex];
-      }, 3000);
-
-      // Cycle through hints every 5 seconds
-      setInterval(() => {
-        hintIndex = (hintIndex + 1) % gameHints.length;
-        const hintEl = document.getElementById('loading-hint');
-        if (hintEl) hintEl.textContent = gameHints[hintIndex];
-      }, 5000);
-
-      ipcRenderer.on('loading-progress', (event, data) => {
-        const progressBar = document.getElementById('progress-bar');
-        const progressPercentage = document.getElementById('progress-percentage');
-        const progressCount = document.getElementById('progress-count');
-        const status = document.getElementById('loading-status');
-        const currentFile = document.getElementById('loading-current-file');
-
-        if (progressBar && progressPercentage && progressCount && status && currentFile) {
-          const percentage = Math.round((data.loaded / data.total) * 100);
-          progressBar.style.width = percentage + '%';
-          progressPercentage.textContent = percentage + '%';
-          progressCount.textContent = `(${data.loaded}/${data.total})`;
-
-          status.textContent = data.phase || 'Loading Assets...';
-          currentFile.textContent = data.currentFile || 'Processing files...';
-        }
-      });
-
-      ipcRenderer.on('start-model-cache', () => {
-        // Trigger model caching if AssetCache is available
-        if (typeof AssetCache !== 'undefined') {
-          AssetCache.preloadTerrainModels(() => {
-            AssetCache.preloadCharacterModels(() => {
-              // Model caching complete
-            });
-          });
-        }
-      });
-
-      // Loading screen is now hidden by default - shown only for updates
-      // In dev mode, we go straight to the title screen
+      // Loading screen and asset preloading code has been removed
+      // The title screen now shows immediately on app load
+      // Loading screen is reserved for future update notifications
 
 </body>
 </html>
