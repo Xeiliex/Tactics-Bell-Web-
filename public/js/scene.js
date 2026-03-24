@@ -1937,7 +1937,7 @@ CharacterPreviewScene.prototype.init = function (canvasId) {
 
     this._camera = new BABYLON.ArcRotateCamera(
       'prevCam', -Math.PI / 2, Math.PI / 3.2, 2.8,
-      new BABYLON.Vector3(0, 0.85, 0), this.scene
+      new BABYLON.Vector3(0, 0.05, 0), this.scene
     );
     this._camera.attachControl(canvas, true);
 
@@ -2007,7 +2007,8 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
       meshes.forEach(function (m, i) {
         var verts = m.getTotalVertices ? m.getTotalVertices() : 0;
         var indices = m.getTotalIndices ? m.getTotalIndices() : 0;
-        console.log('Preview mesh', i, 'name:', m.name, 'vertices:', verts, 'indices:', indices);
+        var normals = m.getVerticesData ? m.getVerticesData(BABYLON.VertexBuffer.NormalKind) : null;
+        console.log('Preview mesh', i, 'name:', m.name, 'vertices:', verts, 'indices:', indices, 'normals:', normals ? normals.length : 'none');
       });
       if (!meshes || !meshes.length || !self.scene) return;
       // Discard if the class was changed while loading
@@ -2034,6 +2035,12 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
       }
       if (!model) return;
 
+      // Ensure the mesh has normals for proper PBR rendering
+      if (!model.getVerticesData(BABYLON.VertexBuffer.NormalKind)) {
+        console.log('Computing normals for preview model');
+        model.createNormals(true);
+      }
+
       model.position = new BABYLON.Vector3(0, 0.05, 0);
       model.scaling  = new BABYLON.Vector3(
         CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE
@@ -2041,12 +2048,12 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
 
       // glTF models keep their texture materials; OBJ models get solid PBR colour.
       if (!isGltf) {
-        var mat = new BABYLON.PBRMaterial('prevpbr_' + classId, self.scene);
-        mat.albedoColor = new BABYLON.Color3(col.r, col.g, col.b);
-        mat.metallic    = CHARACTER_PBR_METALLIC;
-        mat.roughness   = CHARACTER_PBR_ROUGHNESS;
+        // Try StandardMaterial instead of PBR for testing
+        var mat = new BABYLON.StandardMaterial('prevstd_' + classId, self.scene);
+        mat.diffuseColor = new BABYLON.Color3(col.r, col.g, col.b);
+        mat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
         model.material  = mat;
-        console.log('Applied material to preview model:', mat.name, 'color:', col);
+        console.log('Applied StandardMaterial to preview model:', mat.name, 'color:', col);
       }
 
       // For GLTF models, assume they have proper heads and don't add procedural spheres
