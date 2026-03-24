@@ -935,6 +935,11 @@ GameScene.prototype._startIdleAnim = function (unitId, mesh, skeleton) {
 GameScene.prototype._attachHeadMesh = function (unit, rootNode, meshes, isGltf) {
   if (!this.scene || !rootNode) return;
 
+  // For GLTF models, assume they have proper heads and don't add procedural spheres
+  if (isGltf) {
+    return;
+  }
+
   // Check if a head mesh already exists in the provided geometry.
   var hasHeadMesh = meshes.some(function (m) {
     return m.name && m.name.toLowerCase().indexOf('head') !== -1;
@@ -1214,7 +1219,7 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
   scene.beginAnimation(node.glow, 0, frames, false, 1);
 
   if (node.model) {
-    // Animate the OBJ model mesh instead of the procedural body + head.
+    // Enhanced walking animation for GLTF models with skeletons
     var animModel = new BABYLON.Animation(
       'moveModel_' + unit.id, 'position', 60,
       BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
@@ -1225,6 +1230,72 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
       { frame: frames, value: new BABYLON.Vector3(pos.x, 0.05, pos.z) }
     ]);
     animModel.setEasingFunction(ease);
+
+    // Add walking bob animation (gentle up-down movement)
+    var walkBobAnim = new BABYLON.Animation(
+      'walkBob_' + unit.id, 'position.y', 60,
+      BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+      BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
+    walkBobAnim.setKeys([
+      { frame: 0,  value: 0.05 },
+      { frame: 5,  value: 0.08 },
+      { frame: 10, value: 0.05 },
+      { frame: 15, value: 0.08 },
+      { frame: 20, value: 0.05 }
+    ]);
+
+    // Combine position and bob animations
+    node.model.animations = [animModel, walkBobAnim];
+
+    // Add arm swinging for walking animation if skeleton exists
+    if (node.modelParts && node.modelParts.length > 0 && node.modelParts[0].skeleton) {
+      var skeleton = node.modelParts[0].skeleton;
+      var armSwingAnims = [];
+
+      // Left arm swing
+      var leftArmIdx = skeleton.getBoneIndexByName('upperarm_l');
+      if (leftArmIdx >= 0) {
+        var leftArmAnim = new BABYLON.Animation(
+          'walkLeftArm_' + unit.id, 'rotation.z', 60,
+          BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+          BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+        );
+        leftArmAnim.setKeys([
+          { frame: 0,  value: -1.2 },  // Rest position
+          { frame: 5,  value: -1.0 },  // Forward swing
+          { frame: 10, value: -1.2 },  // Back to rest
+          { frame: 15, value: -1.4 },  // Back swing
+          { frame: 20, value: -1.2 }   // Back to rest
+        ]);
+        armSwingAnims.push({ boneIndex: leftArmIdx, animation: leftArmAnim });
+      }
+
+      // Right arm swing (opposite phase)
+      var rightArmIdx = skeleton.getBoneIndexByName('upperarm_r');
+      if (rightArmIdx >= 0) {
+        var rightArmAnim = new BABYLON.Animation(
+          'walkRightArm_' + unit.id, 'rotation.z', 60,
+          BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+          BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+        );
+        rightArmAnim.setKeys([
+          { frame: 0,  value: 1.2 },   // Rest position
+          { frame: 5,  value: 1.4 },   // Back swing
+          { frame: 10, value: 1.2 },   // Back to rest
+          { frame: 15, value: 1.0 },   // Forward swing
+          { frame: 20, value: 1.2 }    // Back to rest
+        ]);
+        armSwingAnims.push({ boneIndex: rightArmIdx, animation: rightArmAnim });
+      }
+
+      // Apply arm swing animations
+      armSwingAnims.forEach(function (armAnim) {
+        skeleton.bones[armAnim.boneIndex].animations = [armAnim.animation];
+        scene.beginAnimation(skeleton.bones[armAnim.boneIndex], 0, frames, false, 1);
+      });
+    }
+
     // Animate weapon alongside model
     var weapon = this._weaponNodes[unit.id];
     if (weapon) {
@@ -1241,7 +1312,7 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
       weapon.animations = [animWpnM];
       scene.beginAnimation(weapon, 0, frames, false, 1);
     }
-    node.model.animations = [animModel];
+
     scene.beginAnimation(node.model, 0, frames, false, 1, function () {
       if (onDone) onDone();
     });
@@ -1449,6 +1520,61 @@ GameScene.prototype._spawnHitParticles = function (unit, skillType, skillId) {
 GameScene.prototype.playAttackAnimation = function (attacker, target, skillType, skillId, onDone) {
   var self   = this;
   var weapon = this._weaponNodes[attacker.id];
+  var node   = this._unitNodes[attacker.id];
+
+  // ── Character pose animation for attack ───────────────────────────────────
+  if (node && node.model && this.scene) {
+    var isMelee = (attacker.attackRange <= 1);
+    var attackFrames = isMelee ? 14 : 18; // Match weapon animation duration
+
+    // Body lean forward for attack
+    var bodyLeanAnim = new BABYLON.Animation(
+      'attackLean_' + attacker.id, 'rotation.x', 60,
+      BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+      BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
+    bodyLeanAnim.setKeys([
+      { frame: 0,     value: 0.0 },
+      { frame: attackFrames * 0.3, value: isMelee ? -0.2 : -0.1 }, // Lean forward
+      { frame: attackFrames * 0.7, value: isMelee ? -0.3 : -0.15 }, // More lean for impact
+      { frame: attackFrames, value: 0.0 } // Return to neutral
+    ]);
+
+    // Add arm extension for melee attacks
+    var armAnims = [];
+    if (isMelee && node.modelParts && node.modelParts.length > 0 && node.modelParts[0].skeleton) {
+      var skeleton = node.modelParts[0].skeleton;
+
+      // Extend forward arm
+      var forwardArmIdx = skeleton.getBoneIndexByName(attacker.classId === 'archer' ? 'upperarm_l' : 'upperarm_r');
+      if (forwardArmIdx >= 0) {
+        var armExtendAnim = new BABYLON.Animation(
+          'attackArm_' + attacker.id, 'rotation.z', 60,
+          BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+          BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+        );
+        var baseRotation = attacker.classId === 'archer' ? -1.2 : 1.2;
+        armExtendAnim.setKeys([
+          { frame: 0,     value: baseRotation },
+          { frame: attackFrames * 0.3, value: baseRotation + (attacker.classId === 'archer' ? -0.5 : 0.5) },
+          { frame: attackFrames * 0.7, value: baseRotation + (attacker.classId === 'archer' ? -0.8 : 0.8) },
+          { frame: attackFrames, value: baseRotation }
+        ]);
+        armAnims.push({ boneIndex: forwardArmIdx, animation: armExtendAnim });
+      }
+    }
+
+    // Apply character animations
+    node.model.animations = (node.model.animations || []).concat([bodyLeanAnim]);
+    this.scene.beginAnimation(node.model, 0, attackFrames, false, 2.0);
+
+    // Apply arm animations
+    armAnims.forEach(function (armAnim) {
+      var skeleton = node.modelParts[0].skeleton;
+      skeleton.bones[armAnim.boneIndex].animations = [armAnim.animation];
+      self.scene.beginAnimation(skeleton.bones[armAnim.boneIndex], 0, attackFrames, false, 2.0);
+    });
+  }
 
   // ── Weapon animation ──────────────────────────────────────────────────────
   if (weapon && this.scene) {
@@ -1954,8 +2080,11 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
         model.material  = mat;
       }
 
-      // Add a procedural head sphere when the model has no head mesh.
+      // For GLTF models, assume they have proper heads and don't add procedural spheres
       if (isGltf) {
+        // Skip procedural head for GLTF models - they should have proper heads
+      } else {
+        // Add a procedural head sphere for OBJ models when the model has no head mesh.
         var hasHead = meshes.some(function (m) {
           return m.name && m.name.toLowerCase().indexOf('head') !== -1;
         });

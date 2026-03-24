@@ -423,9 +423,12 @@ var ENEMY_PRESETS = [
 //  ALLY PRESETS  (CPU-controlled allies)
 // ═══════════════════════════════════════
 var ALLY_PRESETS = [
-  { race: 'human',    classId: 'warrior', name: 'Knight',   emoji: '🛡️' },
-  { race: 'elf',      classId: 'mage',    name: 'Sorcerer', emoji: '🔮' },
-  { race: 'beastkin', classId: 'archer',  name: 'Ranger',   emoji: '🏹' }
+  { race: 'human',    classId: 'warrior', name: 'Knight',     emoji: '🛡️' },
+  { race: 'elf',      classId: 'mage',    name: 'Sorcerer',   emoji: '🔮' },
+  { race: 'beastkin', classId: 'archer',  name: 'Ranger',     emoji: '🏹' },
+  { race: 'dwarf',    classId: 'warrior', name: 'Guardian',   emoji: '⛰️' },
+  { race: 'human',    classId: 'healer',  name: 'Cleric',     emoji: '💚' },
+  { race: 'elf',      classId: 'archer',  name: 'Hunter',     emoji: '🏹' }
 ];
 
 // ═══════════════════════════════════════
