@@ -119,40 +119,46 @@ html, body {
   z-index: 10;  /* Increased from 2 to ensure it's above background elements */
   max-width: 900px;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 20px;  /* Reduced padding for more screen space */
   text-align: center;
   pointer-events: auto;  /* Ensure content is interactive */
+  min-height: 100vh;  /* Ensure full height usage */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;  /* Center content vertically */
 }
 
 .fantasy-header {
-  margin-bottom: 40px;
+  margin-bottom: 20px;  /* Reduced margin */
+  flex-shrink: 0;  /* Don't shrink header */
 }
 
 .fantasy-title {
-  font-size: 3.5em;
+  font-size: 2.8em;  /* Slightly smaller */
   font-weight: bold;
   color: var(--bell-gold);
   text-shadow:
     0 0 20px var(--glow-gold),
     2px 2px 4px var(--shadow-dark);
-  margin-bottom: 10px;
+  margin-bottom: 8px;  /* Reduced margin */
   font-family: var(--font-medieval);
   letter-spacing: 3px;
   text-transform: uppercase;
 }
 
 .fantasy-subtitle {
-  font-size: 1.3em;
+  font-size: 1.1em;  /* Slightly smaller */
   color: var(--ink-light);
-  margin-bottom: 20px;
+  margin-bottom: 15px;  /* Reduced margin */
   font-style: italic;
 }
 
 .fantasy-tagline {
-  font-size: 1.1em;
+  font-size: 0.95em;  /* Slightly smaller */
   color: var(--magic-purple);
   text-shadow: 0 0 10px var(--glow-purple);
   animation: magical-pulse 3s ease-in-out infinite;
+  margin-bottom: 10px;  /* Reduced margin */
 }
 
 @keyframes magical-pulse {
@@ -175,28 +181,32 @@ html, body {
 }
 
 .fantasy-menu {
-  margin: 50px 0;
+  margin: 20px auto;  /* Reduced margins */
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;  /* Reduced gap */
   max-width: 600px;
-  margin: 50px auto;
+  flex: 1;  /* Take available space */
+  justify-content: center;  /* Center menu items */
+  max-height: calc(100vh - 300px);  /* Leave room for header/footer */
+  overflow-y: auto;  /* Allow scrolling if needed */
 }
 
 .fantasy-menu-item {
   background: var(--panel-bg);
   border: 2px solid var(--border-silver);
   border-radius: 12px;
-  padding: 20px;
+  padding: 12px;  /* Further reduced padding */
   transition: all 0.3s ease;
   position: relative;
-  overflow: visible;  /* Changed from hidden to visible to ensure buttons are not clipped */
-  pointer-events: auto;  /* Ensure menu items are interactive */
+  overflow: visible;
+  pointer-events: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  min-height: 200px;  /* Ensure consistent height */
+  min-height: 120px;  /* Further reduced height */
+  justify-content: space-between;  /* Space content evenly */
 }
 
 .fantasy-menu-item::before {
@@ -205,10 +215,11 @@ html, body {
   top: 0;
   left: -100%;
   width: 100%;
-  height: 100%;
+  height: 70%;  /* Only cover top 70% to avoid button area */
   background: linear-gradient(90deg, transparent, var(--glow-gold), transparent);
   transition: left 0.5s ease;
   pointer-events: none;  /* Don't interfere with button clicks */
+  border-radius: 12px 12px 0 0;  /* Match container border radius */
 }
 
 .fantasy-menu-item:hover {
@@ -224,31 +235,37 @@ html, body {
 }
 
 .fantasy-menu-icon {
-  font-size: 2.5em;
-  margin-bottom: 10px;
+  font-size: 2em;  /* Slightly smaller */
+  margin-bottom: 8px;  /* Reduced margin */
   display: block;
+  filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.3));
 }
 
 .fantasy-menu-title {
-  font-size: 1.4em;
+  font-size: 1.2em;  /* Slightly smaller */
   color: var(--parchment);
-  margin-bottom: 8px;
+  margin-bottom: 6px;  /* Reduced margin */
   font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .fantasy-menu-desc {
   color: var(--ink-light);
-  font-size: 0.9em;
+  font-size: 0.85em;  /* Smaller font for description */
   font-family: var(--font-script);
+  line-height: 1.3;
+  margin-bottom: 8px;  /* Reduced margin */
 }
 
 .fantasy-footer {
-  margin-top: 40px;
+  margin-top: 15px;  /* Reduced margin */
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 15px;  /* Reduced gap */
+  flex-shrink: 0;  /* Don't shrink footer */
 }
 
 .fantasy-version {
@@ -265,19 +282,21 @@ html, body {
   border: 2px solid var(--bell-gold);
   color: var(--ink-dark);
   font-family: var(--font-medieval);
-  font-size: 1.1em;
+  font-size: 1em;  /* Slightly smaller font */
   font-weight: bold;
-  padding: 12px 24px;
+  padding: 10px 20px;  /* Reduced padding */
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
   text-transform: uppercase;
   letter-spacing: 1px;
   box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
-  margin-top: 15px;
+  margin-top: 10px;  /* Reduced margin */
   position: relative;
-  z-index: 15;  /* Higher z-index to ensure buttons are clickable */
+  z-index: 20;  /* Higher z-index to ensure buttons are clickable */
   pointer-events: auto;  /* Ensure buttons receive click events */
+  align-self: stretch;  /* Make buttons full width of container */
+  max-width: 200px;  /* Reasonable max width */
 }
 
 .fantasy-btn-primary:hover {
