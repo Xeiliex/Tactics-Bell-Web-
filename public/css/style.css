@@ -119,10 +119,12 @@ html, body {
 .bell-tower-container {
   position: absolute;
   top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  left: 45%;
+  transform: translate(-50%, -50%) scale(2.5);
   z-index: 5;
   animation: tower-camera 25s ease-in-out infinite;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .bell-tower-container::before {
@@ -406,23 +408,30 @@ html, body {
 }
 
 .fantasy-content {
-  position: relative;
-  z-index: 10;  /* Increased from 2 to ensure it's above background elements */
-  max-width: min(90vw, 900px);  /* Responsive max-width */
-  margin: 0 auto;
-  padding: clamp(10px, 2vw, 20px);  /* Responsive padding */
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 15;
+  max-width: 320px;
+  padding: 30px;
   text-align: center;
-  pointer-events: auto;  /* Ensure content is interactive */
-  min-height: 100vh;  /* Ensure full height usage */
-  display: flex;
-  flex-direction: column;
-  justify-content: center;  /* Center content vertically */
-  transform: translateY(50px); /* Move content down to avoid bell tower */
+  pointer-events: auto;
+  background: rgba(26, 20, 16, 0.95);
+  border: 2px solid var(--bell-gold);
+  border-radius: 15px;
+  box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+  animation: menu-fade-in 0.8s ease-out;
+}
+
+@keyframes menu-fade-in {
+  0% { opacity: 0; transform: translateY(-50%) translateX(50px); }
+  100% { opacity: 1; transform: translateY(-50%) translateX(0); }
 }
 
 .fantasy-header {
-  margin-bottom: 20px;  /* Reduced margin */
-  flex-shrink: 0;  /* Don't shrink header */
+  margin-bottom: 15px;
+  flex-shrink: 0;
 }
 
 .fantasy-title {
@@ -473,22 +482,18 @@ html, body {
 }
 
 .fantasy-menu {
-  margin: clamp(10px, 3vw, 20px) auto;  /* Responsive margins */
+  margin: 15px 0;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: clamp(15px, 3vw, 20px);  /* Responsive gap */
-  max-width: min(95vw, 1000px);  /* Responsive max-width */
-  flex: 1;  /* Take available space */
-  max-height: calc(100vh - 300px);  /* Leave room for header/footer */
-  overflow-y: auto;  /* Allow scrolling if needed */
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
 }
 
 .fantasy-menu-item {
-  background: var(--panel-bg);
-  border: 2px solid var(--border-silver);
-  border-radius: 12px;
-  padding: clamp(8px, 2vw, 12px);  /* Responsive padding */
+  background: transparent;
+  border: 1px solid var(--border-silver);
+  border-radius: 8px;
+  padding: 10px;
   transition: all 0.3s ease;
   position: relative;
   overflow: visible;
@@ -497,10 +502,10 @@ html, body {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  min-height: clamp(100px, 15vh, 120px);  /* Responsive min-height */
-  justify-content: space-between;  /* Space content evenly */
-  width: clamp(250px, 25vw, 300px);  /* Fixed width for consistent layout */
-  flex-shrink: 0;  /* Don't shrink */
+  min-height: 70px;
+  justify-content: center;
+  width: 100%;
+  flex-shrink: 0;
 }
 
 .fantasy-menu-item::before {

@@ -72,280 +72,78 @@ function checkForUpdates(callback) {
 }
 
 function preloadAssets(callback) {
-  const appPath = __dirname; // electron-main.js is in the root directory
-  let totalAssets = 0;
-  let loadedAssets = 0;
-  let currentPhase = 'Initializing...';
+  // In development mode, skip heavy asset scanning since the dev server handles file serving
+  if (process.env.ELECTRON_IS_DEV) {
+    console.log('Development mode: Skipping asset preloading, assets served via dev server');
+    
+    // Send quick loading progress for UI feedback
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('loading-progress', {
+        loaded: 100,
+        total: 100,
+        currentFile: 'Development mode - assets served locally',
+        phase: 'Ready to play!'
+      });
+    }
 
-  // Send initial progress to main window
+    // Complete quickly
+    setTimeout(() => {
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send('loading-complete');
+      }
+      callback();
+    }, 500);
+    return;
+  }
+
+  // Production mode: Complete loading without fake delays
+  console.log('Production mode: Starting asset validation');
+  
+  // Send initial status
   if (mainWindow && mainWindow.webContents) {
     mainWindow.webContents.send('loading-progress', {
-      loaded: 0,
+      loaded: 50,
       total: 100,
-      currentFile: 'Preparing asset scanner...',
-      phase: 'Initializing game engine...'
+      currentFile: 'Validating game assets...',
+      phase: 'Loading game resources...'
     });
   }
 
-  // First, count all assets to get accurate totals
-  function countAssets(callback) {
-    console.log('Counting assets...');
-    let pendingDirs = ASSETS_TO_PRELOAD.length;
+  // Validate that critical asset directories exist
+  const appPath = __dirname;
+  let validDirs = 0;
+  let failedDirs = [];
 
-    if (pendingDirs === 0) {
-      callback();
-      return;
-    }
-
-    ASSETS_TO_PRELOAD.forEach(assetDir => {
-      const fullPath = path.join(appPath, assetDir);
-      countDirectory(fullPath, () => {
-        pendingDirs--;
-        if (pendingDirs === 0) {
-          console.log(`Found ${totalAssets} total assets to load`);
-          callback();
-        }
-      });
-    });
-  }
-
-  function countDirectory(dirPath, callback) {
-    fs.readdir(dirPath, { withFileTypes: true }, (err, files) => {
-      if (err) {
-        console.log(`Directory not found: ${dirPath} - ${err.message}`);
-        callback();
-        return;
-      }
-
-      let pending = files.length;
-      if (pending === 0) {
-        callback();
-        return;
-      }
-
-      files.forEach(file => {
-        const filePath = path.join(dirPath, file.name);
-
-        if (file.isDirectory()) {
-          // Recursively count subdirectories
-          countDirectory(filePath, () => {
-            pending--;
-            if (pending === 0) callback();
-          });
-        } else {
-          // Count this file
-          totalAssets++;
-          pending--;
-          if (pending === 0) callback();
-        }
-      });
-    });
-  }
-
-  // Simulate initial loading phases
-  const initialPhases = [
-    { phase: 'Checking for updates...', delay: 300 },
-    { phase: 'Initializing game engine...', delay: 500 },
-    { phase: 'Loading core systems...', delay: 300 },
-    { phase: 'Preparing battlefield...', delay: 400 },
-    { phase: 'Caching 3D models...', delay: 1000 },
-    { phase: 'Scanning game assets...', delay: 200 }
-  ];
-
-  let phaseIndex = 0;
-  const runInitialPhases = () => {
-    if (phaseIndex < initialPhases.length) {
-      const currentInitialPhase = initialPhases[phaseIndex];
-      const progressPercent = Math.round((phaseIndex / initialPhases.length) * 30); // First 30% for initial phases
-
-      if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('loading-progress', {
-          loaded: progressPercent,
-          total: 100,
-          currentFile: currentInitialPhase.phase.toLowerCase(),
-          phase: currentInitialPhase.phase
-        });
-      }
-
-      // If this is the update check phase, actually perform the check
-      if (currentInitialPhase.phase === 'Checking for updates...') {
-        checkForUpdates(() => {
-          setTimeout(() => {
-            phaseIndex++;
-            runInitialPhases();
-          }, currentInitialPhase.delay);
-        });
-        return;
-      }
-
-      // If this is the model caching phase, trigger it in the renderer
-      if (currentInitialPhase.phase === 'Caching 3D models...') {
-        if (mainWindow && mainWindow.webContents) {
-          mainWindow.webContents.send('start-model-cache');
-        }
-        setTimeout(() => {
-          phaseIndex++;
-          runInitialPhases();
-        }, currentInitialPhase.delay);
-        return;
-      }
-
-      setTimeout(() => {
-        phaseIndex++;
-        runInitialPhases();
-      }, currentInitialPhase.delay);
+  ASSETS_TO_PRELOAD.forEach(assetDir => {
+    const fullPath = path.join(appPath, assetDir);
+    if (fs.existsSync(fullPath)) {
+      validDirs++;
     } else {
-      // Now count assets first, then scan
-      countAssets(() => {
-        startAssetScanning();
-      });
+      failedDirs.push(assetDir);
     }
-  };
+  });
 
-  function scanDirectory(dirPath, callback) {
-    fs.readdir(dirPath, { withFileTypes: true }, (err, files) => {
-      if (err) {
-        console.log(`Directory not found or inaccessible: ${dirPath} - ${err.message}`);
-        callback(); // Continue with other directories
-        return;
-      }
+  if (failedDirs.length > 0) {
+    console.warn('Missing asset directories:', failedDirs);
+  }
 
-      let pending = files.length;
-      if (pending === 0) {
-        callback();
-        return;
-      }
-
-      // Add timeout to prevent getting stuck
-      const timeout = setTimeout(() => {
-        console.log(`Timeout scanning directory: ${dirPath}`);
-        callback();
-      }, 5000); // 5 second timeout per directory
-
-      files.forEach(file => {
-        const filePath = path.join(dirPath, file.name);
-
-        if (file.isDirectory()) {
-          // Recursively scan subdirectories
-          scanDirectory(filePath, () => {
-            pending--;
-            if (pending === 0) {
-              clearTimeout(timeout);
-              callback();
-            }
-          });
-        } else {
-          // Count file
-          loadedAssets++;
-
-          // Update phase based on file type
-          if (filePath.includes('.js')) currentPhase = 'Loading JavaScript modules...';
-          else if (filePath.includes('.css')) currentPhase = 'Loading stylesheets...';
-          else if (filePath.includes('.json')) currentPhase = 'Loading configuration...';
-          else if (filePath.includes('.png') || filePath.includes('.jpg') || filePath.includes('.webp')) currentPhase = 'Loading textures...';
-          else if (filePath.includes('.obj') || filePath.includes('.gltf') || filePath.includes('.fbx')) currentPhase = 'Loading 3D models...';
-          else currentPhase = 'Loading game assets...';
-
-          // Progress is now 30% (initial phases) + 70% (scanning phase)
-          const progressPercent = 30 + Math.round((loadedAssets / totalAssets) * 70);
-
-          if (mainWindow && mainWindow.webContents) {
-            mainWindow.webContents.send('loading-progress', {
-              loaded: progressPercent,
-              total: 100,
-              currentFile: path.relative(appPath, filePath),
-              phase: currentPhase
-            });
-          }
-
-          // Add small artificial delay to make loading visible
-          setTimeout(() => {
-            pending--;
-            if (pending === 0) {
-              clearTimeout(timeout);
-              callback();
-            }
-          }, Math.random() * 20 + 5); // 5-25ms random delay (faster)
-        }
-      });
+  // Send completion
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('loading-progress', {
+      loaded: 100,
+      total: 100,
+      currentFile: `Ready to play! (${validDirs}/${ASSETS_TO_PRELOAD.length} asset libraries available)`,
+      phase: 'Loading complete!'
     });
   }
 
-  const startAssetScanning = () => {
-    console.log('Starting asset scanning...');
-    // Start scanning assets
-    let pendingDirs = ASSETS_TO_PRELOAD.length;
-    let completedDirs = 0;
-
-    if (totalAssets === 0) {
-      // No assets to scan, complete immediately
-      if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('loading-progress', {
-          loaded: 100,
-          total: 100,
-          currentFile: 'All assets ready!',
-          phase: 'Loading complete!'
-        });
-      }
-      setTimeout(() => {
-        if (mainWindow && mainWindow.webContents) {
-          mainWindow.webContents.send('loading-complete');
-        }
-        callback();
-      }, 500);
-      return;
-    }
-
-    ASSETS_TO_PRELOAD.forEach((assetDir, index) => {
-      const fullPath = path.join(appPath, assetDir);
-      scanDirectory(fullPath, () => {
-        completedDirs++;
-        pendingDirs--;
-
-        const progressPercent = 30 + Math.round((completedDirs / ASSETS_TO_PRELOAD.length) * 70); // 30-100% for scanning
-
-        if (mainWindow && mainWindow.webContents) {
-          mainWindow.webContents.send('loading-progress', {
-            loaded: progressPercent,
-            total: 100,
-            currentFile: `Completed scanning ${assetDir}`,
-            phase: `Scanning game assets... (${completedDirs}/${ASSETS_TO_PRELOAD.length})`
-          });
-        }
-
-        if (pendingDirs === 0) {
-          // All directories scanned
-          console.log(`Asset scanning complete. Processed ${loadedAssets} files.`);
-          if (mainWindow && mainWindow.webContents) {
-            mainWindow.webContents.send('loading-progress', {
-              loaded: 100,
-              total: 100,
-              currentFile: 'Asset scanning complete!',
-              phase: 'Loading complete!'
-            });
-          }
-
-          setTimeout(() => {
-            if (mainWindow && mainWindow.webContents) {
-              mainWindow.webContents.send('loading-complete');
-            }
-            callback();
-          }, 500);
-        }
-      });
-    });
-  };
-
-  // Start the loading process
-  runInitialPhases();
-
-  // Add a safety timeout to ensure loading always completes
+  // Complete loading
   setTimeout(() => {
     if (mainWindow && mainWindow.webContents) {
       mainWindow.webContents.send('loading-complete');
     }
     callback();
-  }, 15000); // 15 second absolute timeout
+  }, 300);
 }
 
 // Custom protocol for launching from links

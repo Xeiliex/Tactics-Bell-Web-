@@ -10,8 +10,8 @@
 </head>
 <body>
 
-  <!-- ══════════════ LOADING SCREEN ══════════════ -->
-  <div id="screen-loading" class="screen active">
+  <!-- ══════════════ LOADING SCREEN (Hidden by default, shown only for updates) ══════════════ -->
+  <div id="screen-loading" class="screen hidden">
     <div class="loading-screen-content">
       <div class="loading-bell-icon">🔔</div>
       <h1 class="loading-title">Tactics Bell</h1>
@@ -508,42 +508,13 @@
           AssetCache.preloadTerrainModels(() => {
             AssetCache.preloadCharacterModels(() => {
               // Model caching complete
-              console.log('Model caching completed');
             });
           });
         }
       });
 
-      let loadingCompleted = false;
-
-      function completeLoading() {
-        if (loadingCompleted) return;
-        loadingCompleted = true;
-
-        const loadingScreen = document.getElementById('screen-loading');
-        const titleScreen = document.getElementById('screen-title');
-
-        if (loadingScreen && titleScreen) {
-          // Hide loading screen
-          loadingScreen.classList.remove('active');
-          loadingScreen.classList.add('hidden');
-
-          // Show title screen
-          titleScreen.classList.remove('hidden');
-          titleScreen.classList.add('active');
-        }
-      }
-
-      // Electron IPC handler for loading-complete event
-      ipcRenderer.on('loading-complete', () => {
-        completeLoading();
-      });
-
-      // Fallback timeout (10 seconds) for browser mode or IPC failure
-      // This prevents infinite loading screen if IPC doesn't fire
-      setTimeout(() => {
-        completeLoading();
-      }, 10000);
+      // Loading screen is now hidden by default - shown only for updates
+      // In dev mode, we go straight to the title screen
 
 </body>
 </html>

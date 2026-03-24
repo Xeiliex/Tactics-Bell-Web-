@@ -228,6 +228,19 @@ var game = (function () {
       return btn;
     }
 
+    // Bell tower → Character Creation (click the bell to start)
+    var bellTower = document.querySelector('.bell-tower-container');
+    if (bellTower) {
+      bellTower.addEventListener('click', function () {
+        clearSave();
+        g.stage       = 1;
+        g.player      = null;
+        g.partyConfig = null;
+        g.story       = null;
+        g.ui.showPartyChoiceScreen();
+      });
+    }
+
     // Title → Create
     var btn = getBtn('btn-new-game');
     if (btn) {
@@ -1269,6 +1282,6 @@ var game = (function () {
   g.distributeExp        = distributeExp;
   g.updateContinueButton = _updateContinueButton;
 
-  return g; // expose for debugging
+  return g;
 
 }());

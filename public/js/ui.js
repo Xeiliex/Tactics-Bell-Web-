@@ -94,25 +94,35 @@ GameUI.prototype._showScreenIn = function (id) {
 GameUI.prototype.showTitleScreen = function () {
   this._disposePreview();
   this.showScreen('screen-title');
-  // Animate bell and title on load
+  
+  // Animate bell tower entrance with gentle scale
   anime({
-    targets: '.title-bell',
-    translateY: [-30, 0], opacity: [0, 1],
-    duration: 700, easing: 'easeOutBounce', delay: 200
+    targets: '.bell-tower-container',
+    scale: [2, 2.5],
+    opacity: [0.7, 1],
+    duration: 800,
+    easing: 'easeOutQuart',
+    delay: 0
   });
+  
+  // Animate menu title
   anime({
-    targets: '.game-title',
-    translateY: [-20, 0], opacity: [0, 1],
-    duration: 600, easing: 'easeOutQuart', delay: 400
+    targets: '.fantasy-title',
+    opacity: [0, 1],
+    translateY: [10, 0],
+    duration: 600,
+    easing: 'easeOutQuart',
+    delay: 200
   });
+  
+  // Animate each menu item with stagger
   anime({
-    targets: '.tagline',
-    opacity: [0, 1], duration: 500, delay: 700
-  });
-  anime({
-    targets: '#btn-new-game',
-    scale: [0.8, 1], opacity: [0, 1],
-    duration: 500, easing: 'easeOutBack', delay: 900
+    targets: '.fantasy-menu-item',
+    opacity: [0, 1],
+    translateX: [20, 0],
+    duration: 500,
+    easing: 'easeOutQuart',
+    delay: anime.stagger(100, { start: 500 })
   });
 };
 
