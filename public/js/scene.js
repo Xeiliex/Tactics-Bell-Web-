@@ -665,7 +665,7 @@ GameScene.prototype.renderUnits = function (units) {
 // procedural shapes remain, so the game is always playable.
 
 GameScene.prototype._upgradeUnitsToModels = function (units) {
-  console.log('_upgradeUnitsToModels called with', units.length, 'units');
+  console.log('_upgradeUnitsToModels called with', units.length, 'units, GRAPHICS_QUALITY:', typeof GRAPHICS_QUALITY !== 'undefined' ? GRAPHICS_QUALITY : 'undefined');
   if (typeof GRAPHICS_QUALITY !== 'undefined' && GRAPHICS_QUALITY === 'low') return;
   if (!BABYLON.SceneLoader || typeof BABYLON.SceneLoader.ImportMesh !== 'function') return;
 
@@ -1964,6 +1964,7 @@ CharacterPreviewScene.prototype.init = function (canvasId) {
 
 /** Load (or reload) the glTF/OBJ model for classId with the given colour and gender. */
 CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, gender, hairStyle, hairColor) {
+  console.log('CharacterPreviewScene.loadModel called for class:', classId, 'gender:', gender);
   if (!this.scene) return;
   var self = this;
   this._pendingClassId = classId;
@@ -1990,6 +1991,7 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
   var genderKey = (gender === 'female') ? 'female' : 'male';
   var genderMap = CHARACTER_MODEL_FILES[genderKey] || CHARACTER_MODEL_FILES.male;
   var fileName  = genderMap[classId];
+  console.log('Preview loading model file:', fileName, 'for class:', classId, 'gender:', gender);
   if (!fileName || !BABYLON.SceneLoader) return;
 
   var isGltf    = fileName.indexOf('.gltf') !== -1 || fileName.indexOf('.glb') !== -1;
@@ -2001,6 +2003,12 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
 
   BABYLON.SceneLoader.ImportMesh('', rootUrl, srcFile, self.scene,
     function (meshes) {
+      console.log('Preview ImportMesh success for', fileName, 'meshes:', meshes.length);
+      meshes.forEach(function (m, i) {
+        var verts = m.getTotalVertices ? m.getTotalVertices() : 0;
+        var indices = m.getTotalIndices ? m.getTotalIndices() : 0;
+        console.log('Preview mesh', i, 'name:', m.name, 'vertices:', verts, 'indices:', indices);
+      });
       if (!meshes || !meshes.length || !self.scene) return;
       // Discard if the class was changed while loading
       if (self._pendingClassId !== classId) {
@@ -2038,6 +2046,7 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
         mat.metallic    = CHARACTER_PBR_METALLIC;
         mat.roughness   = CHARACTER_PBR_ROUGHNESS;
         model.material  = mat;
+        console.log('Applied material to preview model:', mat.name, 'color:', col);
       }
 
       // For GLTF models, assume they have proper heads and don't add procedural spheres
@@ -2072,6 +2081,8 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
       }
 
       self._model = model;
+      console.log('Preview model set:', model.name, 'position:', model.position, 'scaling:', model.scaling, 'visible:', model.isVisible, 'enabled:', model.isEnabled());
+      console.log('Scene children count:', self.scene.meshes.length);
     },
     null,
     function (scene, message, exception) { /* model absent — keep procedural fallback */
