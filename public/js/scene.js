@@ -665,6 +665,7 @@ GameScene.prototype.renderUnits = function (units) {
 // procedural shapes remain, so the game is always playable.
 
 GameScene.prototype._upgradeUnitsToModels = function (units) {
+  console.log('_upgradeUnitsToModels called with', units.length, 'units');
   if (typeof GRAPHICS_QUALITY !== 'undefined' && GRAPHICS_QUALITY === 'low') return;
   if (!BABYLON.SceneLoader || typeof BABYLON.SceneLoader.ImportMesh !== 'function') return;
 
@@ -684,12 +685,14 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
     var bucket  = buckets[bucketKey];
     var classId = bucket.classId;
     var gender  = bucket.gender;
+    console.log('Processing bucket:', bucketKey, 'with', bucket.units.length, 'units');
 
     // Pick the model file: glTF for high quality (always the case here),
     // OBJ for low quality (already guarded above).
     var genderMap = CHARACTER_MODEL_FILES[gender] || CHARACTER_MODEL_FILES.male;
     var fileName  = genderMap[classId];
     if (!fileName) return;
+    console.log('Loading model file:', fileName, 'for class:', classId, 'gender:', gender);
 
     var isGltf = fileName.indexOf('.gltf') !== -1 || fileName.indexOf('.glb') !== -1;
 
@@ -699,7 +702,7 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
     var useBlob   = !isGltf && typeof AssetCache !== 'undefined' && AssetCache.hasCached('models/character/' + fileName);
     var rootUrl   = useBlob ? ''                    : 'models/character/';
     var srcFile   = useBlob ? AssetCache.getCachedUrl('models/character/' + fileName) : fileName;
-    var pluginExt = useBlob ? '.obj'                : null;
+    var pluginExt = '.obj';
 
     BABYLON.SceneLoader.ImportMesh(
       '',          // import all meshes
@@ -707,12 +710,16 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
       srcFile,
       self.scene,
       function (meshes) {
+        console.log('ImportMesh success for', fileName, 'meshes:', meshes.length);
         if (!meshes || !meshes.length || !self.scene) return;
 
         // Filter to geometry meshes only (glTF also returns TransformNodes).
         var geoMeshes = meshes.filter(function (m) {
-          return m.getTotalVertices && m.getTotalVertices() > 0;
+          var verts = m.getTotalVertices ? m.getTotalVertices() : 0;
+          console.log('Mesh', m.name, 'vertices:', verts);
+          return verts > 0;
         });
+        console.log('Character model', fileName, 'loaded with', geoMeshes.length, 'geometry meshes');
         if (!geoMeshes.length) return;
 
         if (isGltf) {
@@ -834,7 +841,8 @@ GameScene.prototype._upgradeUnitsToModels = function (units) {
         }
       },
       null,           // progress callback — not needed
-      function () {   // error callback — model file absent, keep procedural fallback
+      function (scene, message, exception) {   // error callback — model file absent, keep procedural fallback
+        console.error('Failed to load character model:', fileName, message, exception);
       },
       pluginExt
     );
@@ -1989,7 +1997,7 @@ CharacterPreviewScene.prototype.loadModel = function (classId, colorId, raceId, 
   var useBlob   = !isGltf && typeof AssetCache !== 'undefined' && AssetCache.hasCached('models/character/' + fileName);
   var rootUrl   = useBlob ? ''                    : 'models/character/';
   var srcFile   = useBlob ? AssetCache.getCachedUrl('models/character/' + fileName) : fileName;
-  var pluginExt = useBlob ? '.obj'                : null;
+  var pluginExt = isGltf ? null : '.obj';
 
   BABYLON.SceneLoader.ImportMesh('', rootUrl, srcFile, self.scene,
     function (meshes) {
