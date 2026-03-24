@@ -118,6 +118,20 @@ GameUI.prototype.showTitleScreen = function () {
 
 GameUI.prototype.showPartyChoiceScreen = function () {
   this._disposePreview();
+  
+  // Clean up old event listeners if they exist
+  if (this._partyChoiceListeners) {
+    if (this._partyChoiceListeners.customPartyBtn && this._partyChoiceListeners.customPartyHandler) {
+      this._partyChoiceListeners.customPartyBtn.removeEventListener('click', this._partyChoiceListeners.customPartyHandler);
+    }
+    if (this._partyChoiceListeners.prefillPartyBtn && this._partyChoiceListeners.prefillPartyHandler) {
+      this._partyChoiceListeners.prefillPartyBtn.removeEventListener('click', this._partyChoiceListeners.prefillPartyHandler);
+    }
+    if (this._partyChoiceListeners.partyBackBtn && this._partyChoiceListeners.partyBackHandler) {
+      this._partyChoiceListeners.partyBackBtn.removeEventListener('click', this._partyChoiceListeners.partyBackHandler);
+    }
+  }
+  
   this.showScreen('screen-party-select');
   anime({
     targets: '#screen-party-select .card',
@@ -127,15 +141,31 @@ GameUI.prototype.showPartyChoiceScreen = function () {
     delay: anime.stagger(100),
     complete: () => {
       // Wire up buttons now that this screen is active and rendered.
-      document.getElementById('btn-custom-party').addEventListener('click', () => {
-        if (this.game && this.game.ui) this.game.ui.showCreateScreen();
-      });
-      document.getElementById('btn-prefill-party').addEventListener('click', () => {
-        if (this.game && this.game.ui) this.game.ui.showScreen('screen-title');
-      });
-      document.getElementById('btn-party-back').addEventListener('click', () => {
-        if (this.game && this.game.ui) this.game.ui.showScreen('screen-title');
-      });
+      // Store listeners for cleanup on next navigation
+      this._partyChoiceListeners = {
+        customPartyBtn: document.getElementById('btn-custom-party'),
+        customPartyHandler: () => {
+          if (this.game && this.game.ui) this.game.ui.showCreateScreen();
+        },
+        prefillPartyBtn: document.getElementById('btn-prefill-party'),
+        prefillPartyHandler: () => {
+          if (this.game && this.game.ui) this.game.ui.showScreen('screen-title');
+        },
+        partyBackBtn: document.getElementById('btn-party-back'),
+        partyBackHandler: () => {
+          if (this.game && this.game.ui) this.game.ui.showScreen('screen-title');
+        }
+      };
+      
+      if (this._partyChoiceListeners.customPartyBtn) {
+        this._partyChoiceListeners.customPartyBtn.addEventListener('click', this._partyChoiceListeners.customPartyHandler);
+      }
+      if (this._partyChoiceListeners.prefillPartyBtn) {
+        this._partyChoiceListeners.prefillPartyBtn.addEventListener('click', this._partyChoiceListeners.prefillPartyHandler);
+      }
+      if (this._partyChoiceListeners.partyBackBtn) {
+        this._partyChoiceListeners.partyBackBtn.addEventListener('click', this._partyChoiceListeners.partyBackHandler);
+      }
     }
   });
 };

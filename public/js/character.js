@@ -278,12 +278,16 @@ function createAlly(preset, level) {
  */
 function createPartyMember(opts) {
   var meshColor = null;
-  if (opts.colorId && opts.colorId !== 'default') {
+  if (opts.colorId && opts.colorId !== 'default' && BODY_COLORS) {
     for (var ci = 0; ci < BODY_COLORS.length; ci++) {
       if (BODY_COLORS[ci].id === opts.colorId) {
         meshColor = { r: BODY_COLORS[ci].r, g: BODY_COLORS[ci].g, b: BODY_COLORS[ci].b };
         break;
       }
+    }
+    // Log warning if color was requested but not found
+    if (!meshColor && opts.colorId !== 'default') {
+      console.warn('Character color not found: ' + opts.colorId + ' — using default');
     }
   }
   return new Character({

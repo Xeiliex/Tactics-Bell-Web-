@@ -514,7 +514,12 @@
         }
       });
 
-      ipcRenderer.on('loading-complete', () => {
+      let loadingCompleted = false;
+
+      function completeLoading() {
+        if (loadingCompleted) return;
+        loadingCompleted = true;
+
         const loadingScreen = document.getElementById('screen-loading');
         const titleScreen = document.getElementById('screen-title');
 
@@ -527,7 +532,18 @@
           titleScreen.classList.remove('hidden');
           titleScreen.classList.add('active');
         }
+      }
+
+      // Electron IPC handler for loading-complete event
+      ipcRenderer.on('loading-complete', () => {
+        completeLoading();
       });
+
+      // Fallback timeout (10 seconds) for browser mode or IPC failure
+      // This prevents infinite loading screen if IPC doesn't fire
+      setTimeout(() => {
+        completeLoading();
+      }, 10000);
 
 </body>
 </html>

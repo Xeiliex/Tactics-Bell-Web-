@@ -162,6 +162,12 @@ var game = (function () {
     g.ui.showTitleScreen();
     _updateContinueButton();
 
+    // Defer button listener attachment to next animation frame
+    // to ensure loading screen is hidden and DOM is fully settled
+    requestAnimationFrame(function () {
+      _attachButtonListeners();
+    });
+
     // Graphics quality toggle (title screen)
     (function () {
       var btn = document.getElementById('btn-gfx-toggle');
@@ -207,133 +213,191 @@ var game = (function () {
       document.addEventListener('fullscreenchange', updateIcon);
       updateIcon();
     }());
+  }
+
+  /**
+   * Attach all button event listeners.
+   * This is deferred to after init() to ensure loading screen is hidden
+   * and DOM is fully settled before attaching listeners.
+   */
+  function _attachButtonListeners() {
+    // Helper function to safely get button and log if missing
+    function getBtn(id) {
+      var btn = document.getElementById(id);
+      if (!btn) console.warn('Button element missing: ' + id);
+      return btn;
+    }
 
     // Title → Create
-    document.getElementById('btn-new-game').addEventListener('click', function () {
-      clearSave();
-      g.stage       = 1;
-      g.player      = null;
-      g.partyConfig = null;
-      g.story       = null;
-      g.ui.showPartyChoiceScreen();
-    });
+    var btn = getBtn('btn-new-game');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        clearSave();
+        g.stage       = 1;
+        g.player      = null;
+        g.partyConfig = null;
+        g.story       = null;
+        g.ui.showPartyChoiceScreen();
+      });
+    }
 
     // Title → Story Mode
-    document.getElementById('btn-story-mode').addEventListener('click', function () {
-      g.stage       = 1;
-      g.player      = null;
-      g.partyConfig = null;
-      g.story       = new StoryManager(g);
-      g.ui.showCreateScreen();
-    });
+    btn = getBtn('btn-story-mode');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        g.stage       = 1;
+        g.player      = null;
+        g.partyConfig = null;
+        g.story       = new StoryManager(g);
+        g.ui.showCreateScreen();
+      });
+    }
 
     // Title → Quick Match
-    document.getElementById('btn-quick-match').addEventListener('click', function () {
-      clearSave();
-      g.stage  = 1;
-      g.player = null;
-      _startQuickMatch();
-    });
+    btn = getBtn('btn-quick-match');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        clearSave();
+        g.stage  = 1;
+        g.player = null;
+        _startQuickMatch();
+      });
+    }
 
     // Title → Multiplayer
-    document.getElementById('btn-multiplayer').addEventListener('click', function () {
-      g.ui.showScreen('screen-lobby');
-      _initLobbyUI();
-    });
+    btn = getBtn('btn-multiplayer');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        g.ui.showScreen('screen-lobby');
+        _initLobbyUI();
+      });
+    }
 
     // Title → Continue
-    document.getElementById('btn-continue-game').addEventListener('click', function () {
-      var save = loadSave();
-      if (!save) return;
-      g.stage = save.stage;
-      g.gold  = save.gold || 0;
+    btn = getBtn('btn-continue-game');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        var save = loadSave();
+        if (!save) return;
+        g.stage = save.stage;
+        g.gold  = save.gold || 0;
 
-      if (save.party && save.party.length > 0) {
-        g.partyConfig = save.party.map(function (m) {
-          return {
-            name:         m.name         || 'Adventurer',
-            race:         m.race,
-            classId:      m.classId,
-            backgroundId: m.backgroundId || null,
-            gender:       m.gender       || 'male',
-            hairStyle:    m.hairStyle    || 'none',
-            hairColor:    m.hairColor    || 'dark',
-            colorId:      m.colorId      || 'default',
-            level:        m.level        || 1,
-            exp:          m.exp          || 0,
-            hp:           m.hp           || 0
-          };
-        });
-      } else if (save.race) {
-        // Legacy single-hero save: synthesise a partyConfig
-        var legacyParty = [
-          { name: 'Hero', race: save.race, classId: save.classId, backgroundId: null, colorId: 'default', level: save.level || 1, exp: save.exp || 0, hp: save.hp || 0 }
-        ];
-        for (var lp = 0; lp < 2 && lp < ALLY_PRESETS.length; lp++) {
-          legacyParty.push({ name: ALLY_PRESETS[lp].name, race: ALLY_PRESETS[lp].race, classId: ALLY_PRESETS[lp].classId, backgroundId: null, colorId: 'default', level: save.level || 1, exp: 0, hp: 0 });
+        if (save.party && save.party.length > 0) {
+          g.partyConfig = save.party.map(function (m) {
+            return {
+              name:         m.name         || 'Adventurer',
+              race:         m.race,
+              classId:      m.classId,
+              backgroundId: m.backgroundId || null,
+              gender:       m.gender       || 'male',
+              hairStyle:    m.hairStyle    || 'none',
+              hairColor:    m.hairColor    || 'dark',
+              colorId:      m.colorId      || 'default',
+              level:        m.level        || 1,
+              exp:          m.exp          || 0,
+              hp:           m.hp           || 0
+            };
+          });
+        } else if (save.race) {
+          // Legacy single-hero save: synthesise a partyConfig
+          var legacyParty = [
+            { name: 'Hero', race: save.race, classId: save.classId, backgroundId: null, colorId: 'default', level: save.level || 1, exp: save.exp || 0, hp: save.hp || 0 }
+          ];
+          for (var lp = 0; lp < 2 && lp < ALLY_PRESETS.length; lp++) {
+            legacyParty.push({ name: ALLY_PRESETS[lp].name, race: ALLY_PRESETS[lp].race, classId: ALLY_PRESETS[lp].classId, backgroundId: null, colorId: 'default', level: save.level || 1, exp: 0, hp: 0 });
+          }
+          g.partyConfig = legacyParty;
+        } else {
+          return;
         }
-        g.partyConfig = legacyParty;
-      } else {
-        return;
-      }
 
-      g._pendingSave = save;
-      startBattle(false);
-    });
+        g._pendingSave = save;
+        startBattle(false);
+      });
+    }
 
     // Party Choice → Back to Title
-    document.getElementById('btn-party-back').addEventListener('click', function () {
-      if (g.ui) g.ui.showTitleScreen();
-    });
+    btn = getBtn('btn-party-back');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        if (g.ui) g.ui.showTitleScreen();
+      });
+    }
 
     // Party Review → Recreate
-    document.getElementById('btn-review-back').addEventListener('click', function () {
-      // Restart wizard at step 0, member 0, preserving existing choices
-      if (g.story) {
-        g.ui.showCreateScreen();
-      } else {
-        // For non-story mode, go back to the party choice screen
-        g.ui.showPartyChoiceScreen();
-      }
-    });
+    btn = getBtn('btn-review-back');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        // Restart wizard at step 0, member 0, preserving existing choices
+        if (g.story) {
+          g.ui.showCreateScreen();
+        } else {
+          // For non-story mode, go back to the party choice screen
+          g.ui.showPartyChoiceScreen();
+        }
+      });
+    }
 
     // Party Review → Battle
-    document.getElementById('btn-start-battle').addEventListener('click', function () {
-      if (!g.partyConfig || !g.partyConfig[0] || !g.partyConfig[0].race || !g.partyConfig[0].classId) {
-        return;
-      }
-      // The confirmation dialog was removed; proceed directly to battle.
-      // g.ui.showBattleConfirmScreen(g.stage, g.story);
-      startBattle(true);
-    });
-
-    document.getElementById('btn-attack').addEventListener('click', function () {
-      if (g.combat) g.combat.beginTargeting(null);
-    });
-    document.getElementById('btn-skill').addEventListener('click', function () {
-      if (!g.combat) return;
-      var unit = g.combat.currentUnit();
-      if (!unit) return;
-      g.ui.showSkillMenu(unit, function (skill) {
-        g.combat.beginTargeting(skill);
+    btn = getBtn('btn-start-battle');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        if (!g.partyConfig || !g.partyConfig[0] || !g.partyConfig[0].race || !g.partyConfig[0].classId) {
+          return;
+        }
+        // The confirmation dialog was removed; proceed directly to battle.
+        // g.ui.showBattleConfirmScreen(g.stage, g.story);
+        startBattle(true);
       });
-    });
-    document.getElementById('btn-wait').addEventListener('click', function () {
-      if (g.combat) g.combat.doWait();
-    });
-    document.getElementById('btn-cancel-action').addEventListener('click', function () {
-      if (!g.combat) return;
-      g.combat.state = COMBAT_STATE.PLAYER_SELECT;
-      g.ui.hideActionMenu();
-      g.ui.showMessage('Action cancelled. Select a unit.');
-      g.scene.clearHighlights();
-    });
-    document.getElementById('btn-cancel-skill').addEventListener('click', function () {
-      if (!g.combat) return;
-      g.ui.hideSkillMenu();
-      var unit = g.combat.currentUnit();
-      if (unit) g.ui.showActionMenu(unit);
-    });
+    }
+
+    // Battle actions
+    btn = getBtn('btn-attack');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        if (g.combat) g.combat.beginTargeting(null);
+      });
+    }
+
+    btn = getBtn('btn-skill');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        if (!g.combat) return;
+        var unit = g.combat.currentUnit();
+        if (!unit) return;
+        g.ui.showSkillMenu(unit, function (skill) {
+          g.combat.beginTargeting(skill);
+        });
+      });
+    }
+
+    btn = getBtn('btn-wait');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        if (g.combat) g.combat.doWait();
+      });
+    }
+
+    btn = getBtn('btn-cancel-action');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        if (!g.combat) return;
+        g.combat.state = COMBAT_STATE.PLAYER_SELECT;
+        g.ui.hideActionMenu();
+        g.ui.showMessage('Action cancelled. Select a unit.');
+        g.scene.clearHighlights();
+      });
+    }
+
+    btn = getBtn('btn-cancel-skill');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        if (!g.combat) return;
+        g.ui.hideSkillMenu();
+        var unit = g.combat.currentUnit();
+        if (unit) g.ui.showActionMenu(unit);
+      });
+    }
   }
 
   // ─── Start / restart battle ──────────────────────────────────────────────────
