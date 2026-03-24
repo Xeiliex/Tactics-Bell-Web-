@@ -22,21 +22,19 @@ var GRAPHICS_QUALITY = (function () {
 
 // ─── Character model configuration ───────────────────────────────────────────
 // Maps gender+class IDs to glTF filenames in public/models/character/ (high quality).
-// Only two base mesh shapes are available (Peasant and Ranger) per gender.
-// Warrior/Healer use the Peasant body; Mage/Archer use the Ranger body.
-// The player's gender choice selects the matching male or female variant.
+// Use OBJ models instead of GLTF for better compatibility and proper heads
 var CHARACTER_MODEL_FILES = {
   male: {
-    warrior: 'Male_Peasant.gltf',
-    mage:    'Male_Ranger.gltf',
-    archer:  'Male_Ranger.gltf',
-    healer:  'Male_Peasant.gltf'
+    warrior: 'character-warrior.obj',
+    mage:    'character-mage.obj',
+    archer:  'character-archer.obj',
+    healer:  'character-healer.obj'
   },
   female: {
-    warrior: 'Female_Peasant.gltf',
-    mage:    'Female_Ranger.gltf',
-    archer:  'Female_Ranger.gltf',
-    healer:  'Female_Peasant.gltf'
+    warrior: 'character-warrior.obj',
+    mage:    'character-mage.obj',
+    archer:  'character-archer.obj',
+    healer:  'character-healer.obj'
   }
 };
 
@@ -867,6 +865,7 @@ GameScene.prototype._startIdleAnim = function (unitId, mesh, skeleton) {
   ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
 
   // ── Root mesh: gentle Y-position rise-and-fall (breathing bob) ──────────────
+  // Reduced amplitude to prevent floating/clipping issues
   var idleAnim = new BABYLON.Animation(
     'idle_' + unitId, 'position.y', 60,
     BABYLON.Animation.ANIMATIONTYPE_FLOAT,
@@ -875,7 +874,7 @@ GameScene.prototype._startIdleAnim = function (unitId, mesh, skeleton) {
   idleAnim.setEasingFunction(ease);
   idleAnim.setKeys([
     { frame: 0,  value: 0.00 },
-    { frame: 30, value: 0.04 },
+    { frame: 30, value: 0.01 },  // Reduced from 0.04 to 0.01
     { frame: 60, value: 0.00 }
   ]);
   mesh.animations = (mesh.animations || []).concat([idleAnim]);
@@ -935,15 +934,13 @@ GameScene.prototype._startIdleAnim = function (unitId, mesh, skeleton) {
 GameScene.prototype._attachHeadMesh = function (unit, rootNode, meshes, isGltf) {
   if (!this.scene || !rootNode) return;
 
-  // For GLTF models, assume they have proper heads and don't add procedural spheres
-  if (isGltf) {
-    return;
-  }
-
   // Check if a head mesh already exists in the provided geometry.
   var hasHeadMesh = meshes.some(function (m) {
     return m.name && m.name.toLowerCase().indexOf('head') !== -1;
   });
+
+  // For GLTF models, still add procedural heads since they appear to be body-only
+  // if (!isGltf && hasHeadMesh) return;
   if (hasHeadMesh) return;
 
   // Create a procedural sphere for the head.
@@ -1227,74 +1224,29 @@ GameScene.prototype.moveUnit = function (unit, onDone) {
     );
     animModel.setKeys([
       { frame: 0,      value: node.model.position.clone() },
-      { frame: frames, value: new BABYLON.Vector3(pos.x, 0.05, pos.z) }
+      { frame: frames, value: new BABYLON.Vector3(pos.x, 0, pos.z) }  // Keep on ground level
     ]);
     animModel.setEasingFunction(ease);
 
-    // Add walking bob animation (gentle up-down movement)
+    // Add walking bob animation (gentle up-down movement) - but less aggressive
     var walkBobAnim = new BABYLON.Animation(
       'walkBob_' + unit.id, 'position.y', 60,
       BABYLON.Animation.ANIMATIONTYPE_FLOAT,
       BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
     );
     walkBobAnim.setKeys([
-      { frame: 0,  value: 0.05 },
-      { frame: 5,  value: 0.08 },
-      { frame: 10, value: 0.05 },
-      { frame: 15, value: 0.08 },
-      { frame: 20, value: 0.05 }
+      { frame: 0,  value: 0.0 },
+      { frame: 5,  value: 0.02 },  // Reduced amplitude
+      { frame: 10, value: 0.0 },
+      { frame: 15, value: 0.02 },
+      { frame: 20, value: 0.0 }
     ]);
 
     // Combine position and bob animations
     node.model.animations = [animModel, walkBobAnim];
 
-    // Add arm swinging for walking animation if skeleton exists
-    if (node.modelParts && node.modelParts.length > 0 && node.modelParts[0].skeleton) {
-      var skeleton = node.modelParts[0].skeleton;
-      var armSwingAnims = [];
-
-      // Left arm swing
-      var leftArmIdx = skeleton.getBoneIndexByName('upperarm_l');
-      if (leftArmIdx >= 0) {
-        var leftArmAnim = new BABYLON.Animation(
-          'walkLeftArm_' + unit.id, 'rotation.z', 60,
-          BABYLON.Animation.ANIMATIONTYPE_FLOAT,
-          BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
-        );
-        leftArmAnim.setKeys([
-          { frame: 0,  value: -1.2 },  // Rest position
-          { frame: 5,  value: -1.0 },  // Forward swing
-          { frame: 10, value: -1.2 },  // Back to rest
-          { frame: 15, value: -1.4 },  // Back swing
-          { frame: 20, value: -1.2 }   // Back to rest
-        ]);
-        armSwingAnims.push({ boneIndex: leftArmIdx, animation: leftArmAnim });
-      }
-
-      // Right arm swing (opposite phase)
-      var rightArmIdx = skeleton.getBoneIndexByName('upperarm_r');
-      if (rightArmIdx >= 0) {
-        var rightArmAnim = new BABYLON.Animation(
-          'walkRightArm_' + unit.id, 'rotation.z', 60,
-          BABYLON.Animation.ANIMATIONTYPE_FLOAT,
-          BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
-        );
-        rightArmAnim.setKeys([
-          { frame: 0,  value: 1.2 },   // Rest position
-          { frame: 5,  value: 1.4 },   // Back swing
-          { frame: 10, value: 1.2 },   // Back to rest
-          { frame: 15, value: 1.0 },   // Forward swing
-          { frame: 20, value: 1.2 }    // Back to rest
-        ]);
-        armSwingAnims.push({ boneIndex: rightArmIdx, animation: rightArmAnim });
-      }
-
-      // Apply arm swing animations
-      armSwingAnims.forEach(function (armAnim) {
-        skeleton.bones[armAnim.boneIndex].animations = [armAnim.animation];
-        scene.beginAnimation(skeleton.bones[armAnim.boneIndex], 0, frames, false, 1);
-      });
-    }
+    // Arm swinging only works with GLTF models that have skeletons
+    // OBJ models are static, so skip arm animations
 
     // Animate weapon alongside model
     var weapon = this._weaponNodes[unit.id];
