@@ -268,7 +268,7 @@ function _handleWsClose(ws) {
   delete rooms[code];
 }
 
-const PORT      = parseInt(process.env.PORT || '8081', 10);
+const PORT      = parseInt(process.env.PORT || '8003', 10);
 const publicDir = join(__dirname, 'public');
 
 /** Minimal MIME map for the assets this project serves. */
@@ -417,7 +417,17 @@ if (typeof Bun !== 'undefined') {
       }
 
       // Try the requested file; fall back to index.html for unknown paths (SPA)
-      const filePath = fs.existsSync(resolved) ? resolved : join(publicDir, 'index.html');
+      let filePath;
+      if (fs.existsSync(resolved)) {
+        // Check if it's a directory - if so, forbid access to prevent directory listing
+        if (fs.statSync(resolved).isDirectory()) {
+          res.writeHead(403);
+          return res.end('Directory listing not allowed');
+        }
+        filePath = resolved;
+      } else {
+        filePath = join(publicDir, 'index.html');
+      }
       const ext      = filePath.slice(filePath.lastIndexOf('.'));
       const mime     = mimeFor(filePath);
 
