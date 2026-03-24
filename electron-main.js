@@ -382,15 +382,19 @@ function createWindow() {
 
   mainWindow.loadURL(startUrl);
 
-  // Start preloading assets
-  preloadAssets(() => {
-    // Assets loaded, hide loading overlay
-    if (mainWindow) {
-      // Open DevTools in development
-      if (process.env.ELECTRON_IS_DEV) {
-        mainWindow.webContents.openDevTools();
+  // Wait for page to load before starting asset preloading
+  // This ensures IPC listeners are registered before we send events
+  mainWindow.webContents.on('did-finish-load', () => {
+    // Start preloading assets
+    preloadAssets(() => {
+      // Assets loaded, hide loading overlay
+      if (mainWindow) {
+        // Open DevTools in development
+        if (process.env.ELECTRON_IS_DEV) {
+          mainWindow.webContents.openDevTools();
+        }
       }
-    }
+    });
   });
 
   // Emitted when the window is closed
