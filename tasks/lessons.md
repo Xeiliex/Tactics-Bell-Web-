@@ -34,3 +34,23 @@
 1. **Window management in Electron** - Creating loading windows that are always-on-top and frameless, then transitioning to main windows provides professional app startup experience.
 
 2. **Preload scripts for secure IPC** - Using contextBridge to expose safe APIs to renderer processes maintains security while enabling communication.
+
+## UI Cleanup for Electron App
+
+### Web-to-Desktop Transition Lessons
+1. **Identify and remove web-specific features** - AdSense, SSO authentication, and web monetization elements should be removed when focusing on desktop app experience.
+
+2. **Multiple loading screens create confusion** - Having both Electron loading windows and HTML loading overlays leads to redundant UI. Consolidate to a single, well-designed loading experience.
+
+3. **Authentication belongs on web, not desktop** - SSO systems designed for web browsers don't translate well to desktop apps. Remove or replace with simpler local authentication.
+
+4. **Clean HTML for better performance** - Removing unused scripts, styles, and HTML elements reduces bundle size and improves load times.
+
+5. **Focus on core game experience** - Desktop apps should prioritize gameplay over web features like ads, social login, and cross-platform compatibility.
+
+### Implementation Approach
+1. **Systematic removal of web elements** - Methodically identify and remove AdSense, authentication, and web-specific scripts while preserving game functionality.
+
+2. **Preserve backward compatibility** - Use typeof checks for removed modules to prevent errors when web features are absent.
+
+3. **Maintain game-focused UI** - Keep version info, graphics toggles, and other game-relevant UI elements while removing web distractions.

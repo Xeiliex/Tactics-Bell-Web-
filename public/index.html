@@ -7,32 +7,37 @@
   <!-- Fonts are vendored locally — no CDN required -->
   <link rel="stylesheet" href="vendor/fonts.css" />
   <link rel="stylesheet" href="css/style.css" />
-  <!-- Google AdSense — replace BOTH placeholders below with your real AdSense IDs:
-       • ca-pub-XXXXXXXXXXXXXXXX → your publisher ID (from AdSense account → Account → Publisher ID)
-       • data-ad-slot="XXXXXXXXXX" → a unique ad-unit slot ID per placement (from AdSense → Ads → By ad unit) -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX"
-    crossorigin="anonymous"></script>
 </head>
 <body>
 
-  <!-- ══════════════ LOADING SCREEN (Electron) ══════════════ -->
-  <div id="screen-loading" class="screen" style="display: none;">
-    <div class="loading-bg">
-      <div class="loading-content">
-        <div class="loading-title">
-          <span class="fantasy-bell-symbol">🔔</span>
-          TACTICS BELL
-          <span class="fantasy-bell-symbol">🔔</span>
+  <!-- ══════════════ LOADING SCREEN ══════════════ -->
+  <div id="screen-loading" class="screen active">
+    <div class="loading-screen-content">
+      <div class="loading-bell-icon">🔔</div>
+      <h1 class="loading-title">Tactics Bell</h1>
+      <p class="loading-subtitle">Preparing your adventure...</p>
+
+      <div class="loading-progress-section">
+        <div class="loading-progress-container">
+          <div class="loading-progress-bar" id="progress-bar"></div>
         </div>
-        <div class="loading-subtitle">Loading Assets...</div>
-        <div class="loading-progress">
-          <div class="loading-bar">
-            <div class="loading-fill" id="loading-fill" style="width: 0%"></div>
-          </div>
-          <div class="loading-text" id="loading-text">Initializing...</div>
+        <div class="loading-progress-text">
+          <span id="progress-percentage">0%</span>
+          <span id="progress-count">(0/0)</span>
         </div>
-        <div class="loading-tip">First time loading may take a moment as assets are cached</div>
       </div>
+
+      <div class="loading-details">
+        <div class="loading-status" id="loading-status">Initializing...</div>
+        <div class="loading-current-file" id="loading-current-file">Scanning game files...</div>
+      </div>
+
+      <div class="loading-whimsy">
+        <div class="loading-message" id="loading-message">The bells are ringing... your adventure awaits!</div>
+        <div class="loading-hint" id="loading-hint">💡 Pro tip: Position your units strategically to control the battlefield</div>
+      </div>
+
+      <div class="loading-spinner"></div>
     </div>
   </div>
 
@@ -90,32 +95,6 @@
             <button class="fantasy-gfx-toggle" id="btn-gfx-toggle" title="Toggle graphics quality">High Magic</button>
           </div>
         </div>
-
-        <!-- SSO auth area — visible once GOOGLE_CLIENT_ID is configured on the server -->
-        <div id="sso-auth-area" class="fantasy-auth">
-          <!-- Shown when signed in -->
-          <div id="sso-user-widget" class="hidden">
-            <div class="fantasy-user">
-              <div class="sso-avatar"></div>
-              <span class="sso-name"></span>
-              <button id="btn-sso-logout" class="fantasy-logout-btn">Logout</button>
-            </div>
-          </div>
-          <!-- Rendered as a Google Sign-In button by GSI when signed out -->
-          <div id="sso-signin-btn"></div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- AdSense — title screen banner -->
-    <div class="ad-banner ad-banner--title">
-      <ins class="adsbygoogle"
-        style="display:block"
-        data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
-        data-ad-slot="XXXXXXXXXX"
-          data-ad-format="auto"
-          data-full-width-responsive="true"></ins>
-        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
       </div>
     </div>
   </div>
@@ -319,14 +298,6 @@
     </div>
   </div>
 
-  <!-- ══════════════ LOADING SCREEN ══════════════ -->
-  <div id="screen-loading" class="loading-overlay hidden">
-    <div class="loading-container">
-      <div class="loading-spinner"></div>
-      <div class="loading-message">Preparing battle…</div>
-    </div>
-  </div>
-
   <!-- ══════════════ CUTSCENE SCREEN ══════════════ -->
   <div id="screen-cutscene" class="screen hidden">
     <div class="cutscene-letterbox cutscene-top"></div>
@@ -439,6 +410,89 @@
   <script src="js/ui.js"></script>
   <script src="js/story.js"></script>
   <script src="js/game.js"></script>
-  <script src="js/auth.js"></script>
+
+  <!-- Loading screen script for Electron IPC -->
+  <script>
+    // Only run in Electron environment
+    if (typeof require !== 'undefined' && typeof require('electron') !== 'undefined') {
+      const { ipcRenderer } = require('electron');
+
+      // Whimsical messages and hints
+      const whimsicalMessages = [
+        "The bells are ringing... your adventure awaits!",
+        "Sharpening swords and polishing armor...",
+        "Consulting ancient tomes of strategy...",
+        "Awakening the spirits of fallen heroes...",
+        "Calibrating magical energies...",
+        "Preparing the battlefield for glory...",
+        "Whispering secrets to the wind...",
+        "Forging alliances with legendary warriors...",
+        "Unraveling the mysteries of tactics...",
+        "Summoning the courage of champions..."
+      ];
+
+      const gameHints = [
+        "💡 Pro tip: Position your units strategically to control the battlefield",
+        "💡 Remember: Each unit has unique strengths and weaknesses",
+        "💡 Tip: Use terrain to your advantage in combat",
+        "💡 Hint: Timing is everything in battle - strike at the right moment",
+        "💡 Strategy: Surround your enemies to limit their movement",
+        "💡 Wisdom: A good tactician knows when to advance and when to retreat",
+        "💡 Secret: Some units can perform special abilities in combat",
+        "💡 Lore: Ancient bells hold the power to turn the tide of battle"
+      ];
+
+      let messageIndex = 0;
+      let hintIndex = 0;
+
+      // Cycle through messages every 3 seconds
+      setInterval(() => {
+        messageIndex = (messageIndex + 1) % whimsicalMessages.length;
+        const messageEl = document.getElementById('loading-message');
+        if (messageEl) messageEl.textContent = whimsicalMessages[messageIndex];
+      }, 3000);
+
+      // Cycle through hints every 5 seconds
+      setInterval(() => {
+        hintIndex = (hintIndex + 1) % gameHints.length;
+        const hintEl = document.getElementById('loading-hint');
+        if (hintEl) hintEl.textContent = gameHints[hintIndex];
+      }, 5000);
+
+      ipcRenderer.on('loading-progress', (event, data) => {
+        const progressBar = document.getElementById('progress-bar');
+        const progressPercentage = document.getElementById('progress-percentage');
+        const progressCount = document.getElementById('progress-count');
+        const status = document.getElementById('loading-status');
+        const currentFile = document.getElementById('loading-current-file');
+
+        if (progressBar && progressPercentage && progressCount && status && currentFile) {
+          const percentage = Math.round((data.loaded / data.total) * 100);
+          progressBar.style.width = percentage + '%';
+          progressPercentage.textContent = percentage + '%';
+          progressCount.textContent = `(${data.loaded}/${data.total})`;
+
+          status.textContent = data.phase || 'Loading Assets...';
+          currentFile.textContent = data.currentFile || 'Processing files...';
+        }
+      });
+
+      ipcRenderer.on('loading-complete', () => {
+        const loadingScreen = document.getElementById('screen-loading');
+        const titleScreen = document.getElementById('screen-title');
+
+        if (loadingScreen && titleScreen) {
+          // Hide loading screen
+          loadingScreen.classList.remove('active');
+          loadingScreen.classList.add('hidden');
+
+          // Show title screen
+          titleScreen.classList.remove('hidden');
+          titleScreen.classList.add('active');
+        }
+      });
+    }
+  </script>
+
 </body>
 </html>
