@@ -30,7 +30,7 @@
   --fire-orange:   #8b4513;   /* ember orange */
 
   /* UI Element Colors */
-  --panel-bg:      rgba(26, 20, 16, 0.95);  /* semi-transparent parchment */
+  --panel-bg:      rgba(26, 20, 16, 0.99);  /* semi-transparent parchment - almost fully opaque */
   --border-gold:   rgba(212, 175, 55, 0.6); /* golden border */
   --border-silver: rgba(192, 192, 192, 0.4); /* silver border */
   --glow-gold:     rgba(212, 175, 55, 0.8); /* magical glow */
@@ -90,7 +90,8 @@ html, body {
     radial-gradient(circle at 30% 70%, var(--magic-purple) 0%, transparent 40%),
     radial-gradient(circle at 70% 30%, var(--magic-blue) 0%, transparent 40%),
     radial-gradient(circle at 50% 50%, var(--bell-gold) 0%, transparent 60%);
-  opacity: 0.3;
+  opacity: 0.4;  /* Reduced opacity for better readability */
+  pointer-events: none;  /* Don't interfere with clicks */
 }
 
 .fantasy-particles {
@@ -103,6 +104,7 @@ html, body {
     radial-gradient(circle at 80% 40%, var(--bell-silver) 1px, transparent 1px);
   background-size: 200px 200px, 150px 150px, 180px 180px, 220px 220px;
   animation: magical-float 20s ease-in-out infinite;
+  pointer-events: none;  /* Don't interfere with clicks */
 }
 
 @keyframes magical-float {
@@ -114,11 +116,12 @@ html, body {
 
 .fantasy-content {
   position: relative;
-  z-index: 2;
+  z-index: 10;  /* Increased from 2 to ensure it's above background elements */
   max-width: 900px;
   margin: 0 auto;
   padding: 40px 20px;
   text-align: center;
+  pointer-events: auto;  /* Ensure content is interactive */
 }
 
 .fantasy-header {
@@ -187,7 +190,13 @@ html, body {
   padding: 20px;
   transition: all 0.3s ease;
   position: relative;
-  overflow: hidden;
+  overflow: visible;  /* Changed from hidden to visible to ensure buttons are not clipped */
+  pointer-events: auto;  /* Ensure menu items are interactive */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-height: 200px;  /* Ensure consistent height */
 }
 
 .fantasy-menu-item::before {
@@ -199,6 +208,7 @@ html, body {
   height: 100%;
   background: linear-gradient(90deg, transparent, var(--glow-gold), transparent);
   transition: left 0.5s ease;
+  pointer-events: none;  /* Don't interfere with button clicks */
 }
 
 .fantasy-menu-item:hover {
@@ -265,6 +275,9 @@ html, body {
   letter-spacing: 1px;
   box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
   margin-top: 15px;
+  position: relative;
+  z-index: 15;  /* Higher z-index to ensure buttons are clickable */
+  pointer-events: auto;  /* Ensure buttons receive click events */
 }
 
 .fantasy-btn-primary:hover {
