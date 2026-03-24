@@ -13,6 +13,8 @@
 - [x] **FIXED PURPLE TEXT CLASH** - Changed loading message color from magic-purple to parchment for better contrast
 - [x] **FIXED LOADING STUCK ISSUE** - Added timeout protection and better progress tracking for asset scanning
 - [x] **ADDED BELL TOWER** - Created animated bell tower with swinging bells and camera pan/tilt effects on title screen
+- [x] **FIXED LOADING TRANSITION** - Added missing loading-complete event handler to properly show title screen
+- [x] **FIXED BELL TOWER CSS** - Added missing bell-tower-container class definition for proper display
 
 ## Summary
 Successfully optimized the loading experience by removing redundant loading screens and improving visual design:

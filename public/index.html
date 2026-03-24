@@ -513,8 +513,21 @@
           });
         }
       });
-    }
-  </script>
+
+      ipcRenderer.on('loading-complete', () => {
+        const loadingScreen = document.getElementById('screen-loading');
+        const titleScreen = document.getElementById('screen-title');
+
+        if (loadingScreen && titleScreen) {
+          // Hide loading screen
+          loadingScreen.classList.remove('active');
+          loadingScreen.classList.add('hidden');
+
+          // Show title screen
+          titleScreen.classList.remove('hidden');
+          titleScreen.classList.add('active');
+        }
+      });
 
 </body>
 </html>
