@@ -17,67 +17,67 @@
 
   <!-- ══════════════ TITLE SCREEN ══════════════ -->
   <div id="screen-title" class="screen active">
-    <div class="console-bg">
-      <div class="console-scanlines"></div>
-      <div class="console-content">
-        <div class="console-header">
-          <div class="console-title">TACTICS BELL v1.0.0</div>
-          <div class="console-subtitle">Strategic Turn-Based Combat System</div>
-          <div class="console-status">System Ready - Select Command:</div>
+    <div class="fantasy-bg">
+      <div class="fantasy-particles"></div>
+      <div class="fantasy-content">
+        <div class="fantasy-header">
+          <div class="fantasy-title">
+            <span class="fantasy-bell-symbol">🔔</span>
+            TACTICS BELL
+            <span class="fantasy-bell-symbol">🔔</span>
+          </div>
+          <div class="fantasy-subtitle">Strategic Fantasy Combat</div>
+          <div class="fantasy-tagline">Where Magical Bells Shape the Battlefield</div>
         </div>
-        
-        <div class="console-ascii">
-          <pre>
- ████████╗ █████╗  ██████╗████████╗██╗ ██████╗███████╗
- ╚══██╔══╝██╔══██╗██╔════╝╚══██╔══╝██║██╔════╝██╔════╝
-    ██║   ███████║██║  ███╗  ██║   ██║██║     ███████╗
-    ██║   ██╔══██║██║   ██║  ██║   ██║██║     ╚════██║
-    ██║   ██║  ██║╚██████╔╝  ██║   ██║╚██████╗███████║
-    ╚═╝   ╚═╝  ╚═╝ ╚═════╝   ╚═╝   ╚═╝ ╚═════╝╚══════╝
-          </pre>
-        </div>
-        
-        <div class="console-menu">
-          <div class="console-command">
-            <span class="console-prompt">&gt;</span>
-            <button class="console-btn" id="btn-new-game">NEW_GAME</button>
-            <span class="console-desc">Create custom party</span>
+
+        <div class="fantasy-menu">
+          <div class="fantasy-menu-item">
+            <div class="fantasy-menu-icon">⚔️</div>
+            <div class="fantasy-menu-title">Custom Campaign</div>
+            <div class="fantasy-menu-desc">Forge your legend with custom heroes and magical artifacts</div>
+            <button class="fantasy-btn-primary" id="btn-new-game">Begin Quest</button>
           </div>
-          <div class="console-command">
-            <span class="console-prompt">&gt;</span>
-            <button class="console-btn" id="btn-story-mode">STORY_MODE</button>
-            <span class="console-desc">Campaign mode</span>
+
+          <div class="fantasy-menu-item">
+            <div class="fantasy-menu-icon">📜</div>
+            <div class="fantasy-menu-title">Story Mode</div>
+            <div class="fantasy-menu-desc">Embark on the epic tale of the enchanted bells</div>
+            <button class="fantasy-btn-primary" id="btn-story-mode">Start Story</button>
           </div>
-          <div class="console-command">
-            <span class="console-prompt">&gt;</span>
-            <button class="console-btn" id="btn-quick-match">QUICK_MATCH</button>
-            <span class="console-desc">Instant battle</span>
+
+          <div class="fantasy-menu-item">
+            <div class="fantasy-menu-icon">🏹</div>
+            <div class="fantasy-menu-title">Quick Battle</div>
+            <div class="fantasy-menu-desc">Test your skills in instant magical combat</div>
+            <button class="fantasy-btn-primary" id="btn-quick-match">Quick Match</button>
           </div>
-          <div class="console-command">
-            <span class="console-prompt">&gt;</span>
-            <button class="console-btn" id="btn-multiplayer">MULTIPLAYER</button>
-            <span class="console-desc">Online PvP</span>
+
+          <div class="fantasy-menu-item">
+            <div class="fantasy-menu-icon">🌐</div>
+            <div class="fantasy-menu-title">Multiplayer Arena</div>
+            <div class="fantasy-menu-desc">Challenge other mages in online tactical warfare</div>
+            <button class="fantasy-btn-primary" id="btn-multiplayer">Enter Arena</button>
           </div>
         </div>
-        
-        <div class="console-footer">
-          <div class="console-continue">
-            <button class="console-btn-secondary hidden" id="btn-continue-game">CONTINUE_GAME</button>
+
+        <div class="fantasy-footer">
+          <div class="fantasy-continue">
+            <button class="fantasy-btn-secondary hidden" id="btn-continue-game">Resume Journey</button>
           </div>
-          <div class="console-info">
-            <div class="console-version">Build: 2026.03.23 | Engine: Babylon.js 7.0</div>
-            <button class="btn-gfx-toggle" id="btn-gfx-toggle" title="Toggle graphics quality">GFX: HIGH</button>
+          <div class="fantasy-info">
+            <div class="fantasy-version">Version 1.0.0 | Engine: Babylon.js 7.0</div>
+            <button class="fantasy-gfx-toggle" id="btn-gfx-toggle" title="Toggle graphics quality">High Magic</button>
           </div>
         </div>
 
         <!-- SSO auth area — visible once GOOGLE_CLIENT_ID is configured on the server -->
-        <div id="sso-auth-area" class="console-auth">
+        <div id="sso-auth-area" class="fantasy-auth">
           <!-- Shown when signed in -->
           <div id="sso-user-widget" class="hidden">
-            <div class="console-user">
+            <div class="fantasy-user">
               <div class="sso-avatar"></div>
               <span class="sso-name"></span>
-              <button id="btn-sso-logout" class="console-logout-btn">LOGOUT</button>
+              <button id="btn-sso-logout" class="fantasy-logout-btn">Logout</button>
             </div>
           </div>
           <!-- Rendered as a Google Sign-In button by GSI when signed out -->
@@ -103,26 +103,26 @@
   <div id="screen-party-select" class="screen hidden">
     <div class="party-select-container">
       <h2 class="section-title">Choose Your Adventure</h2>
-      <p class="party-select-subtitle">How would you like to build your party?</p>
-      
+      <p class="party-select-subtitle">How shall your legendary tale begin?</p>
+
       <div class="party-select-grid">
         <div class="card party-option-card" id="card-custom-party">
-          <div class="card-icon">🎨</div>
-          <h3 class="card-title">Custom Party</h3>
-          <p class="card-desc">Create your own adventurers with custom races, classes, and appearances.</p>
-          <button class="btn-primary btn-large" id="btn-custom-party">Create Party</button>
+          <div class="card-icon">⚔️</div>
+          <h3 class="card-title">Forge Your Legend</h3>
+          <p class="card-desc">Craft a party of unique heroes, each with their own magical bells and ancient artifacts. Shape your destiny in a world of tactical fantasy combat.</p>
+          <button class="btn-primary btn-large" id="btn-custom-party">Create Heroes</button>
         </div>
-        
+
         <div class="card party-option-card" id="card-quick-party">
-          <div class="card-icon">🏠</div>
-          <h3 class="card-title">Back to Title</h3>
-          <p class="card-desc">Return to the main menu.</p>
+          <div class="card-icon">🏰</div>
+          <h3 class="card-title">Return to Hearth</h3>
+          <p class="card-desc">Journey back to the mystical halls where your adventure began. Resume your quest for the enchanted bells.</p>
           <button class="btn-secondary btn-large" id="btn-prefill-party">Main Menu</button>
         </div>
       </div>
-      
+
       <div class="party-select-actions">
-        <button class="btn-secondary" id="btn-party-back">← Back to Title</button>
+        <button class="btn-secondary" id="btn-party-back">← Return to Realms</button>
       </div>
     </div>
   </div>

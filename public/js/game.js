@@ -168,11 +168,11 @@ var game = (function () {
       if (!btn) return;
       function updateBtn() {
         var isHigh = (typeof GRAPHICS_QUALITY === 'undefined' || GRAPHICS_QUALITY !== 'low');
-        btn.textContent  = isHigh ? 'GFX: HIGH' : 'GFX: LOW';
-        btn.className    = 'btn-gfx-toggle ' + (isHigh ? 'gfx-high' : 'gfx-low');
+        btn.textContent  = isHigh ? 'High Magic' : 'Low Magic';
+        btn.className    = 'fantasy-gfx-toggle ' + (isHigh ? 'gfx-high' : 'gfx-low');
         btn.title        = isHigh
-          ? 'Using high-quality 3-D models — click to switch to low graphics'
-          : 'Using low-quality procedural shapes — click to switch to high graphics';
+          ? 'Using high-quality magical models — click to switch to low magic'
+          : 'Using low-quality procedural shapes — click to switch to high magic';
       }
       btn.addEventListener('click', function () {
         GRAPHICS_QUALITY = (GRAPHICS_QUALITY === 'low') ? 'high' : 'low';
