@@ -282,7 +282,7 @@ var game = (function () {
     });
 
     // Party Choice → Back to Title
-    document.getElementById('btn-party-choice-back').addEventListener('click', function () {
+    document.getElementById('btn-party-back').addEventListener('click', function () {
       if (g.ui) g.ui.showTitleScreen();
     });
 

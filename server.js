@@ -268,7 +268,7 @@ function _handleWsClose(ws) {
   delete rooms[code];
 }
 
-const PORT      = parseInt(process.env.PORT || '8080', 10);
+const PORT      = parseInt(process.env.PORT || '8081', 10);
 const publicDir = join(__dirname, 'public');
 
 /** Minimal MIME map for the assets this project serves. */

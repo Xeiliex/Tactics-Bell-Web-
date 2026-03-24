@@ -183,11 +183,11 @@ html, body {
 .fantasy-menu {
   margin: clamp(10px, 3vw, 20px) auto;  /* Responsive margins */
   display: flex;
-  flex-direction: column;
-  gap: clamp(8px, 2vw, 12px);  /* Responsive gap */
-  max-width: min(85vw, 600px);  /* Responsive max-width */
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(15px, 3vw, 20px);  /* Responsive gap */
+  max-width: min(95vw, 1000px);  /* Responsive max-width */
   flex: 1;  /* Take available space */
-  justify-content: center;  /* Center menu items */
   max-height: calc(100vh - 300px);  /* Leave room for header/footer */
   overflow-y: auto;  /* Allow scrolling if needed */
 }
@@ -207,6 +207,8 @@ html, body {
   text-align: center;
   min-height: clamp(100px, 15vh, 120px);  /* Responsive min-height */
   justify-content: space-between;  /* Space content evenly */
+  width: clamp(250px, 25vw, 300px);  /* Fixed width for consistent layout */
+  flex-shrink: 0;  /* Don't shrink */
 }
 
 .fantasy-menu-item::before {
