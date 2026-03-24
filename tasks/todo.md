@@ -3,16 +3,15 @@
 - [x] Added cycling whimsical messages and game hints during loading
 - [x] Implemented asset preloading with phase-based progress and artificial delays for visibility
 - [x] Fixed syntax errors in electron-main.js preventing app execution
-- [x] Tested Electron app launch with enhanced loading screen functionality
+- [x] **REMOVED POPUP LOADING SCREENS** - Eliminated "Preparing battle..." and "Preparing multiplayer battle..." overlays for seamless transitions
+- [x] Streamlined loading experience: Electron window (2s) → Direct title screen → Immediate battle start
 
 ## Summary
-Successfully implemented a verbose, engaging loading screen for the Tactics Bell Electron app featuring:
-- Real-time progress bar with percentage and file count display
-- Dynamic status messages showing current loading phase and file being processed
-- 10 rotating whimsical messages (every 3 seconds) with fantasy-themed loading text
-- 8 cycling game hints/tips (every 5 seconds) to educate players during load time
-- Smooth transitions and completion animations
-- Fixed all syntax errors and verified app launches correctly
+Successfully optimized the loading experience by removing redundant loading screens:
+- **Before**: Electron loading → HTML loading → "Preparing battle..." popup → Battle screen
+- **After**: Electron loading → Direct title screen → Immediate battle transition
+
+The app now provides a smooth, professional loading experience without intrusive popups. The initial Electron loading window handles all asset preparation with engaging progress tracking and whimsical content, then transitions seamlessly to gameplay.
 
 # Asset Unpack Plan
 - [x] Import the new asset archives from the VS Code cache into an Assets/ folder and inspect their contents.

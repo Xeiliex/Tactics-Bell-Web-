@@ -347,14 +347,9 @@ var game = (function () {
       });
     }
 
-    // Show the loading screen first, then show the battle screen (which contains
-    // the canvas). The loading screen will cover the transition.
-    // The actual Babylon.js scene setup happens in the callback, ensuring the
-    // canvas element is visible and has its final dimensions.
-    g.ui.showLoadingScreen('Preparing battle…', function () {
-      g.ui.showBattleScreen();
-      _setupBattle(isNewGame);
-    });
+    // Show the battle screen immediately (no loading screen since we already loaded in Electron)
+    g.ui.showBattleScreen();
+    _setupBattle(isNewGame);
   }
 
   function _setupBattle(isNewGame) {
@@ -566,8 +561,7 @@ var game = (function () {
       };
     }
 
-    // 13. Dismiss loading overlay now that the battle is ready
-    g.ui.hideLoadingScreen();
+    // 13. Battle is ready - no loading screen to dismiss
   }
 
   // ─── Select enemy team for a given stage ────────────────────────────────────
@@ -1055,7 +1049,7 @@ var game = (function () {
       battleScreenEl.style.opacity = '0';
     }
     g.ui.showBattleScreen();
-    g.ui.showLoadingScreen('Preparing multiplayer battle…');
+    // Skip loading screen since we already loaded in Electron
 
     setTimeout(function () {
       _setupMultiplayerBattle(hostParty, guestParty, grid, playerIdx);
@@ -1179,7 +1173,7 @@ var game = (function () {
     }
 
     g.combat.start();
-    g.ui.hideLoadingScreen();
+    // No loading screen to hide since we skipped it
   }
 
   function _onMpVictory() {

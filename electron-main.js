@@ -195,7 +195,7 @@ function createWindow() {
 
   // Start preloading assets
   preloadAssets(() => {
-    // Assets loaded, show main window
+    // Assets loaded, show main window and close loading window immediately
     if (mainWindow) {
       mainWindow.show();
 
@@ -205,7 +205,7 @@ function createWindow() {
       }
     }
 
-    // Close loading window
+    // Close loading window immediately (no delay)
     if (loadingWindow) {
       loadingWindow.close();
     }
