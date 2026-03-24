@@ -2571,3 +2571,107 @@ html, body {
     font-size: 3em;
   }
 }
+
+/* ────────────────────────────────────────
+   ELECTRON LOADING SCREEN
+──────────────────────────────────────── */
+#screen-loading {
+  position: fixed;
+  inset: 0;
+  background: var(--shadow-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  background-image:
+    radial-gradient(circle at 30% 70%, var(--magic-purple) 0%, transparent 50%),
+    radial-gradient(circle at 70% 30%, var(--magic-blue) 0%, transparent 50%),
+    linear-gradient(135deg, var(--shadow-dark) 0%, var(--earth-brown) 100%);
+  background-attachment: fixed;
+}
+
+.loading-screen-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+  text-align: center;
+  max-width: 600px;
+  padding: 40px;
+}
+
+.loading-bell-icon {
+  font-size: 4em;
+  color: var(--bell-gold);
+  text-shadow: 0 0 20px var(--glow-gold);
+  animation: bell-chime 3s ease-in-out infinite;
+}
+
+.loading-title {
+  font-family: var(--font-medieval);
+  font-size: 2.5em;
+  color: var(--parchment);
+  text-shadow: 0 0 15px var(--glow-gold);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.loading-subtitle {
+  font-family: var(--font-script);
+  font-size: 1.2em;
+  color: var(--ink-light);
+  font-style: italic;
+  margin-bottom: 20px;
+}
+
+.loading-progress-container {
+  width: 100%;
+  max-width: 400px;
+  background: rgba(244, 241, 232, 0.1);
+  border: 2px solid var(--border-silver);
+  border-radius: 25px;
+  padding: 4px;
+  margin: 20px 0;
+}
+
+.loading-progress-bar {
+  height: 20px;
+  background: linear-gradient(90deg, var(--bell-gold) 0%, var(--bell-bronze) 100%);
+  border-radius: 20px;
+  width: 0%;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+}
+
+.loading-status {
+  font-family: var(--font-medieval);
+  font-size: 1.1em;
+  color: var(--ink-light);
+  margin-top: 10px;
+  min-height: 1.5em;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(212, 175, 55, 0.2);
+  border-top: 4px solid var(--bell-gold);
+  border-radius: 50%;
+  animation: loading-spin 1s linear infinite;
+  margin-top: 10px;
+}
+
+@keyframes loading-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-hint {
+  font-family: var(--font-script);
+  font-size: 0.9em;
+  color: var(--ink-medium);
+  font-style: italic;
+  margin-top: 20px;
+  opacity: 0.8;
+}

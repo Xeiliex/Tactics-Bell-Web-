@@ -15,6 +15,27 @@
 </head>
 <body>
 
+  <!-- ══════════════ LOADING SCREEN (Electron) ══════════════ -->
+  <div id="screen-loading" class="screen" style="display: none;">
+    <div class="loading-bg">
+      <div class="loading-content">
+        <div class="loading-title">
+          <span class="fantasy-bell-symbol">🔔</span>
+          TACTICS BELL
+          <span class="fantasy-bell-symbol">🔔</span>
+        </div>
+        <div class="loading-subtitle">Loading Assets...</div>
+        <div class="loading-progress">
+          <div class="loading-bar">
+            <div class="loading-fill" id="loading-fill" style="width: 0%"></div>
+          </div>
+          <div class="loading-text" id="loading-text">Initializing...</div>
+        </div>
+        <div class="loading-tip">First time loading may take a moment as assets are cached</div>
+      </div>
+    </div>
+  </div>
+
   <!-- ══════════════ TITLE SCREEN ══════════════ -->
   <div id="screen-title" class="screen active">
     <div class="fantasy-bg">

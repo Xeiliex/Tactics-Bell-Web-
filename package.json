@@ -1,12 +1,17 @@
 {
-  "name": "tactics-bell-web",
+  "name": "tactics-bell",
   "version": "1.0.0",
   "description": "A light tactical battle game powered by Babylon.js, Oimo.js, and anime.js",
-  "main": "server.js",
+  "main": "electron-main.js",
+  "homepage": "./",
   "scripts": {
     "start": "bun server.js",
     "dev": "bun --watch server.js",
-    "start:node": "node server.js"
+    "start:node": "node server.js",
+    "electron": "electron .",
+    "electron-dev": "ELECTRON_IS_DEV=true electron .",
+    "build": "electron-builder",
+    "dist": "electron-builder --publish=never"
   },
   "engines": {
     "bun": ">=1.1.0",
@@ -15,5 +20,38 @@
   "license": "GPL-3.0",
   "dependencies": {
     "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.0"
+  },
+  "build": {
+    "appId": "com.tacticsbell.game",
+    "productName": "Tactics Bell",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "public/**/*",
+      "electron-main.js",
+      "electron-preload.js",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.games",
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    },
+    "protocols": [
+      {
+        "name": "Tactics Bell",
+        "schemes": ["tacticsbell"]
+      }
+    ]
   }
 }
