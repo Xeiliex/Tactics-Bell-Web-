@@ -22,8 +22,8 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
-    "electron": "^30.0.0",
-    "electron-builder": "^24.13.0"
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1"
   },
   "build": {
     "appId": "com.tacticsbell.game",
@@ -50,7 +50,9 @@
     "protocols": [
       {
         "name": "Tactics Bell",
-        "schemes": ["tacticsbell"]
+        "schemes": [
+          "tacticsbell"
+        ]
       }
     ]
   }
