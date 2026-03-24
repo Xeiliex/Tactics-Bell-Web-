@@ -117,9 +117,9 @@ html, body {
 .fantasy-content {
   position: relative;
   z-index: 10;  /* Increased from 2 to ensure it's above background elements */
-  max-width: 900px;
+  max-width: min(90vw, 900px);  /* Responsive max-width */
   margin: 0 auto;
-  padding: 20px;  /* Reduced padding for more screen space */
+  padding: clamp(10px, 2vw, 20px);  /* Responsive padding */
   text-align: center;
   pointer-events: auto;  /* Ensure content is interactive */
   min-height: 100vh;  /* Ensure full height usage */
@@ -134,7 +134,7 @@ html, body {
 }
 
 .fantasy-title {
-  font-size: 2.8em;  /* Slightly smaller */
+  font-size: clamp(1.8rem, 4vw, 2.8em);  /* Responsive font size */
   font-weight: bold;
   color: var(--bell-gold);
   text-shadow:
@@ -181,11 +181,11 @@ html, body {
 }
 
 .fantasy-menu {
-  margin: 20px auto;  /* Reduced margins */
+  margin: clamp(10px, 3vw, 20px) auto;  /* Responsive margins */
   display: flex;
   flex-direction: column;
-  gap: 12px;  /* Reduced gap */
-  max-width: 600px;
+  gap: clamp(8px, 2vw, 12px);  /* Responsive gap */
+  max-width: min(85vw, 600px);  /* Responsive max-width */
   flex: 1;  /* Take available space */
   justify-content: center;  /* Center menu items */
   max-height: calc(100vh - 300px);  /* Leave room for header/footer */
@@ -196,7 +196,7 @@ html, body {
   background: var(--panel-bg);
   border: 2px solid var(--border-silver);
   border-radius: 12px;
-  padding: 12px;  /* Further reduced padding */
+  padding: clamp(8px, 2vw, 12px);  /* Responsive padding */
   transition: all 0.3s ease;
   position: relative;
   overflow: visible;
@@ -205,7 +205,7 @@ html, body {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  min-height: 120px;  /* Further reduced height */
+  min-height: clamp(100px, 15vh, 120px);  /* Responsive min-height */
   justify-content: space-between;  /* Space content evenly */
 }
 
@@ -235,16 +235,16 @@ html, body {
 }
 
 .fantasy-menu-icon {
-  font-size: 2em;  /* Slightly smaller */
-  margin-bottom: 8px;  /* Reduced margin */
+  font-size: clamp(1.5rem, 4vw, 2em);  /* Responsive font size */
+  margin-bottom: clamp(4px, 1vw, 8px);  /* Responsive margin */
   display: block;
   filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.3));
 }
 
 .fantasy-menu-title {
-  font-size: 1.2em;  /* Slightly smaller */
+  font-size: clamp(0.9rem, 2.5vw, 1.2em);  /* Responsive font size */
   color: var(--parchment);
-  margin-bottom: 6px;  /* Reduced margin */
+  margin-bottom: clamp(3px, 0.8vw, 6px);  /* Responsive margin */
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -252,10 +252,10 @@ html, body {
 
 .fantasy-menu-desc {
   color: var(--ink-light);
-  font-size: 0.85em;  /* Smaller font for description */
+  font-size: clamp(0.7rem, 2vw, 0.85em);  /* Responsive font size */
   font-family: var(--font-script);
   line-height: 1.3;
-  margin-bottom: 8px;  /* Reduced margin */
+  margin-bottom: clamp(4px, 1vw, 8px);  /* Responsive margin */
 }
 
 .fantasy-footer {
@@ -282,21 +282,21 @@ html, body {
   border: 2px solid var(--bell-gold);
   color: var(--ink-dark);
   font-family: var(--font-medieval);
-  font-size: 1em;  /* Slightly smaller font */
+  font-size: clamp(0.8rem, 2vw, 1em);  /* Responsive font size */
   font-weight: bold;
-  padding: 10px 20px;  /* Reduced padding */
+  padding: clamp(8px, 2vw, 10px) clamp(15px, 3vw, 20px);  /* Responsive padding */
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
   text-transform: uppercase;
   letter-spacing: 1px;
   box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
-  margin-top: 10px;  /* Reduced margin */
+  margin-top: clamp(6px, 1.5vw, 10px);  /* Responsive margin */
   position: relative;
   z-index: 20;  /* Higher z-index to ensure buttons are clickable */
   pointer-events: auto;  /* Ensure buttons receive click events */
   align-self: stretch;  /* Make buttons full width of container */
-  max-width: 200px;  /* Reasonable max width */
+  max-width: min(80vw, 200px);  /* Responsive max width */
 }
 
 .fantasy-btn-primary:hover {
@@ -2479,4 +2479,93 @@ html, body {
 /* Overlay screens (victory / defeat): sits below the action buttons */
 .ad-banner--overlay {
   margin-top: 16px;
+}
+
+/* ────────────────────────────────────────
+   RESPONSIVE DESIGN - VIEWPORT SCALING
+──────────────────────────────────────── */
+
+/* Mobile devices (phones) */
+@media (max-width: 768px) {
+  .fantasy-content {
+    padding: clamp(15px, 3vw, 25px);
+  }
+
+  .fantasy-menu {
+    gap: clamp(10px, 3vw, 15px);
+    max-height: calc(100vh - 250px);
+  }
+
+  .fantasy-menu-item {
+    padding: clamp(10px, 3vw, 15px);
+    min-height: clamp(110px, 18vh, 140px);
+  }
+
+  .fantasy-btn-primary {
+    padding: clamp(10px, 3vw, 12px) clamp(18px, 4vw, 25px);
+    font-size: clamp(0.9rem, 3vw, 1.1em);
+    max-width: min(90vw, 250px);
+  }
+
+  .party-select-grid {
+    grid-template-columns: 1fr;
+    gap: 25px;
+  }
+
+  .party-option-card {
+    padding: 25px 20px;
+  }
+
+  .review-party-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+
+  .wizard-shell {
+    padding: 20px;
+  }
+
+  .lobby-container {
+    padding: 20px 15px;
+  }
+
+  .lobby-code-input {
+    width: 110px;
+    font-size: 24px;
+  }
+
+  .lobby-code-display {
+    font-size: 48px;
+    letter-spacing: 12px;
+    padding: 10px 20px;
+  }
+}
+
+/* Small tablets */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .fantasy-content {
+    max-width: min(95vw, 800px);
+  }
+
+  .fantasy-menu {
+    max-width: min(90vw, 550px);
+  }
+
+  .party-select-grid {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+}
+
+/* Large screens */
+@media (min-width: 1200px) {
+  .fantasy-content {
+    max-width: 1000px;
+  }
+
+  .fantasy-menu {
+    max-width: 700px;
+  }
+
+  .fantasy-title {
+    font-size: 3em;
+  }
 }

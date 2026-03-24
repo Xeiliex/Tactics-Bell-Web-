@@ -281,26 +281,9 @@ var game = (function () {
       startBattle(false);
     });
 
-    // Wizard navigation
-    document.getElementById('btn-wizard-back').addEventListener('click', function () {
-      var w = g.ui && g.ui._wizard;
-      if (!w || (w.memberIdx === 0 && w.stepIdx === 0)) {
-        // Cancel — return to title
-        g.partyConfig = null;
-        g.ui.showTitleScreen();
-        _updateContinueButton();
-      } else {
-        g.ui.wizardBack();
-      }
-    });
-
     // Party Choice → Back to Title
     document.getElementById('btn-party-choice-back').addEventListener('click', function () {
       if (g.ui) g.ui.showTitleScreen();
-    });
-
-    document.getElementById('btn-wizard-next').addEventListener('click', function () {
-      if (g.ui) g.ui.wizardNext();
     });
 
     // Party Review → Recreate

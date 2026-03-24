@@ -185,6 +185,42 @@ GameUI.prototype.showCreateScreen = function () {
 
   this.showScreen('screen-create');
   this._renderWizardStep();
+
+  // Set up wizard navigation event listeners (remove any existing first)
+  var self = this;
+  var backBtn = document.getElementById('btn-wizard-back');
+  var nextBtn = document.getElementById('btn-wizard-next');
+  
+  // Remove existing listeners to prevent duplicates
+  if (backBtn) backBtn.replaceWith(backBtn.cloneNode(true));
+  if (nextBtn) nextBtn.replaceWith(nextBtn.cloneNode(true));
+  
+  // Re-get the elements after cloning
+  backBtn = document.getElementById('btn-wizard-back');
+  nextBtn = document.getElementById('btn-wizard-next');
+  
+  if (backBtn) {
+    backBtn.addEventListener('click', function () {
+      var w = self._wizard;
+      if (!w || (w.memberIdx === 0 && w.stepIdx === 0)) {
+        // Cancel — return to title
+        game.partyConfig = null;
+        self.showTitleScreen();
+        // Update continue button state
+        if (game.updateContinueButton) {
+          game.updateContinueButton();
+        }
+      } else {
+        self.wizardBack();
+      }
+    });
+  }
+  
+  if (nextBtn) {
+    nextBtn.addEventListener('click', function () {
+      if (self) self.wizardNext();
+    });
+  }
 };
 
 // ─── Wizard rendering ─────────────────────────────────────────────────────────
