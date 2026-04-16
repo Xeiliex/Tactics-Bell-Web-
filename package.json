@@ -8,6 +8,7 @@
     "start": "bun server.js",
     "dev": "bun --watch server.js",
     "start:node": "node server.js",
+    "test": "node --test test/smoke-server.test.js",
     "electron": "electron .",
     "electron-dev": "ELECTRON_IS_DEV=true electron .",
     "build": "electron-builder",

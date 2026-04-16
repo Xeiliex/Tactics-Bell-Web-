@@ -1,3 +1,20 @@
+# Phase 2.1 Plan Alignment (GitHub Roadmap)
+- [x] Implement campaign linking UI in editor panel
+- [x] Add campaign playback preview (branch visibility from start/current node)
+- [x] Persist campaign data in scenario save/load/export lifecycle
+- [x] Add campaign localStorage save/load/list helpers
+- [x] Validate editor scripts and run automated smoke test
+
+## Review
+- Campaign panel is no longer a placeholder; users can create/load/save campaigns, add current scenario node, link/unlink nodes, choose a start node, and preview possible next branches.
+- Scenario serialization now includes campaign state so quick save/load and JSON export preserve campaign graph data.
+- Validation completed: JS syntax checks pass for updated editor modules and `npm test` passes.
+
+## Next Natural Steps
+- [ ] Add campaign node management UX: rename/remove nodes directly from panel.
+- [ ] Add runtime campaign playback handoff so game mode can follow branch choices between scenarios.
+- [ ] Add collision integration so props affect movement pathing in tactical battles.
+
 # Loading Screen Enhancement - COMPLETED ✅
 - [x] Enhanced loading screen with progress bar, percentage display, and file-by-file status updates
 - [x] Added cycling whimsical messages and game hints during loading

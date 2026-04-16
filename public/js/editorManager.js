@@ -388,15 +388,194 @@ EditorManager.prototype._showAIPanel = function() {
 /** Show campaign configuration panel. */
 EditorManager.prototype._showCampaignPanel = function() {
   var campaignMgr = this.editor._campaignManager;
-  
+  var scenario = this.editor._scenario;
+  var campaign = campaignMgr.getCampaign();
+  if (!campaign) {
+    campaign = campaignMgr.createCampaign((scenario && scenario.name ? scenario.name : 'New') + ' Campaign');
+  }
+
+  var scenarioName = (scenario && scenario.name) ? scenario.name : 'Unnamed Scenario';
+  var currentId = 'scenario_' + scenarioName;
+  var hasCurrentNode = campaign.scenarios.some(function(s) { return s.id === currentId; });
+  var safeCampaignName = campaign.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  var safeScenarioName = scenarioName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
   var html = '<h4>📜 Campaign Sequences</h4>' +
-    '<p style="color: #8899cc; font-size: 10px;">Campaign features coming in Phase 2.1</p>' +
-    '<p style="color: #8899cc; font-size: 10px;">Link multiple scenarios together to create story campaigns.</p>';
-  
+    '<label style="display:block; font-size:10px; color:#8899cc; margin:4px 0;">Campaign Name</label>' +
+    '<input id="campaign-name" type="text" value="' + safeCampaignName + '" style="width: 100%; padding: 4px; margin: 2px 0; background: #0f1828; color: #e0e8f0; border: 1px solid #4a5f8f; border-radius: 2px;">' +
+    '<button id="campaign-save" style="width:100%; padding:6px; margin-top:4px; background:#1a2d4d; color:#e0e8f0; border:1px solid #4a5f8f; border-radius:2px; cursor:pointer;">💾 Save Campaign</button>' +
+    '<label style="display:block; font-size:10px; color:#8899cc; margin:8px 0 4px 0;">Load Saved Campaign</label>' +
+    '<select id="campaign-load-select" style="width:100%; padding:4px; background:#0f1828; color:#e0e8f0; border:1px solid #4a5f8f; border-radius:2px;">' +
+    '<option value="">-- Select Campaign --</option>';
+
+  campaignMgr.listCampaignNames().forEach(function(name) {
+    html += '<option value="' + name + '">' + name + '</option>';
+  });
+
+  html += '</select>' +
+    '<button id="campaign-load" style="width:100%; padding:6px; margin-top:4px; background:#1a2d4d; color:#e0e8f0; border:1px solid #4a5f8f; border-radius:2px; cursor:pointer;">📂 Load Campaign</button>' +
+    '<hr style="border:none; border-top:1px solid #3a4f6f; margin:8px 0;">' +
+    '<div style="font-size:10px; color:#8899cc; margin-bottom:4px;">Current Scenario: <strong>' + safeScenarioName + '</strong></div>' +
+    '<button id="campaign-add-current" style="width:100%; padding:6px; margin-bottom:6px; background:#1a2d4d; color:#e0e8f0; border:1px solid #4a5f8f; border-radius:2px; cursor:pointer;">' + (hasCurrentNode ? '✅ Already in Campaign' : '➕ Add Current Scenario') + '</button>' +
+    '<label style="display:block; font-size:10px; color:#8899cc; margin:4px 0;">Scenario Links</label>' +
+    '<select id="campaign-link-from" style="width:100%; padding:4px; margin:2px 0; background:#0f1828; color:#e0e8f0; border:1px solid #4a5f8f; border-radius:2px;"><option value="">From...</option>';
+
+  campaign.scenarios.forEach(function(node) {
+    html += '<option value="' + node.id + '">' + node.name + '</option>';
+  });
+
+  html += '</select>' +
+    '<select id="campaign-link-to" style="width:100%; padding:4px; margin:2px 0; background:#0f1828; color:#e0e8f0; border:1px solid #4a5f8f; border-radius:2px;"><option value="">To...</option>';
+
+  campaign.scenarios.forEach(function(node) {
+    html += '<option value="' + node.id + '">' + node.name + '</option>';
+  });
+
+  html += '</select>' +
+    '<button id="campaign-link" style="width:100%; padding:6px; margin-top:4px; background:#1a2d4d; color:#e0e8f0; border:1px solid #4a5f8f; border-radius:2px; cursor:pointer;">🔗 Link Scenarios</button>' +
+    '<button id="campaign-unlink" style="width:100%; padding:6px; margin-top:4px; background:#2b1a2d; color:#e0e8f0; border:1px solid #7b4a8f; border-radius:2px; cursor:pointer;">✂️ Remove Link</button>' +
+    '<label style="display:block; font-size:10px; color:#8899cc; margin:8px 0 4px 0;">Start Scenario</label>' +
+    '<select id="campaign-start" style="width:100%; padding:4px; background:#0f1828; color:#e0e8f0; border:1px solid #4a5f8f; border-radius:2px;">' +
+    '<option value="">-- Auto --</option>';
+
+  campaign.scenarios.forEach(function(node) {
+    html += '<option value="' + node.id + '" ' + (campaign.startScenarioId === node.id ? 'selected' : '') + '>' + node.name + '</option>';
+  });
+
+  html += '</select>' +
+    '<button id="campaign-set-start" style="width:100%; padding:6px; margin-top:4px; background:#1a2d4d; color:#e0e8f0; border:1px solid #4a5f8f; border-radius:2px; cursor:pointer;">🏁 Set Start</button>' +
+    '<hr style="border:none; border-top:1px solid #3a4f6f; margin:8px 0;">' +
+    '<label style="display:block; font-size:10px; color:#8899cc; margin:4px 0;">Playback Preview</label>' +
+    '<select id="campaign-preview-from" style="width:100%; padding:4px; background:#0f1828; color:#e0e8f0; border:1px solid #4a5f8f; border-radius:2px;">' +
+    '<option value="">Use start scenario</option>';
+
+  campaign.scenarios.forEach(function(node) {
+    html += '<option value="' + node.id + '">' + node.name + '</option>';
+  });
+
+  html += '</select>' +
+    '<button id="campaign-preview" style="width:100%; padding:6px; margin-top:4px; background:#1a2d4d; color:#e0e8f0; border:1px solid #4a5f8f; border-radius:2px; cursor:pointer;">▶️ Show Next Branches</button>' +
+    '<div id="campaign-preview-output" style="background:#0f1828; border:1px solid #3a4f6f; border-radius:2px; margin-top:4px; padding:6px; font-size:10px; color:#8899cc;">Select a node and preview next scenarios.</div>' +
+    '<hr style="border:none; border-top:1px solid #3a4f6f; margin:8px 0;">' +
+    '<div style="max-height:120px; overflow-y:auto; font-size:10px;">';
+
+  if (campaign.scenarios.length === 0) {
+    html += '<p style="color:#8899cc; margin:0;">No scenarios in campaign yet.</p>';
+  } else {
+    campaign.scenarios.forEach(function(node) {
+      var links = node.nextScenarios.length ? node.nextScenarios.join(', ') : 'None';
+      html += '<div style="background:#0f1828; border:1px solid #3a4f6f; border-radius:2px; padding:4px; margin-bottom:4px;">' +
+        '<strong>' + node.name + '</strong><br>' +
+        'ID: ' + node.id + '<br>' +
+        'Next: ' + links +
+        '</div>';
+    });
+  }
+
+  html += '</div>';
+
   var panel = document.querySelector('.editor-panel:last-child');
-  if (panel) panel.innerHTML = html;
-  
-  this._updateStatus('📜 Campaign support launching soon');
+  if (panel) {
+    panel.innerHTML = html;
+  } else {
+    return;
+  }
+
+  var self = this;
+
+  document.getElementById('campaign-save').addEventListener('click', function() {
+    var name = document.getElementById('campaign-name').value.trim();
+    if (!name) {
+      self._updateStatus('❌ Campaign name is required');
+      return;
+    }
+    campaignMgr.saveCampaign(name);
+    self._updateStatus('💾 Campaign saved: ' + name);
+    self._showCampaignPanel();
+  });
+
+  document.getElementById('campaign-load').addEventListener('click', function() {
+    var selected = document.getElementById('campaign-load-select').value;
+    if (!selected) {
+      self._updateStatus('❌ Select a campaign to load');
+      return;
+    }
+    var loaded = campaignMgr.loadCampaignByName(selected);
+    if (!loaded) {
+      self._updateStatus('❌ Failed to load campaign');
+      return;
+    }
+    self._updateStatus('📂 Campaign loaded: ' + selected);
+    self._showCampaignPanel();
+  });
+
+  document.getElementById('campaign-add-current').addEventListener('click', function() {
+    if (!scenario || !scenario.name) {
+      self._updateStatus('❌ Save or name the current scenario first');
+      return;
+    }
+    var existing = campaign.scenarios.some(function(s) { return s.id === currentId; });
+    if (!existing) {
+      campaign.addScenario(currentId, scenario.name);
+      self._updateStatus('➕ Added scenario to campaign: ' + scenario.name);
+    } else {
+      self._updateStatus('ℹ️ Scenario already linked in campaign');
+    }
+    self._showCampaignPanel();
+  });
+
+  document.getElementById('campaign-link').addEventListener('click', function() {
+    var fromId = document.getElementById('campaign-link-from').value;
+    var toId = document.getElementById('campaign-link-to').value;
+    if (!fromId || !toId) {
+      self._updateStatus('❌ Select both source and destination scenarios');
+      return;
+    }
+    if (fromId === toId) {
+      self._updateStatus('❌ A scenario cannot link to itself');
+      return;
+    }
+    campaign.linkScenarios(fromId, toId);
+    self._updateStatus('🔗 Linked campaign nodes');
+    self._showCampaignPanel();
+  });
+
+  document.getElementById('campaign-unlink').addEventListener('click', function() {
+    var fromId = document.getElementById('campaign-link-from').value;
+    var toId = document.getElementById('campaign-link-to').value;
+    if (!fromId || !toId) {
+      self._updateStatus('❌ Select both source and destination scenarios');
+      return;
+    }
+    var ok = campaign.unlinkScenarios(fromId, toId);
+    self._updateStatus(ok ? '✂️ Link removed' : '⚠️ Link not found');
+    self._showCampaignPanel();
+  });
+
+  document.getElementById('campaign-set-start').addEventListener('click', function() {
+    var startId = document.getElementById('campaign-start').value;
+    campaign.startScenarioId = startId || (campaign.scenarios[0] ? campaign.scenarios[0].id : null);
+    self._updateStatus(campaign.startScenarioId ? '🏁 Campaign start set' : '⚠️ No scenarios in campaign');
+    self._showCampaignPanel();
+  });
+
+  document.getElementById('campaign-preview').addEventListener('click', function() {
+    var selected = document.getElementById('campaign-preview-from').value;
+    var fromId = selected || campaign.startScenarioId;
+    var outputEl = document.getElementById('campaign-preview-output');
+    if (!fromId) {
+      outputEl.textContent = 'Set a start scenario or select one to preview.';
+      return;
+    }
+    var next = campaign.getNextScenarios(fromId);
+    if (!next.length) {
+      outputEl.textContent = 'No branches after this scenario. Campaign would end here.';
+      return;
+    }
+    outputEl.textContent = 'Next branches: ' + next.map(function(n) { return n.name; }).join(', ');
+  });
+
+  this._updateStatus('📜 Campaign panel ready: linking and branching enabled');
 };
 
 /** Configure AI for a specific unit. */

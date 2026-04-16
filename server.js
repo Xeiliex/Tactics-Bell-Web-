@@ -2,6 +2,13 @@
 
 const { join, relative, isAbsolute } = require('path');
 const crypto = require('crypto');
+const fs = require('fs');
+
+const MAX_SAVE_SIZE_BYTES = 512 * 1024;
+const MAX_JSON_BODY_BYTES = 1024 * 1024;
+const SAVE_STORE_DIR = join(__dirname, 'data', 'saves');
+const ROOM_TTL_MS = 5 * 60 * 1000;
+const ROOMS_PER_MINUTE = 10;
 
 // ─── SSO session & cloud-save storage ─────────────────────────────────────────
 
@@ -17,10 +24,82 @@ const sessions = {};
  * Key = Google userId (the `sub` claim from the ID token).
  * Value = Base64-encoded save string (same format as localStorage).
  *
- * NOTE: this is in-process only.  Restarts clear saves.  For production,
- * replace with a persistent store (database, Redis, etc.).
+ * Saves are mirrored to disk under data/saves/ so restarts do not lose progress.
  */
 const cloudSaves = {};
+
+/** Per-client room creation timestamps used for rate limiting. */
+const roomCreateBuckets = {};
+
+function _saveFilePathForUser(userId) {
+  const idHash = crypto.createHash('sha256').update(String(userId)).digest('hex');
+  return join(SAVE_STORE_DIR, idHash + '.json');
+}
+
+function _ensureSaveDir() {
+  if (!fs.existsSync(SAVE_STORE_DIR)) fs.mkdirSync(SAVE_STORE_DIR, { recursive: true });
+}
+
+function _persistCloudSave(userId, saveBlob) {
+  try {
+    _ensureSaveDir();
+    fs.writeFileSync(
+      _saveFilePathForUser(userId),
+      JSON.stringify({ userId: String(userId), save: saveBlob }),
+      'utf8'
+    );
+  } catch (err) {
+    console.error('Failed to persist cloud save:', err && err.message ? err.message : err);
+  }
+}
+
+function _loadCloudSaves() {
+  try {
+    _ensureSaveDir();
+    const files = fs.readdirSync(SAVE_STORE_DIR);
+    files.forEach(function (name) {
+      if (!name.endsWith('.json')) return;
+      try {
+        const raw = fs.readFileSync(join(SAVE_STORE_DIR, name), 'utf8');
+        const data = JSON.parse(raw);
+        if (!data || typeof data.userId !== 'string' || typeof data.save !== 'string') return;
+        cloudSaves[data.userId] = data.save;
+      } catch (_) {
+        // Ignore malformed save files so one bad file doesn't block startup.
+      }
+    });
+  } catch (err) {
+    console.error('Failed to load cloud saves:', err && err.message ? err.message : err);
+  }
+}
+
+function _clientKeyForSocket(ws) {
+  if (ws && ws._clientIp) return String(ws._clientIp);
+  if (ws && ws.data && ws.data.ip) return String(ws.data.ip);
+  return 'unknown';
+}
+
+function _canCreateRoom(ws) {
+  const key = _clientKeyForSocket(ws);
+  const now = Date.now();
+  const bucket = roomCreateBuckets[key] || [];
+  const recent = bucket.filter(function (ts) { return now - ts < 60 * 1000; });
+  if (recent.length >= ROOMS_PER_MINUTE) {
+    roomCreateBuckets[key] = recent;
+    return false;
+  }
+  recent.push(now);
+  roomCreateBuckets[key] = recent;
+  return true;
+}
+
+function _extractForwardedIp(forwardedForHeader) {
+  if (!forwardedForHeader) return 'unknown';
+  const first = String(forwardedForHeader).split(',')[0].trim();
+  return first || 'unknown';
+}
+
+_loadCloudSaves();
 
 /** Parse a raw Cookie header into a { key: value } map. */
 function _parseCookies(cookieHeader) {
@@ -169,7 +248,11 @@ async function _handleApiRequest(req, pathname, body) {
     if (!body || typeof body.save !== 'string') {
       return { status: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Invalid save data' }) };
     }
+    if (Buffer.byteLength(body.save, 'utf8') > MAX_SAVE_SIZE_BYTES) {
+      return { status: 413, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Save too large' }) };
+    }
     cloudSaves[session.userId] = body.save;
+    _persistCloudSave(session.userId, body.save);
     return {
       status:  200,
       headers: { 'Content-Type': 'application/json' },
@@ -209,13 +292,17 @@ function _handleWsMessage(ws, rawMsg) {
 
   switch (msg.type) {
     case 'create_room': {
+      if (!_canCreateRoom(ws)) {
+        _wsSend(ws, { type: 'error', message: 'Too many rooms created. Please wait a minute and try again.' });
+        return;
+      }
       let code, attempts = 0;
       do { code = _generateRoomCode(); attempts++; } while (rooms[code] && attempts < 200);
       if (attempts >= 200) {
         _wsSend(ws, { type: 'error', message: 'Server is full — please try again.' });
         return;
       }
-      rooms[code] = { players: [ws, null] };
+      rooms[code] = { players: [ws, null], createdAt: Date.now() };
       ws._roomCode   = code;
       ws._playerIdx  = 0;
       _wsSend(ws, { type: 'room_created', code });
@@ -268,6 +355,27 @@ function _handleWsClose(ws) {
   delete rooms[code];
 }
 
+const roomMaintenanceTimer = setInterval(function () {
+  const now = Date.now();
+
+  Object.keys(rooms).forEach(function (code) {
+    const room = rooms[code];
+    if (!room) return;
+    // Expire unpaired rooms to avoid unbounded room growth.
+    if (!room.players[1] && room.createdAt && (now - room.createdAt > ROOM_TTL_MS)) {
+      delete rooms[code];
+    }
+  });
+
+  Object.keys(roomCreateBuckets).forEach(function (key) {
+    const recent = roomCreateBuckets[key].filter(function (ts) { return now - ts < 60 * 1000; });
+    if (recent.length) roomCreateBuckets[key] = recent;
+    else delete roomCreateBuckets[key];
+  });
+}, 30 * 1000);
+
+if (typeof roomMaintenanceTimer.unref === 'function') roomMaintenanceTimer.unref();
+
 const PORT      = parseInt(process.env.PORT || '8003', 10);
 const publicDir = join(__dirname, 'public');
 
@@ -315,7 +423,7 @@ if (typeof Bun !== 'undefined') {
     port: PORT,
 
     websocket: {
-      open(ws)         { /* nothing on open */ },
+      open(ws)         { ws._clientIp = (ws.data && ws.data.ip) || 'unknown'; },
       message(ws, msg) { _handleWsMessage(ws, msg); },
       close(ws)        { _handleWsClose(ws); },
     },
@@ -326,7 +434,9 @@ if (typeof Bun !== 'undefined') {
 
       // WebSocket upgrade for /ws
       if (pathname === '/ws' && req.headers.get('upgrade') === 'websocket') {
-        const ok = server.upgrade(req);
+        const ok = server.upgrade(req, {
+          data: { ip: _extractForwardedIp(req.headers.get('x-forwarded-for')) },
+        });
         if (ok) return undefined;
         return new Response('WebSocket upgrade failed', { status: 400 });
       }
@@ -335,9 +445,25 @@ if (typeof Bun !== 'undefined') {
       if (pathname.startsWith('/api/')) {
         let body = null;
         if (req.method !== 'GET') {
+          const cl = parseInt(req.headers.get('content-length') || '0', 10);
+          if (Number.isFinite(cl) && cl > MAX_JSON_BODY_BYTES) {
+            return new Response(JSON.stringify({ error: 'Payload too large' }), {
+              status: 413,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
           const ct = req.headers.get('content-type') || '';
           if (ct.includes('application/json')) {
-            try { body = await req.json(); } catch (_) {}
+            try {
+              const raw = await req.text();
+              if (Buffer.byteLength(raw, 'utf8') > MAX_JSON_BODY_BYTES) {
+                return new Response(JSON.stringify({ error: 'Payload too large' }), {
+                  status: 413,
+                  headers: { 'Content-Type': 'application/json' },
+                });
+              }
+              body = JSON.parse(raw);
+            } catch (_) {}
           }
         }
         const result = await _handleApiRequest(req, pathname, body);
@@ -377,7 +503,6 @@ if (typeof Bun !== 'undefined') {
 // ─── Node.js ──────────────────────────────────────────────────────────────────
 } else {
   const http  = require('http');
-  const fs    = require('fs');
   const zlib  = require('zlib');
 
   const server = http.createServer(async (req, res) => {
@@ -389,15 +514,40 @@ if (typeof Bun !== 'undefined') {
       if (pathname.startsWith('/api/')) {
         let body = null;
         if (req.method !== 'GET') {
+          const cl = parseInt(req.headers['content-length'] || '0', 10);
+          if (Number.isFinite(cl) && cl > MAX_JSON_BODY_BYTES) {
+            res.writeHead(413, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Payload too large' }));
+            return;
+          }
           const ct = req.headers['content-type'] || '';
           if (ct.includes('application/json')) {
             body = await new Promise(function (resolve) {
               let raw = '';
-              req.on('data', function (chunk) { raw += chunk; });
+              let bytes = 0;
+              let tooLarge = false;
+              req.on('data', function (chunk) {
+                if (tooLarge) return;
+                bytes += chunk.length;
+                if (bytes > MAX_JSON_BODY_BYTES) {
+                  tooLarge = true;
+                  return;
+                }
+                raw += chunk;
+              });
               req.on('end',  function () {
+                if (tooLarge) {
+                  resolve('__payload_too_large__');
+                  return;
+                }
                 try { resolve(JSON.parse(raw)); } catch (_) { resolve(null); }
               });
             });
+            if (body === '__payload_too_large__') {
+              res.writeHead(413, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Payload too large' }));
+              return;
+            }
           }
         }
         const result = await _handleApiRequest(req, pathname, body);
@@ -471,7 +621,9 @@ if (typeof Bun !== 'undefined') {
   // Attach WebSocket server to the existing HTTP server using the `ws` package.
   const WebSocket = require('ws');
   const wss = new WebSocket.Server({ server, path: '/ws' });
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
+    const forwarded = req && req.headers ? req.headers['x-forwarded-for'] : null;
+    ws._clientIp = _extractForwardedIp(forwarded) || (req && req.socket ? req.socket.remoteAddress : 'unknown');
     ws.on('message', (raw) => _handleWsMessage(ws, raw.toString()));
     ws.on('close',   ()    => _handleWsClose(ws));
     ws.on('error',   ()    => { /* swallow errors on individual sockets */ });

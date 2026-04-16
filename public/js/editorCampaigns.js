@@ -141,11 +141,11 @@ CampaignSequence.fromJSON = function(json) {
   campaign.startScenarioId = json.startScenarioId;
   campaign.metadata = json.metadata || {};
   
-  campaign.scenarios = (json.scenarios || []).map(function(sData) {
+  campaign.scenarios = (json.scenarios || []).map(function(sData, idx) {
     return {
       id: sData.id,
       name: sData.name,
-      index: campaign.scenarios.length,
+      index: idx,
       nextScenarios: sData.nextScenarios || [],
       position: sData.position || { x: 0, y: 0 }
     };
@@ -161,6 +161,8 @@ CampaignSequence.fromJSON = function(json) {
 function CampaignManager() {
   this.currentCampaign = null;
 }
+
+CampaignManager.STORAGE_PREFIX = 'campaign_';
 
 /** Create a new campaign. */
 CampaignManager.prototype.createCampaign = function(name) {
@@ -181,4 +183,50 @@ CampaignManager.prototype.loadCampaign = function(campaign) {
 /** Get current campaign. */
 CampaignManager.prototype.getCampaign = function() {
   return this.currentCampaign;
+};
+
+/** Save current campaign to localStorage. */
+CampaignManager.prototype.saveCampaign = function(name) {
+  if (!this.currentCampaign) return null;
+
+  if (name && typeof name === 'string' && name.trim()) {
+    this.currentCampaign.name = name.trim();
+  }
+
+  this.currentCampaign.metadata = this.currentCampaign.metadata || {};
+  this.currentCampaign.metadata.updatedAt = new Date().toISOString();
+
+  var key = CampaignManager.STORAGE_PREFIX + this.currentCampaign.name;
+  localStorage.setItem(key, JSON.stringify(this.currentCampaign.toJSON()));
+  console.log('💾 [CampaignManager] Saved campaign:', this.currentCampaign.name);
+  return this.currentCampaign.name;
+};
+
+/** Load campaign by storage name. */
+CampaignManager.prototype.loadCampaignByName = function(name) {
+  var key = CampaignManager.STORAGE_PREFIX + name;
+  var raw = localStorage.getItem(key);
+  if (!raw) return null;
+
+  var json = JSON.parse(raw);
+  var campaign = CampaignSequence.fromJSON(json);
+  return this.loadCampaign(campaign);
+};
+
+/** List all saved campaign names from localStorage. */
+CampaignManager.prototype.listCampaignNames = function() {
+  var names = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var key = localStorage.key(i);
+    if (key && key.indexOf(CampaignManager.STORAGE_PREFIX) === 0) {
+      names.push(key.slice(CampaignManager.STORAGE_PREFIX.length));
+    }
+  }
+  names.sort();
+  return names;
+};
+
+/** Remove a saved campaign by name. */
+CampaignManager.prototype.deleteCampaign = function(name) {
+  localStorage.removeItem(CampaignManager.STORAGE_PREFIX + name);
 };

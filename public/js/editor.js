@@ -545,6 +545,9 @@ ScenarioEditor.prototype.saveScenario = function(name) {
   this._scenario.objectives = this._objectiveManager.toJSON();
   this._scenario.props = this._propManager.toJSON();
   this._scenario.aiConfigs = this._aiManager.toJSON();
+  this._scenario.campaign = this._campaignManager.getCampaign()
+    ? this._campaignManager.getCampaign().toJSON()
+    : null;
   
   var json = JSON.stringify(this._scenario);
   localStorage.setItem('scenario_' + this._scenario.name, json);
@@ -567,6 +570,11 @@ ScenarioEditor.prototype.loadScenario = function(name) {
   this._objectiveManager.fromJSON(this._scenario.objectives || []);
   this._propManager.fromJSON(this._scenario.props || []);
   this._aiManager.fromJSON(this._scenario.aiConfigs || {});
+  if (this._scenario.campaign) {
+    this._campaignManager.loadCampaign(CampaignSequence.fromJSON(this._scenario.campaign));
+  } else {
+    this._campaignManager.currentCampaign = null;
+  }
   
   console.log('📂 [EDITOR] Loaded scenario:', name);
   this.render();
@@ -575,6 +583,13 @@ ScenarioEditor.prototype.loadScenario = function(name) {
 
 /** Get scenario as JSON. */
 ScenarioEditor.prototype.getScenarioJSON = function() {
+  if (!this._scenario) return '{}';
+  this._scenario.objectives = this._objectiveManager.toJSON();
+  this._scenario.props = this._propManager.toJSON();
+  this._scenario.aiConfigs = this._aiManager.toJSON();
+  this._scenario.campaign = this._campaignManager.getCampaign()
+    ? this._campaignManager.getCampaign().toJSON()
+    : null;
   return JSON.stringify(this._scenario, null, 2);
 };
 
