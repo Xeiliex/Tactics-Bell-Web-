@@ -5,6 +5,9 @@
 //  COMBAT SYSTEM
 // ═══════════════════════════════════════
 
+/** Cardinal direction offsets reused by _isAdjacentToMountain. */
+var _CARDINAL_DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
 var COMBAT_STATE = {
   IDLE:          'IDLE',
   PLAYER_SELECT: 'PLAYER_SELECT',
@@ -81,6 +84,8 @@ Combat.prototype.currentUnit = function () {
 // ─── Start ───────────────────────────────────────────────────────────────────
 
 Combat.prototype.start = function () {
+  // Reset encounter-skill usage for every unit at the start of each battle.
+  this.units.forEach(function (u) { u.usedEncounterSkills = {}; });
   this.buildTurnOrder();
   this.state = COMBAT_STATE.PLAYER_SELECT;
   this.ui.updateTurnOrder(this.turnOrder, this.currentUnit());
@@ -435,6 +440,11 @@ Combat.prototype.doAttack = function (attacker, target, skill, preCalcResult) {
   var skillType = skill ? skill.type : 'physical';
   var skillId   = skill ? skill.id   : '';
 
+  // Mark encounter skill as used for this battle.
+  if (skill && skill.encounter) {
+    attacker.usedEncounterSkills[skill.id] = true;
+  }
+
   // Notify multiplayer listener (only when we are the attacker, i.e. no preCalcResult).
   if (this.onActionTaken && !preCalcResult) {
     this.onActionTaken({
@@ -458,10 +468,11 @@ Combat.prototype.doAttack = function (attacker, target, skill, preCalcResult) {
     } else {
       var dealt = target.takeDamage(result.damage);
       var critLabel = result.crit ? ' ✦CRITICAL✦' : '';
+      var triLabel  = self._triLabel(result.triMult);
       var color = result.crit ? '#FFD700' : (skillType === 'magic' ? '#BB86FC' : '#FF6B9D');
       self.ui.showFloatingNumber(target, (result.crit ? '★' : '-') + dealt, color);
       self.ui.showMessage(attacker.name + ' used ' + (skill ? skill.name : 'Attack') +
-        critLabel + ' → ' + target.name + ' took ' + dealt + ' damage!' +
+        critLabel + triLabel + ' → ' + target.name + ' took ' + dealt + ' damage!' +
         ' (d20: ' + result.roll + ')');
 
       // ── Status effects ──────────────────────────────────────────────────
@@ -489,6 +500,42 @@ Combat.prototype.doAttack = function (attacker, target, skill, preCalcResult) {
     attacker.hasActed = true;
 
     if (self.checkEndConditions()) return;
+
+    // ── Mountain counter-attack (Attacks of Opportunity) ─────────────────
+    // If the target survived, is adjacent to mountain terrain, and the
+    // attacker is alive and in the target's attack range, there is a 40%
+    // chance the target fires back with a free counter-attack.
+    if (!result.miss && skillType !== 'heal' &&
+        target.isAlive() && attacker.isAlive() &&
+        self._isAdjacentToMountain(target)) {
+      var counterDist = Math.abs(target.gridRow - attacker.gridRow) +
+                        Math.abs(target.gridCol - attacker.gridCol);
+      if (counterDist <= target.attackRange && Math.random() < 0.40) {
+        self.ui.showMessage('⛰️ ' + target.name + ' seizes the high ground and counters!');
+        var counterResult = self.calcDamage(target, attacker, null);
+        self.scene.playAttackAnimation(target, attacker, 'physical', '', function () {
+          if (counterResult.miss) {
+            self.ui.showFloatingNumber(attacker, 'MISS', '#aaaaaa');
+          } else {
+            var cDealt = attacker.takeDamage(counterResult.damage);
+            self.ui.showFloatingNumber(attacker, '-' + cDealt, '#ff4444');
+            self.ui.showMessage(target.name + '\'s counter hit ' + attacker.name +
+              ' for ' + cDealt + ' damage!');
+            if (!attacker.isAlive()) {
+              self.scene.removeUnit(attacker);
+              var aTile = self.grid.getTile(attacker.gridRow, attacker.gridCol);
+              if (aTile) aTile.unit = null;
+              self.ui.showMessage(attacker.name + ' was defeated by the counter-attack!');
+            }
+          }
+          self.ui.updateUnitPanel(attacker);
+          if (self.checkEndConditions()) return;
+          self.nextUnit();
+        });
+        return; // skip the nextUnit() call below — counter-attack callback handles it
+      }
+    }
+
     self.nextUnit();
   });
 };
@@ -503,14 +550,18 @@ Combat.prototype.doAttack = function (attacker, target, skill, preCalcResult) {
 //
 // Heal skills bypass the hit roll and always restore HP.
 //
-// Returns { damage, roll, crit, miss } so callers can show flavour text.
+// Weapon Triangle modifier is applied when the attacker's skill has a
+// `category` field ('physical'/'arcane'/'holy') and the defender's class has
+// a matching `weaponCategory`.  Advantage ×1.25, disadvantage ×0.75.
+//
+// Returns { damage, roll, crit, miss, triMult } so callers can show flavour text.
 
 Combat.prototype.calcDamage = function (attacker, target, skill) {
   var skillPower = skill ? skill.power : 1.0;
   var skillType  = skill ? skill.type  : 'physical';
 
   if (skillType === 'heal') {
-    return { damage: Math.round(attacker.mag * skillPower), roll: 0, crit: false, miss: false };
+    return { damage: Math.round(attacker.mag * skillPower), roll: 0, crit: false, miss: false, triMult: 1.0 };
   }
 
   var offensive = (skillType === 'magic') ? attacker.mag : attacker.atk;
@@ -520,6 +571,17 @@ Combat.prototype.calcDamage = function (attacker, target, skill) {
   var tile = this.grid.getTile(target.gridRow, target.gridCol);
   if (tile) {
     defensive += (skillType === 'magic') ? tile.terrain.resBonus : tile.terrain.defBonus;
+  }
+
+  // ── Weapon Triangle ───────────────────────────────────────────────────────
+  // skill.category (attacker) vs CLASSES[target.classId].weaponCategory
+  var triMult = 1.0;
+  var atkCat  = skill ? skill.category : null;
+  var defCat  = (typeof CLASSES !== 'undefined' && CLASSES[target.classId])
+    ? CLASSES[target.classId].weaponCategory
+    : null;
+  if (atkCat && defCat && typeof WEAPON_TRIANGLE !== 'undefined' && WEAPON_TRIANGLE[atkCat]) {
+    triMult = WEAPON_TRIANGLE[atkCat][defCat] || 1.0;
   }
 
   // d20 roll (1–20) modified by weather visibility penalty
@@ -536,15 +598,16 @@ Combat.prototype.calcDamage = function (attacker, target, skill) {
   var miss = (roll === 1) || (!crit && (roll + atkBonus + this.weather.hitMod < dc));
 
   if (miss && !crit) {
-    return { damage: 0, roll: roll, crit: false, miss: true };
+    return { damage: 0, roll: roll, crit: false, miss: true, triMult: triMult };
   }
 
   var raw = offensive * skillPower - defensive * 0.5;
   raw = Math.max(1, Math.round(raw + (Math.random() * 3 - 1)));
+  raw = Math.max(1, Math.round(raw * triMult));
 
   if (crit) { raw = Math.ceil(raw * 1.5); }
 
-  return { damage: raw, roll: roll, crit: crit, miss: false };
+  return { damage: raw, roll: roll, crit: crit, miss: false, triMult: triMult };
 };
 
 // ─── AI (ally turns) ─────────────────────────────────────────────────────────
@@ -691,9 +754,10 @@ Combat.prototype.doEnemyAttack = function (attacker, target, skill) {
     } else {
       var dealt = target.takeDamage(result.damage);
       var critLabel = result.crit ? ' ✦CRIT✦ ' : '';
+      var triLabel  = self._triLabel(result.triMult);
       self.ui.showFloatingNumber(target, (result.crit ? '★' : '-') + dealt,
         result.crit ? '#FFD700' : '#ff4444');
-      self.ui.showMessage(attacker.name + critLabel + ' attacked ' + target.name +
+      self.ui.showMessage(attacker.name + critLabel + triLabel + ' attacked ' + target.name +
         ' for ' + dealt + ' damage! (d20: ' + result.roll + ')');
 
       // Enemies can also apply Burn via fireball
@@ -711,6 +775,38 @@ Combat.prototype.doEnemyAttack = function (attacker, target, skill) {
     }
 
     if (self.checkEndConditions()) return;
+
+    // ── Mountain counter-attack (Attacks of Opportunity) ─────────────────
+    if (!result.miss && skillType !== 'heal' &&
+        target.isAlive() && attacker.isAlive() &&
+        self._isAdjacentToMountain(target)) {
+      var counterDist = Math.abs(target.gridRow - attacker.gridRow) +
+                        Math.abs(target.gridCol - attacker.gridCol);
+      if (counterDist <= target.attackRange && Math.random() < 0.40) {
+        self.ui.showMessage('⛰️ ' + target.name + ' seizes the high ground and counters!');
+        var counterResult = self.calcDamage(target, attacker, null);
+        self.scene.playAttackAnimation(target, attacker, 'physical', '', function () {
+          if (counterResult.miss) {
+            self.ui.showFloatingNumber(attacker, 'MISS', '#aaaaaa');
+          } else {
+            var cDealt = attacker.takeDamage(counterResult.damage);
+            self.ui.showFloatingNumber(attacker, '-' + cDealt, '#ff4444');
+            self.ui.showMessage(target.name + '\'s counter hit ' + attacker.name +
+              ' for ' + cDealt + ' damage!');
+            if (!attacker.isAlive()) {
+              self.scene.removeUnit(attacker);
+              var aTile = self.grid.getTile(attacker.gridRow, attacker.gridCol);
+              if (aTile) aTile.unit = null;
+            }
+          }
+          self.ui.updateUnitPanel(attacker);
+          if (self.checkEndConditions()) return;
+          self.nextUnit();
+        });
+        return;
+      }
+    }
+
     self.nextUnit();
   });
 };
@@ -721,6 +817,28 @@ Combat.prototype.unitAt = function (row, col) {
   return this.units.find(function (u) {
     return u.isAlive() && u.gridRow === row && u.gridCol === col;
   }) || null;
+};
+
+/**
+ * Returns true if any of the four cardinal neighbours of the unit's tile is
+ * a Mountain terrain tile (mountain tiles are impassable, so units stand
+ * adjacent to them, not on them).
+ */
+Combat.prototype._isAdjacentToMountain = function (unit) {
+  for (var i = 0; i < _CARDINAL_DIRS.length; i++) {
+    var t = this.grid.getTile(unit.gridRow + _CARDINAL_DIRS[i][0], unit.gridCol + _CARDINAL_DIRS[i][1]);
+    if (t && t.terrain.name === 'Mountain') return true;
+  }
+  return false;
+};
+
+/**
+ * Returns a short label for the weapon-triangle multiplier shown in combat
+ * messages (e.g. ' ▲WTA' for advantage, ' ▽WTD' for disadvantage).
+ */
+Combat.prototype._triLabel = function (triMult) {
+  if (!triMult || triMult === 1.0) return '';
+  return triMult > 1.0 ? ' ▲WTA' : ' ▽WTD';
 };
 
 // ─── Multiplayer helpers ──────────────────────────────────────────────────────
